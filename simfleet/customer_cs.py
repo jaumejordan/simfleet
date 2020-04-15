@@ -12,7 +12,7 @@ from spade.template import Template
 
 from simfleet.helpers import random_position, distance_in_meters, kmh_to_ms, PathRequestException, AlreadyInDestination
 from simfleet.protocol import TRAVEL_PROTOCOL, QUERY_PROTOCOL, REQUEST_PERFORMATIVE, REQUEST_PROTOCOL, \
-    REFUSE_PERFORMATIVE
+    REFUSE_PERFORMATIVE, CANCEL_PERFORMATIVE, PROPOSE_PERFORMATIVE
 from simfleet.utils import CUSTOMER_WAITING, CUSTOMER_IN_DEST, CUSTOMER_IN_TRANSPORT, \
     TRANSPORT_IN_CUSTOMER_PLACE, CUSTOMER_LOCATION, StrategyBehaviour, request_path, chunk_path
 
@@ -22,7 +22,7 @@ ONESECOND_IN_MS = 1000
 class CustomerAgent(Agent):
     """
     Defines the Customer Agent's attributes.
-    Contains basic methods for agent setup and configuration
+    Contains basic methods for agent setup and configuration.
     """
 
     def __init__(self, agentjid, password):
@@ -48,6 +48,8 @@ class CustomerAgent(Agent):
         self.is_launched = False
 
         # Attributes for movement
+        self.set("current_transport", None)
+        self.current_transport_pos = None
         self.set("current_pos", None)
         self.dest = None
         self.set("path", None)
@@ -320,6 +322,28 @@ class CustomerAgent(Agent):
             "icon": self.icon
         }
 
+    async def cancel_transport(self, data=None):
+        """
+        Sends a message to the current booked transport to cancel the assignment.
+
+        Args:
+            data (dict, optional): Complementary info about the cancellation
+        """
+        # TRIGGERED WHEN EXCEPTION TRYING TO MOVE TO TRANSPORTS DESTINATION
+        # COPIED AND MODIFIED FROM transport.py, MIGHT NEED FURTHER MODIFICATION
+        logger.error("Customer {} could not get a path to transport {}.".format(self.agent_id,
+                                                                                self.get("current_transport")))
+        if data is None:
+            data = {}
+        reply = Message()
+        reply.to = self.get("current_transport")
+        reply.set_metadata("protocol", REQUEST_PROTOCOL)
+        reply.set_metadata("performative", CANCEL_PERFORMATIVE)
+        reply.body = json.dumps(data)
+        logger.debug("Customer {} sent cancel proposal to transport {}".format(self.agent_id,
+                                                                               self.get("current_transport")))
+        await self.send(reply)
+
     async def arrived_to_transport(self):
         """
         Informs that the customer has arrived to its booked transport position.
@@ -481,7 +505,7 @@ class CustomerStrategyBehaviour(StrategyBehaviour):
         """
         Checks its available_transports list and pops the closest one.
         Sends a ``spade.message.Mesade`` to the closes transport request a booking.
-        It uses the REQUEST_PROTOCOL and the REQUEST_PERFORMATIVE.
+        It uses the REQUEST_PROTOCOL and the PROPOSE_PERFORMATIVE.
         If no content is set a default content with the customer_id,
         origin and target coordinates is used.
 
@@ -490,7 +514,30 @@ class CustomerStrategyBehaviour(StrategyBehaviour):
         """
         # TODO
 
-    async def refuse_transport(self, transport_id):
+
+
+    async def send_proposal(self, transport_id, content=None):
+        """
+        Send a ``spade.message.Message`` with a proposal to a customer to pick up him.
+        If the content is empty the proposal is sent without content.
+
+        Args:
+            transport_id (str): the id of the customer
+            content (dict, optional): the optional content of the message
+        """
+        # COPIED FROM transport.py, CHECK IF NEEDS MODIFICATION
+        if content is None:
+            content = {}
+            # TODO add destination coordinates to inform the transport agent
+        logger.info("Customer {} sent booking to transport {}".format(self.agent.name, transport_id))
+        reply = Message()
+        reply.to = transport_id
+        reply.set_metadata("protocol", REQUEST_PROTOCOL)
+        reply.set_metadata("performative", PROPOSE_PERFORMATIVE)
+        reply.body = json.dumps(content)
+        await self.send(reply)
+
+    async def cancel_proposal(self, transport_id, content=None):
         """
         Sends an ``spade.message.Message`` to a transport to cancel its booking.
         It uses the REQUEST_PROTOCOL and the REFUSE_PERFORMATIVE.
@@ -498,21 +545,17 @@ class CustomerStrategyBehaviour(StrategyBehaviour):
         Args:
             transport_id (str): The Agent JID of the transport
         """
-        # CHECK IF NEEDS MODIFICATION
+        # COPIED FROM transport.py, CHECK IF NEEDS MODIFICATION
+        if content is None:
+            content = {}
+        logger.info("Customer {} sent cancel booking to transport {}".format(self.agent.name, transport_id))
         reply = Message()
-        reply.to = str(transport_id)
+        reply.to = transport_id
         reply.set_metadata("protocol", REQUEST_PROTOCOL)
-        reply.set_metadata("performative", REFUSE_PERFORMATIVE)
-        content = {
-            "customer_id": str(self.agent.jid),
-            "origin": self.agent.current_pos,
-            "dest": self.agent.dest
-        }
+        reply.set_metadata("performative", CANCEL_PERFORMATIVE)
         reply.body = json.dumps(content)
-
         await self.send(reply)
-        logger.info("Customer {} cancelled booking of transport {}".format(self.agent.name,
-                                                                           transport_id))
+
 
     async def inform_transport(self, content=None):
         """
@@ -525,6 +568,8 @@ class CustomerStrategyBehaviour(StrategyBehaviour):
         Args:
             content (dict): Optional content dictionary
         """
+        # NOT SURE IF THIS WILL BE PERFORMED INSIDE arrived_to_transport OR HERE
+        # DON'T IMPLEMENT BY NOW
         # TODO
 
     async def run(self):
