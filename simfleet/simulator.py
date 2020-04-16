@@ -14,12 +14,12 @@ from spade.agent import Agent
 from spade.behaviour import TimeoutBehaviour
 from tabulate import tabulate
 
-from .customer import CustomerAgent
+from .customer_cs import CustomerAgent
 from .directory import DirectoryAgent
 from .fleetmanager import FleetManagerAgent
 from .route import RouteAgent
 from .station import StationAgent
-from .transport import TransportAgent
+from .transport_cs import TransportAgent
 from .utils import load_class, status_to_str, avg, request_path as async_request_path
 
 faker_factory = faker.Factory.create()
@@ -988,7 +988,8 @@ class SimulatorAgent(Agent):
         agent.set_route_agent(self.route_id)
         agent.set_directory(self.get_directory().jid)
 
-        agent.set_position(position)
+        # agent.set_position(position)  # NEW FOR CARSHARING (set_initial_position)
+        agent.set_initial_position(position)
 
         agent.set_target_position(target)
 

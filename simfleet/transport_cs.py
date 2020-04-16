@@ -64,6 +64,11 @@ class TransportAgent(Agent):
         self.directory_id = None
         self.fleet_type = None
 
+        # waiting time statistics
+        self.waiting_in_queue_time = None
+        self.charge_time = None
+        self.total_waiting_time = None
+
         # ATRIBUTES FOR EVENT AND CALLBACK MANAGEMENT
         # Customer in transport event. Triggered when the customer
         # is not in the transport anymore.

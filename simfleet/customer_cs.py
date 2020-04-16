@@ -27,6 +27,7 @@ class CustomerAgent(Agent):
 
     def __init__(self, agentjid, password):
         super().__init__(agentjid, password)
+        self.__observers = defaultdict(list)
         self.agent_id = None
         self.strategy = None
         self.icon = None
@@ -64,7 +65,7 @@ class CustomerAgent(Agent):
         self.type_service = "taxi"
 
         # ATRIBUTES FOR EVENT AND CALLBACK MANAGEMENT
-        self.__observers = defaultdict(list)
+        # self.__observers = defaultdict(list)
         # Customer arrived to transport event. Triggers when the customer stops its
         # MovingBehavior because it has arrived to the booked transport's position
         self.set("arrived_to_transport", None)
@@ -172,8 +173,18 @@ class CustomerAgent(Agent):
         """
         self.directory_id = directory_id
 
-    def set_initial_position(self, coords):
-        self.set("current_pos", coords)
+    def set_initial_position(self, coords=None):
+        """
+                Sets the position of the customer. If no position is provided it is located in a random position.
+
+                Args:
+                    coords (list): a list coordinates (longitude and latitude)
+                """
+        if coords:
+            self.current_pos = coords
+        else:
+            self.current_pos = random_position()
+        logger.debug("Customer {} position is {}".format(self.agent_id, self.current_pos))
 
     async def set_position(self, coords=None):
         """
@@ -187,10 +198,6 @@ class CustomerAgent(Agent):
             self.set("current_pos", coords)
         else:
             self.set("current_pos", random_position())
-
-        logger.debug("Transport {} position is {}".format(self.agent_id, self.get("current_pos")))
-        if self.status == TRANSPORT_MOVING_TO_DESTINATION:
-            await self.inform_customer(CUSTOMER_LOCATION, {"location": self.get("current_pos")})
         if self.is_in_destination():
             logger.info("Customer {} has arrived to destination. Status: {}".format(self.agent_id, self.status))
             await self.arrived_to_transport()
@@ -500,6 +507,19 @@ class CustomerStrategyBehaviour(StrategyBehaviour):
             content (dict): Optional content dictionary
         """
         # TODO
+        if content is None or len(content) == 0:
+            content = {"customer_id": self.agent.jid}
+        if self.agent.fleetmanagers is not None:
+            for fleetmanager in self.agent.fleetmanagers.keys():
+                msg = Message()
+                msg.to = str(fleetmanager)
+                msg.set_metadata("protocol", QUERY_PROTOCOL)
+                msg.set_metadata("performative", REQUEST_PERFORMATIVE)
+                msg.body = json.dumps(content)
+                await self.send(msg)
+            logger.info("Customer {} asked for a available transports to {}.".format(self.agent.name, fleetmanager))
+        else:
+            logger.warning("Customer {} has no fleet managers.".format(self.agent.name))
 
     async def send_booking_request(self, content=None):
         """
