@@ -591,6 +591,8 @@ class CustomerStrategyBehaviour(StrategyBehaviour):
         # NOT SURE IF THIS WILL BE PERFORMED INSIDE arrived_to_transport OR HERE
         # DON'T IMPLEMENT BY NOW
         # TODO
+        # ++++++++++++ IMPORTANT: SEND AS "dest": THE COORDINATES OF MY CURRENT POSITION
+        # ++++++++++++ WHICH IS ALSO THE TRANSPORT'S POSITION
 
     async def run(self):
         raise NotImplementedError

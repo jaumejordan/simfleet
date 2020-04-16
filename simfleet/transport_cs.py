@@ -703,11 +703,12 @@ class TransportStrategyBehaviour(StrategyBehaviour):
         logger.info("Transport {} refused booking from customer {}".format(self.agent.name,
                                                                            customer_id))
 
-    async def deasign_customer(self, customer_id):
+    async def deasign_customer(self):
         """
         Triggered when, by any reason, a customer cancels their already accepted booking
         """
         # TODO delete saved values (destination, etc.) belonging to booked customer
+        #
 
     async def run(self):
         raise NotImplementedError
