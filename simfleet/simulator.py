@@ -21,6 +21,7 @@ from .route import RouteAgent
 from .station import StationAgent
 from .transport_cs import TransportAgent
 from .utils import load_class, status_to_str, avg, request_path as async_request_path
+from simfleet.strategies_fsm_cs import SendAvailableTransportsBehaviour, FSMCustomerStrategyBehaviour, FSMTransportStrategyBehaviour
 
 faker_factory = faker.Factory.create()
 

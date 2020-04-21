@@ -3,15 +3,14 @@ import json
 from loguru import logger
 from spade.behaviour import State, FSMBehaviour
 from spade.message import Message
+
 from simfleet.customer_cs import CustomerStrategyBehaviour
 from simfleet.fleetmanager import FleetManagerStrategyBehaviour
 from simfleet.helpers import PathRequestException, distance_in_meters
-from simfleet.protocol import REQUEST_PERFORMATIVE, ACCEPT_PERFORMATIVE, REFUSE_PERFORMATIVE, REQUEST_PROTOCOL, \
-    INFORM_PERFORMATIVE, CANCEL_PERFORMATIVE, PROPOSE_PERFORMATIVE, QUERY_PROTOCOL
+from simfleet.protocol import REQUEST_PERFORMATIVE, ACCEPT_PERFORMATIVE, REFUSE_PERFORMATIVE, INFORM_PERFORMATIVE, \
+    CANCEL_PERFORMATIVE, QUERY_PROTOCOL, PROPOSE_PERFORMATIVE
 from simfleet.transport_cs import TransportStrategyBehaviour
-from simfleet.utils import TRANSPORT_WAITING, TRANSPORT_WAITING_FOR_APPROVAL, TRANSPORT_MOVING_TO_CUSTOMER, \
-    TRANSPORT_NEEDS_CHARGING, TRANSPORT_MOVING_TO_STATION, TRANSPORT_IN_STATION_PLACE, TRANSPORT_CHARGING, \
-    TRANSPORT_CHARGED, CUSTOMER_WAITING, CUSTOMER_ASSIGNED, TRANSPORT_BOOKED, TRANSPORT_MOVING_TO_DESTINATION, \
+from simfleet.utils import TRANSPORT_WAITING, CUSTOMER_WAITING, TRANSPORT_BOOKED, TRANSPORT_MOVING_TO_DESTINATION, \
     CUSTOMER_WAITING_FOR_APPROVAL, CUSTOMER_MOVING_TO_TRANSPORT, CUSTOMER_IN_TRANSPORT, CUSTOMER_IN_DEST
 
 
@@ -30,26 +29,27 @@ class SendAvailableTransportsBehaviour(FleetManagerStrategyBehaviour):
             await self.send_registration()
 
         msg = await self.receive(timeout=5)
-        logger.debug("Manager received message: {}".format(msg))
         if msg:
-            protocol = msg.get_metadata("protocol")
-            if protocol == QUERY_PROTOCOL:
-                performative = msg.get_metadata("performative")
-                if performative == REQUEST_PERFORMATIVE:
-                    body = json.loads(msg.body)
-                    reply = Message()
-                    # get list of available transport agents
-                    available_transports = [(t, t.get("current_pos")) for t in self.get_transport_agents() if
-                                            t.status == TRANSPORT_WAITING]
-                    # add list to content
-                    content = {"transports": available_transports}
-                    reply.to(body["customer_id"])
-                    reply.set_metadata("protocol", QUERY_PROTOCOL)
-                    reply.set_metadata("performative", REQUEST_PERFORMATIVE)
-                    reply.body = content
-                    # reply to sender (through send() or a custom method)
-                    await self.send(reply)
-                    logger.debug("Fleet manager sent list of transports to customer {}".format(body["customer_id"]))
+            logger.info("Manager received message: {}".format(msg))
+            # protocol = msg.get_metadata("protocol")
+            # if protocol == QUERY_PROTOCOL:
+            #     performative = msg.get_metadata("performative")
+            #     if performative == REQUEST_PERFORMATIVE:
+            body = json.loads(msg.body)
+            reply = Message()
+            # get list of available transport agents
+            print(self.get_transport_agents())
+            available_transports = [(t, t.get("current_pos")) for t in self.get_transport_agents() if
+                                    t.status == TRANSPORT_WAITING]
+            # add list to content
+            content = {"transports": available_transports}
+            reply.to(body["customer_id"])
+            reply.set_metadata("protocol", QUERY_PROTOCOL)
+            reply.set_metadata("performative", REQUEST_PERFORMATIVE)
+            reply.body = content
+            # reply to sender (through send() or a custom method)
+            await self.send(reply)
+            logger.debug("Fleet manager sent list of transports to customer {}".format(body["customer_id"]))
 
 
 ################################################################
@@ -62,17 +62,17 @@ class TransportWaitingState(TransportStrategyBehaviour, State):
     async def on_start(self):
         await super().on_start()
         self.agent.status = TRANSPORT_WAITING
-        logger.debug("{} in Transport Waiting State".format(self.agent.jid))
+        logger.error("{} in Transport Waiting State".format(self.agent.jid))
 
     async def run(self):
         msg = await self.receive(timeout=60)
         if not msg:
             self.set_next_state(TRANSPORT_WAITING)
             return
-        logger.debug("Transport {} received: {}".format(self.agent.jid, msg.body))
+        logger.info("Transport {} received: {}".format(self.agent.jid, msg))
         content = json.loads(msg.body)
         performative = msg.get_metadata("performative")
-        if performative == REQUEST_PERFORMATIVE:
+        if performative == PROPOSE_PERFORMATIVE:
             await self.accept_customer(content["customer_id"])
             self.set_next_state(TRANSPORT_BOOKED)
             return
@@ -86,14 +86,14 @@ class TransportBookedState(TransportStrategyBehaviour, State):
     async def on_start(self):
         await super().on_start()
         self.agent.status = TRANSPORT_BOOKED
-        logger.debug("{} in Transport Booked State".format(self.agent.jid))
+        logger.warning("{} in Transport Booked State".format(self.agent.jid))
 
     async def run(self):
         msg = await self.receive(timeout=60)
         if not msg:
             self.set_next_state(TRANSPORT_WAITING)
             return
-        logger.debug("Transport {} received: {}".format(self.agent.jid, msg.body))
+        logger.info("Transport {} received: {}".format(self.agent.jid, msg.body))
         content = json.loads(msg.body)
         performative = msg.get_metadata("performative")
         # We can receive 3 types of messages
@@ -105,7 +105,7 @@ class TransportBookedState(TransportStrategyBehaviour, State):
         # 2) Customer cancels request
         elif performative == CANCEL_PERFORMATIVE:
             if self.agent.get("current_customer") == content["customer_id"]:
-                await self.deasign_customer()
+                await self.deassign_customer()
                 self.set_next_state(TRANSPORT_WAITING)
                 return
         # 3) Customer informs that they are in my position
@@ -180,6 +180,8 @@ class CustomerWaitingState(CustomerStrategyBehaviour, State):
 
     async def on_start(self):
         await super().on_start()
+        self.agent.status = CUSTOMER_WAITING
+        logger.warning("{} in Customer Waiting State".format(self.agent.jid))
 
     async def run(self):
         # Get fleet managers
@@ -202,37 +204,50 @@ class CustomerWaitingState(CustomerStrategyBehaviour, State):
                         return
 
         # Get list of available transports
-        if not self.agent.available_transports:
+        if self.agent.available_transports is None or len(self.agent.available_transports) < 1:
             await self.send_get_transports()
 
             msg = await self.receive(timeout=5)
-            if msg:
+            if not msg:
+                self.set_next_state(TRANSPORT_WAITING)
+                return
+            logger.info("Customer received message: {}".format(msg))
+            try:
                 content = json.loads(msg.body)
-                protocol = msg.get_metadata("protocol")
-                if protocol == QUERY_PROTOCOL:
-                    performative = msg.get_metadata("performative")
-                    if performative == REQUEST_PERFORMATIVE:
-                        self.agent.available_transports = content["transports"]
-                        logger.debug("Customer {} got list of available transports {}".format(self.agent.name,
-                                                                                              self.agent.available_transports))
-                        self.set_next_state(CUSTOMER_WAITING)
-                        return
-                    else:
-                        logger.warning("Customer {} received an unexpected message from {} with content {}"
-                                       .format(self.agent.name, msg.sender, content))
-                        self.set_next_state(CUSTOMER_WAITING)
-                        return
+            except TypeError:
+                content = {}
+            performative = msg.get_metadata("performative")
+            protocol = msg.get_metadata("protocol")
+            if protocol == QUERY_PROTOCOL:
+                if performative == INFORM_PERFORMATIVE:
+                    self.agent.available_transports = content
+                    logger.info("Customer {} got dict of available transports {}".format(self.agent.name,
+                                                                                          self.agent.available_transports))
+                    self.set_next_state(CUSTOMER_WAITING)
+                    return
+                elif performative == CANCEL_PERFORMATIVE:
+                    logger.info("Cancellation of request for stations information.")
+                    self.set_next_state(CUSTOMER_WAITING)
+                    return
+                else:
+                    logger.warning("Customer {} received an unexpected message from {} with content {}"
+                                   .format(self.agent.name, msg.sender, content))
+                    self.set_next_state(CUSTOMER_WAITING)
+                    return
 
         else:  # Send proposal
-            closest_transport = min(self.agent.available_transports,
+            transport_positions = []
+            for key in self.agent.available_transports.keys():
+                dic = self.agent.available_transports.get(key)
+                transport_positions.append((dic['jid'], dic['position']))
+            closest_transport = min(transport_positions,
                                     key=lambda x: distance_in_meters(x[1], self.agent.get_position()))
-            logger.debug("Closest transport: {}".format(closest_transport))
+            logger.info("Closest transport: {}".format(closest_transport))
             transport_id = closest_transport[0]
+            transport_position = closest_transport[1]
             # delete that transport from the available_transports list
-            self.agent.available_transports.remove(closest_transport)
+            del self.agent.available_transports[transport_id]
             # self.agent.available_transports = [x for x in self.agent.available_transports if x[0] != transport_id]
-            # Save temporarily data of closest transport in case it accepts the booking request
-            # TODO
             if closest_transport is not None:
                 await self.send_proposal(transport_id)  # maybe str(transport_id)
                 self.set_next_state(CUSTOMER_WAITING_FOR_APPROVAL)
@@ -248,6 +263,8 @@ class CustomerWaitingForApprovalState(CustomerStrategyBehaviour, State):
     # TODO
     async def on_start(self):
         await super().on_start()
+        self.agent.status = CUSTOMER_WAITING_FOR_APPROVAL
+        logger.warning("{} in Customer Waiting for Approval State".format(self.agent.jid))
 
     async def run(self):
         msg = await self.receive(timeout=60)
@@ -258,25 +275,25 @@ class CustomerWaitingForApprovalState(CustomerStrategyBehaviour, State):
         performative = msg.get_metadata("performative")
         if performative == ACCEPT_PERFORMATIVE:
             try:
-                logger.debug("Customer {} booked transport {}".format(self.agent.name,
+                logger.info("Customer {} booked transport {}".format(self.agent.name,
                                                                       content["transport_id"]))
-                await self.go_to_transport(content["transport_id"], content["origin"], content["dest"])
+                await self.go_to_transport(content["transport_id"], content["position"])
                 self.set_next_state(CUSTOMER_MOVING_TO_TRANSPORT)
                 return
             except PathRequestException:
-                logger.error("Customer {} could not get a path to customer {}. Cancelling..."
+                logger.warning("Customer {} could not get a path to customer {}. Cancelling..."
                              .format(self.agent.name, content["transport_id"]))
                 await self.cancel_proposal(content["transport_id"])
                 self.set_next_state(CUSTOMER_WAITING)
                 return
             except Exception as e:
-                logger.error("Unexpected error in customr {}: {}".format(self.agent.name, e))
+                logger.error("Unexpected error in customer {}: {}".format(self.agent.name, e))
                 await self.cancel_proposal(content["transport_id"])
                 self.set_next_state(CUSTOMER_WAITING)
                 return
 
         elif performative == REFUSE_PERFORMATIVE:
-            logger.debug("Customer {} got refusal from transport".format(self.agent.name))
+            logger.info("Customer {} got refusal from transport".format(self.agent.name))
             self.set_next_state(CUSTOMER_WAITING)
             return
 
@@ -289,24 +306,34 @@ class CustomerMovingToTransportState(CustomerStrategyBehaviour, State):
     # TODO
     async def on_start(self):
         await super().on_start()
+        self.agent.status = CUSTOMER_MOVING_TO_TRANSPORT
+        logger.warning("{} in Customer Moving To Transport State".format(self.agent.jid))
 
     async def run(self):
-        return
+        self.agent.arrived_to_transport_event.clear()
+        self.agent.watch_value("arrived_to_transport", self.agent.arrived_to_transport_callback)
+        await self.agent.arrived_to_transport_event.wait()
+        return self.set_next_state(CUSTOMER_IN_TRANSPORT)
 
 
 class CustomerInTransportState(CustomerStrategyBehaviour, State):
     # TODO
     async def on_start(self):
         await super().on_start()
+        self.agent.status = CUSTOMER_IN_TRANSPORT
+        logger.debug("{} in Customer In Transport State".format(self.agent.jid))
 
     async def run(self):
-        return
+        await self.inform_transport()
+        return self.set_next_state(CUSTOMER_IN_DEST)
 
 
 class CustomerInDestState(CustomerStrategyBehaviour, State):
     # TODO
     async def on_start(self):
         await super().on_start()
+        #self.agent.status = CUSTOMER_IN_DEST
+        logger.debug("{} in Customer In Dest State".format(self.agent.jid))
 
     async def run(self):
         return
@@ -332,5 +359,7 @@ class FSMCustomerStrategyBehaviour(FSMBehaviour):
 
         self.add_transition(CUSTOMER_MOVING_TO_TRANSPORT,
                             CUSTOMER_IN_TRANSPORT)  # arrived to transport, picked up by it
+
+        self.add_transition(CUSTOMER_IN_TRANSPORT, CUSTOMER_IN_TRANSPORT)
 
         self.add_transition(CUSTOMER_IN_TRANSPORT, CUSTOMER_IN_DEST)  # arrived to destination

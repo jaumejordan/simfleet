@@ -83,6 +83,8 @@ class TransportAgent(Agent):
         self.customer_in_transport_callback = customer_in_transport_callback
 
     async def setup(self):
+        self.set_type("transport")
+        self.set_status()
         try:
             template = Template()
             template.set_metadata("protocol", REGISTER_PROTOCOL)
@@ -126,6 +128,12 @@ class TransportAgent(Agent):
 
         """
         self.directory_id = directory_id
+
+    def set_type(self, transport_type): # new
+        self.transport_type = transport_type
+
+    def set_status(self, state=TRANSPORT_WAITING):  #new
+        self.status = state
 
     def watch_value(self, key, callback):
         """
@@ -562,6 +570,48 @@ class TransportAgent(Agent):
 
 class RegistrationBehaviour(CyclicBehaviour):
     async def on_start(self):
+        logger.debug("Strategy {} started in directory".format(type(self).__name__))
+
+    def set_registration(self, decision):
+        self.agent.registration = decision
+
+    async def send_registration(self):
+        """
+        Send a ``spade.message.Message`` with a proposal to directory to register.
+        """
+        logger.debug(
+            "Transport {} sent proposal to register to directory {}".format(self.agent.name, self.agent.directory_id))
+        content = {
+            "jid": str(self.agent.jid),
+            "type": self.agent.transport_type,
+            "status": self.agent.status,
+            "position": self.agent.get_position(),
+        }
+        msg = Message()
+        msg.to = str(self.agent.directory_id)
+        msg.set_metadata("protocol", REGISTER_PROTOCOL)
+        msg.set_metadata("performative", REQUEST_PERFORMATIVE)
+        msg.body = json.dumps(content)
+        await self.send(msg)
+
+    async def run(self):
+        try:
+            if not self.agent.registration:
+                await self.send_registration()
+            msg = await self.receive(timeout=10)
+            if msg:
+                performative = msg.get_metadata("performative")
+                if performative == ACCEPT_PERFORMATIVE:
+                    self.set_registration(True)
+                    logger.debug("Registration in the directory")
+        except CancelledError:
+            logger.debug("Cancelling async tasks...")
+        except Exception as e:
+            logger.error("EXCEPTION in RegisterBehaviour of Station {}: {}".format(self.agent.name, e))
+
+
+class RegistrationBehaviourOld(CyclicBehaviour):
+    async def on_start(self):
         logger.debug("Strategy {} started in transport".format(type(self).__name__))
 
     async def send_registration(self):
@@ -673,7 +723,6 @@ class TransportStrategyBehaviour(StrategyBehaviour):
         content = {
             "transport_id": str(self.agent.jid),
             "position": self.agent.get("current_pos")
-            # TODO: save coordinates of destination for the accepted customer
         }
         reply.body = json.dumps(content)
         await self.send(reply)
@@ -703,12 +752,14 @@ class TransportStrategyBehaviour(StrategyBehaviour):
         logger.info("Transport {} refused booking from customer {}".format(self.agent.name,
                                                                            customer_id))
 
-    async def deasign_customer(self):
+    async def deassign_customer(self):
         """
         Triggered when, by any reason, a customer cancels their already accepted booking
         """
-        # TODO delete saved values (destination, etc.) belonging to booked customer
-        #
+        # Delete saved values (destination, etc.) belonging to booked customer
+        self.agent.set("current_customer", None)
+        self.agent.current_customer_orig = None
+        self.agent.current_customer_dest = None
 
     async def run(self):
         raise NotImplementedError

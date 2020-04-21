@@ -12,7 +12,7 @@ from spade.template import Template
 
 from simfleet.helpers import random_position, distance_in_meters, kmh_to_ms, PathRequestException, AlreadyInDestination
 from simfleet.protocol import TRAVEL_PROTOCOL, QUERY_PROTOCOL, REQUEST_PERFORMATIVE, REQUEST_PROTOCOL, \
-    REFUSE_PERFORMATIVE, CANCEL_PERFORMATIVE, PROPOSE_PERFORMATIVE
+    REFUSE_PERFORMATIVE, CANCEL_PERFORMATIVE, PROPOSE_PERFORMATIVE, INFORM_PERFORMATIVE
 from simfleet.utils import CUSTOMER_WAITING, CUSTOMER_IN_DEST, CUSTOMER_IN_TRANSPORT, \
     TRANSPORT_IN_CUSTOMER_PLACE, CUSTOMER_LOCATION, StrategyBehaviour, request_path, chunk_path
 
@@ -49,13 +49,14 @@ class CustomerAgent(Agent):
         self.is_launched = False
 
         # Attributes for movement
+        self.available_transports = []
         self.set("current_transport", None)
         self.current_transport_pos = None
         self.set("current_pos", None)
         self.dest = None
         self.set("path", None)
         self.chunked_path = None
-        self.set("speed_in_kmh", 1000) # MODIFIABLE, NOW MADE A THIRD OF TRANSPORT SPEED
+        self.set("speed_in_kmh", 1000)  # MODIFIABLE, NOW MADE A THIRD OF TRANSPORT SPEED
         self.animation_speed = ONESECOND_IN_MS
         self.distances = []
         self.durations = []
@@ -63,6 +64,7 @@ class CustomerAgent(Agent):
         self.directory_id = None
         # type of the FleetManager (I think)
         self.type_service = "taxi"
+        self.request = "transport"
 
         # ATRIBUTES FOR EVENT AND CALLBACK MANAGEMENT
         # self.__observers = defaultdict(list)
@@ -173,18 +175,10 @@ class CustomerAgent(Agent):
         """
         self.directory_id = directory_id
 
-    def set_initial_position(self, coords=None):
-        """
-                Sets the position of the customer. If no position is provided it is located in a random position.
-
-                Args:
-                    coords (list): a list coordinates (longitude and latitude)
-                """
-        if coords:
-            self.current_pos = coords
-        else:
-            self.current_pos = random_position()
-        logger.debug("Customer {} position is {}".format(self.agent_id, self.current_pos))
+    def set_initial_position(self, coords):
+        self.current_pos = coords
+        self.set("current_pos", coords)
+        logger.debug("Customer {} position is {}".format(self.agent_id, self.get("current_pos")))
 
     async def set_position(self, coords=None):
         """
@@ -198,6 +192,7 @@ class CustomerAgent(Agent):
             self.set("current_pos", coords)
         else:
             self.set("current_pos", random_position())
+        logger.debug("Customer {} position is {}".format(self.agent_id, self.get("current_pos")))
         if self.is_in_destination():
             logger.info("Customer {} has arrived to destination. Status: {}".format(self.agent_id, self.status))
             await self.arrived_to_transport()
@@ -255,7 +250,7 @@ class CustomerAgent(Agent):
         Returns:
             list, float, float: A list of points that represent the path from origin to destination, the distance and the estimated duration
         """
-        return await request_path(self, origin, destination)
+        return await request_path(self, origin, destination, self.route_id)
 
     def total_time(self):
         """
@@ -357,6 +352,9 @@ class CustomerAgent(Agent):
         It must change the appropriate value to trigger a callback
         """
         # TODO
+        logger.info("Customer {} arrived to the transport {} position".format(self.name,
+                                                                              self.get("current_transport")))
+        self.set("arrived_to_transport", True)
 
     async def move_to(self, dest):
         """
@@ -369,13 +367,15 @@ class CustomerAgent(Agent):
              AlreadyInDestination: if the transport is already in the destination coordinates.
         """
         # MUST BE MODIFIED TO ADAPT IT FOR CUSTOMER MOVEMENT TO BOOKED TRANSPORT
+        logger.info("---------------Customer {} MOVING TO transport {}".format(self.name,
+                                                                               self.get("current_transport")))
         if self.get("current_pos") == dest:
             raise AlreadyInDestination
         counter = 5
         path = None
         distance, duration = 0, 0
         while counter > 0 and path is None:
-            logger.debug("Requesting path from {} to {}".format(self.get("current_pos"), dest))
+            logger.info("Requesting path from {} to {}".format(self.get("current_pos"), dest))
             path, distance, duration = await self.request_path(self.get("current_pos"), dest)
             counter -= 1
         if path is None:
@@ -413,6 +413,7 @@ class CustomerAgent(Agent):
         """
 
         async def run(self):
+            logger.warning("Running moving behaviour")
             await self.agent.step()
             self.period = self.agent.animation_speed / ONESECOND_IN_MS
             if self.agent.is_in_destination():
@@ -498,7 +499,20 @@ class CustomerStrategyBehaviour(StrategyBehaviour):
                                                                                           self.agent.directory_id,
                                                                                           self.agent.type_service))
 
-    async def send_get_transports(self, content=None):
+    async def send_get_transports(self, content=None):  # new
+        if content is None or len(content) == 0:
+            content = self.agent.request
+        msg = Message()
+        msg.to = str(self.agent.directory_id)
+        msg.set_metadata("protocol", QUERY_PROTOCOL)
+        msg.set_metadata("performative", REQUEST_PERFORMATIVE)
+        msg.body = content
+        await self.send(msg)
+        logger.debug("Customer {} asked for transports to Directory {} for type {}.".format(self.agent.name,
+                                                                                            self.agent.directory_id,
+                                                                                            self.agent.request))
+
+    async def send_get_transports2(self, content=None):
         """
         Sends an ``spade.message.Message`` to the FleetManager to request a list of available transports.
         It uses the QUERY_PROTOCOL and the REQUEST_PERFORMATIVE.
@@ -513,28 +527,28 @@ class CustomerStrategyBehaviour(StrategyBehaviour):
             for fleetmanager in self.agent.fleetmanagers.keys():
                 msg = Message()
                 msg.to = str(fleetmanager)
-                msg.set_metadata("protocol", QUERY_PROTOCOL)
+                msg.set_metadata("protocol", REQUEST_PROTOCOL)
                 msg.set_metadata("performative", REQUEST_PERFORMATIVE)
+                # msg.set_metadata("protocol", QUERY_PROTOCOL)
+                # msg.set_metadata("performative", REQUEST_PERFORMATIVE)
                 msg.body = json.dumps(content)
                 await self.send(msg)
             logger.info("Customer {} asked for a available transports to {}.".format(self.agent.name, fleetmanager))
         else:
             logger.warning("Customer {} has no fleet managers.".format(self.agent.name))
 
-    async def send_booking_request(self, content=None):
-        """
-        Checks its available_transports list and pops the closest one.
-        Sends a ``spade.message.Mesade`` to the closes transport request a booking.
-        It uses the REQUEST_PROTOCOL and the PROPOSE_PERFORMATIVE.
-        If no content is set a default content with the customer_id,
-        origin and target coordinates is used.
-
-        Args:
-            content (dict): Optional content dictionary
-        """
-        # TODO
-
-
+    # async def send_booking_request(self, content=None):
+    #     """
+    #     Checks its available_transports list and pops the closest one.
+    #     Sends a ``spade.message.Mesade`` to the closes transport request a booking.
+    #     It uses the REQUEST_PROTOCOL and the PROPOSE_PERFORMATIVE.
+    #     If no content is set a default content with the customer_id,
+    #     origin and target coordinates is used.
+    #
+    #     Args:
+    #         content (dict): Optional content dictionary
+    #     """
+    #     # TODO
 
     async def send_proposal(self, transport_id, content=None):
         """
@@ -546,16 +560,17 @@ class CustomerStrategyBehaviour(StrategyBehaviour):
             content (dict, optional): the optional content of the message
         """
         # COPIED FROM transport.py, CHECK IF NEEDS MODIFICATION
-        if content is None:
-            content = {}
-            # TODO add destination coordinates to inform the transport agent
-        logger.info("Customer {} sent booking to transport {}".format(self.agent.name, transport_id))
         reply = Message()
         reply.to = transport_id
         reply.set_metadata("protocol", REQUEST_PROTOCOL)
         reply.set_metadata("performative", PROPOSE_PERFORMATIVE)
+        if content is None:
+            content = {
+                "customer_id": str(self.agent.jid),
+            }
         reply.body = json.dumps(content)
         await self.send(reply)
+        logger.info("Customer {} sent booking to transport {}".format(self.agent.name, transport_id))
 
     async def cancel_proposal(self, transport_id, content=None):
         """
@@ -566,16 +581,27 @@ class CustomerStrategyBehaviour(StrategyBehaviour):
             transport_id (str): The Agent JID of the transport
         """
         # COPIED FROM transport.py, CHECK IF NEEDS MODIFICATION
-        if content is None:
-            content = {}
-        logger.info("Customer {} sent cancel booking to transport {}".format(self.agent.name, transport_id))
         reply = Message()
         reply.to = transport_id
         reply.set_metadata("protocol", REQUEST_PROTOCOL)
         reply.set_metadata("performative", CANCEL_PERFORMATIVE)
+        if content is None:
+            content = {
+                "customer_id": str(self.agent.jid),
+            }
         reply.body = json.dumps(content)
         await self.send(reply)
+        logger.info("Customer {} sent cancel booking to transport {}".format(self.agent.name, transport_id))
 
+    async def go_to_transport(self, transport_id, dest):
+        logger.info("Customer {} on route to transport {}".format(self.agent.name, transport_id))
+        self.agent.set("current_transport", transport_id)
+        self.agent.current_transport_pos = dest
+        logger.info("go_to_transport:::{} {}".format(self.get("current_transport"), self.agent.current_transport_pos))
+        try:
+            await self.agent.move_to(self.agent.current_transport_pos)
+        except AlreadyInDestination:
+            await self.agent.arrived_to_transport()
 
     async def inform_transport(self, content=None):
         """
@@ -590,9 +616,23 @@ class CustomerStrategyBehaviour(StrategyBehaviour):
         """
         # NOT SURE IF THIS WILL BE PERFORMED INSIDE arrived_to_transport OR HERE
         # DON'T IMPLEMENT BY NOW
-        # TODO
-        # ++++++++++++ IMPORTANT: SEND AS "dest": THE COORDINATES OF MY CURRENT POSITION
+        # ++++++++++++ IMPORTANT: SEND AS "origin": THE COORDINATES OF MY CURRENT POSITION
         # ++++++++++++ WHICH IS ALSO THE TRANSPORT'S POSITION
+        msg = Message()
+        msg.to = self.get("current_transport")
+        msg.set_metadata("protocol", REQUEST_PROTOCOL)
+        msg.set_metadata("performative", INFORM_PERFORMATIVE)
+        if content is None:
+            content = {
+                "customer_id": str(self.agent.jid),
+                "origin": self.get("current_pos"),
+                "dest": self.agent.dest
+            }
+        msg.body = json.dumps(content)
+        await self.send(msg)
+        logger.info("Customer {} informed transport {} that they are in its position".format(self.agent.name,
+                                                                                             self.get(
+                                                                                                 "current_transport")))
 
     async def run(self):
         raise NotImplementedError
