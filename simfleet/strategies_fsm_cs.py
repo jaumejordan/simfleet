@@ -137,7 +137,7 @@ class TransportMovingToDestinationState(TransportStrategyBehaviour, State):
     # TODO
     async def on_start(self):
         await super().on_start()
-        self.agent.status = TRANSPORT_MOVING_TO_DESTINATION
+        #self.agent.status = TRANSPORT_MOVING_TO_DESTINATION
         logger.debug("{} in Transport Moving To Destination State".format(self.agent.jid))
 
     # Blocks the strategy behaviour (not the Transport Agent) until the transport agent has
@@ -320,11 +320,12 @@ class CustomerInTransportState(CustomerStrategyBehaviour, State):
     # TODO
     async def on_start(self):
         await super().on_start()
-        self.agent.status = CUSTOMER_IN_TRANSPORT
+        #self.agent.status = CUSTOMER_IN_TRANSPORT
         logger.debug("{} in Customer In Transport State".format(self.agent.jid))
 
     async def run(self):
         await self.inform_transport()
+        # block strategy execution
         return self.set_next_state(CUSTOMER_IN_DEST)
 
 
@@ -336,7 +337,7 @@ class CustomerInDestState(CustomerStrategyBehaviour, State):
         logger.debug("{} in Customer In Dest State".format(self.agent.jid))
 
     async def run(self):
-        return
+        return self.set_next_state(CUSTOMER_IN_DEST)
 
 
 class FSMCustomerStrategyBehaviour(FSMBehaviour):
@@ -363,3 +364,5 @@ class FSMCustomerStrategyBehaviour(FSMBehaviour):
         self.add_transition(CUSTOMER_IN_TRANSPORT, CUSTOMER_IN_TRANSPORT)
 
         self.add_transition(CUSTOMER_IN_TRANSPORT, CUSTOMER_IN_DEST)  # arrived to destination
+
+        self.add_transition(CUSTOMER_IN_DEST, CUSTOMER_IN_DEST)

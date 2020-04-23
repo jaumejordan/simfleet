@@ -606,10 +606,12 @@ class SimulatorAgent(Agent):
         Returns:`
             bool: whether the simulation has finished or not.
         """
+        # Now it has to check that all customers have arrived to their FINAL destinations
         if len(self.customer_agents) > 0:
-            return all([customer.is_in_destination() for customer in self.customer_agents.values()])
+            # OLD: return all([customer.is_in_destination() for customer in self.customer_agents.values()])
+            return all([customer.is_in_final_destination() for customer in self.customer_agents.values()])
         else:
-            return False
+            return Falses
 
     async def run_controller(self, request):
         """

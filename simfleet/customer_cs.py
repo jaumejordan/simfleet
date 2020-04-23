@@ -14,7 +14,8 @@ from simfleet.helpers import random_position, distance_in_meters, kmh_to_ms, Pat
 from simfleet.protocol import TRAVEL_PROTOCOL, QUERY_PROTOCOL, REQUEST_PERFORMATIVE, REQUEST_PROTOCOL, \
     REFUSE_PERFORMATIVE, CANCEL_PERFORMATIVE, PROPOSE_PERFORMATIVE, INFORM_PERFORMATIVE
 from simfleet.utils import CUSTOMER_WAITING, CUSTOMER_IN_DEST, CUSTOMER_IN_TRANSPORT, \
-    TRANSPORT_IN_CUSTOMER_PLACE, CUSTOMER_LOCATION, StrategyBehaviour, request_path, chunk_path
+    TRANSPORT_IN_CUSTOMER_PLACE, CUSTOMER_LOCATION, StrategyBehaviour, request_path, chunk_path, \
+    TRANSPORT_MOVING_TO_CUSTOMER, status_to_str
 
 ONESECOND_IN_MS = 1000
 
@@ -37,7 +38,7 @@ class CustomerAgent(Agent):
         self.route_id = None
         self.status = CUSTOMER_WAITING
         self.current_pos = None
-        self.dest = None
+        self.final_dest = None
         self.port = None
         self.transport_assigned = None
         self.init_time = None
@@ -193,8 +194,10 @@ class CustomerAgent(Agent):
         else:
             self.set("current_pos", random_position())
         logger.debug("Customer {} position is {}".format(self.agent_id, self.get("current_pos")))
+        # if the customer has arrived to its self.dest position
         if self.is_in_destination():
-            logger.info("Customer {} has arrived to destination. Status: {}".format(self.agent_id, self.status))
+            logger.debug("Customer {} has arrived to its moving destination. Status: {}".format(self.agent_id, self.status))
+            # inform the transport
             await self.arrived_to_transport()
 
     def get_position(self):
@@ -216,19 +219,28 @@ class CustomerAgent(Agent):
             coords (list): a list coordinates (longitude and latitude)
         """
         if coords:
-            self.dest = coords
+            self.final_dest = coords
         else:
-            self.dest = random_position()
-        logger.debug("Customer {} target position is {}".format(self.agent_id, self.dest))
+            self.final_dest = random_position()
+        logger.debug("Customer {} target position is {}".format(self.agent_id, self.final_dest))
 
     def is_in_destination(self):
         """
-        Checks if the customer has arrived to its destination.
+        Checks if the customer has arrived to its moving destination (self.dest).
 
         Returns:
-            bool: whether the customer is at its destination or not
+            bool: whether the customer is at its moving destination or not
         """
-        return self.status == CUSTOMER_IN_DEST or self.get_position() == self.dest
+        return self.get_position() == self.dest
+
+    def is_in_final_destination(self):
+        """
+        Indicates the simulator agent that the customer has arrived to its final destination.
+
+        Returns:
+            bool: whether the customer is at its final destination or not
+        """
+        return self.status == CUSTOMER_IN_DEST
 
     def set_speed(self, speed_in_kmh):
         """
@@ -317,7 +329,7 @@ class CustomerAgent(Agent):
         return {
             "id": self.agent_id,
             "position": [float("{0:.6f}".format(coord)) for coord in self.current_pos],
-            "dest": [float("{0:.6f}".format(coord)) for coord in self.dest],
+            "dest": [float("{0:.6f}".format(coord)) for coord in self.final_dest],
             "status": self.status,
             "transport": self.transport_assigned.split("@")[0] if self.transport_assigned else None,
             "waiting": float("{0:.2f}".format(t)) if t else None,
@@ -413,7 +425,7 @@ class CustomerAgent(Agent):
         """
 
         async def run(self):
-            logger.warning("Running moving behaviour")
+            logger.warning("Running moving behaviour. Pos: {}".format(self.get("current_pos")))
             await self.agent.step()
             self.period = self.agent.animation_speed / ONESECOND_IN_MS
             if self.agent.is_in_destination():
@@ -440,6 +452,12 @@ class TravelBehaviour(CyclicBehaviour):
             logger.debug("Customer {} informed of: {}".format(self.agent.name, content))
             if "status" in content:
                 status = content["status"]
+                if status != CUSTOMER_LOCATION:
+                    logger.debug("Customer {} informed of status: {}".format(self.agent.name,
+                                                                             status_to_str(status)))
+                if status == TRANSPORT_MOVING_TO_CUSTOMER:
+                    logger.info("Customer {} waiting for transport. Status {}".format(self.agent.name, self.agent.status))
+                    self.agent.waiting_for_pickup_time = time.time()
                 # Transport informs me that I can go in
                 if status == TRANSPORT_IN_CUSTOMER_PLACE:
                     self.agent.status = CUSTOMER_IN_TRANSPORT
@@ -454,7 +472,7 @@ class TravelBehaviour(CyclicBehaviour):
                 # Move the customer exactly to the coordinates where the transport expects it to be
                 elif status == CUSTOMER_LOCATION:
                     coords = content["location"]
-                    self.agent.set_position(coords)
+                    await self.agent.set_position(coords)
         except CancelledError:
             logger.debug("Cancelling async tasks...")
         except Exception as e:
@@ -626,7 +644,7 @@ class CustomerStrategyBehaviour(StrategyBehaviour):
             content = {
                 "customer_id": str(self.agent.jid),
                 "origin": self.get("current_pos"),
-                "dest": self.agent.dest
+                "dest": self.agent.final_dest
             }
         msg.body = json.dumps(content)
         await self.send(msg)

@@ -218,20 +218,28 @@ class TransportAgent(Agent):
         # CHECK IF IT NEEDS MODIFICATION
         self.set("path", None)
         self.chunked_path = None
+        # if the transport is going to pick up the customer
         if not self.is_customer_in_transport():  # self.status == TRANSPORT_MOVING_TO_CUSTOMER:
             try:
+                # try to pick up the customer and move towards its destination
                 self.set("customer_in_transport", self.get("current_customer"))
                 await self.move_to(self.current_customer_dest)
             except PathRequestException:
+                # if there is no path to customer's destination, cancel it
                 await self.cancel_customer()
                 self.status = TRANSPORT_WAITING
             except AlreadyInDestination:
+                # if the transport is already in the customer's destination, drop the customer off
+                logger.error("++++++++++ transport {} is already in customers destination {}".format(self.name, self.current_customer_dest))
                 await self.drop_customer()
             else:
+                # if there is no error moving to the destination,
+                # inform the customer that it has been picked up
                 await self.inform_customer(TRANSPORT_IN_CUSTOMER_PLACE)
                 self.status = TRANSPORT_MOVING_TO_DESTINATION
                 logger.info("Transport {} has picked up the customer {}.".format(self.agent_id,
                                                                                  self.get("current_customer")))
+        # if the transport is going towards the destination
         else:  # elif self.status == TRANSPORT_MOVING_TO_DESTINATION:
             await self.drop_customer()
 
@@ -305,7 +313,7 @@ class TransportAgent(Agent):
         """
         await self.inform_customer(CUSTOMER_IN_DEST)
         self.status = TRANSPORT_WAITING
-        logger.debug("Transport {} has dropped the customer {} in destination.".format(self.agent_id,
+        logger.info("Transport {} has dropped the customer {} in destination.".format(self.agent_id,
                                                                                        self.get("current_customer")))
         self.set("current_customer", None)
         self.set("customer_in_transport", None)
@@ -458,13 +466,17 @@ class TransportAgent(Agent):
             self.set("current_pos", random_position())
 
         logger.debug("Transport {} position is {}".format(self.agent_id, self.get("current_pos")))
+        # if the transport has the customer inside and its moving to its destination
         if self.status == TRANSPORT_MOVING_TO_DESTINATION:
+            # tell the customer to update its position
             await self.inform_customer(CUSTOMER_LOCATION, {"location": self.get("current_pos")})
+        # if the transport has arrived to its self.dest position
         if self.is_in_destination():
             logger.info("Transport {} has arrived to destination. Status: {}".format(self.agent_id, self.status))
             if self.status == TRANSPORT_MOVING_TO_STATION:
                 await self.arrived_to_station()
             else:
+                # execute method to decide what to do accordingly
                 await self.arrived_to_destination()
 
     def get_position(self):
