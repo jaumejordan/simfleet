@@ -838,6 +838,8 @@ const store = new Vuex.Store({
         customers: [],
         stations: [],
         paths: [],
+        transport_paths: [],
+        customer_paths: [],
         waiting_time: 0,
         total_time: 0,
         simulation_status: false,
@@ -854,19 +856,28 @@ const store = new Vuex.Store({
                         new_paths.push({ latlngs: payload[i].path, color: get_color(payload[i].status) });
                     }
                 }
-                state.paths = new_paths;
+                //state.paths = state.paths.concat(new_paths);
+                state.transport_paths = new_paths
             } else {
                 state.transports = [];
-                state.paths = [];
+                state.transport_paths = [];
             }
         },
         addCustomers: (state, payload) => {
             if (payload.length > 0) {
+                let new_paths = [];
                 for (let i = 0; i < payload.length; i++) {
                     update_item_in_collection(state.customers, payload[i], customer_popup);
+
+                     if (payload[i].path) {
+                        new_paths.push({ latlngs: payload[i].path, color: get_color(payload[i].status) });
+                    }
                 }
+                //state.paths = state.paths.concat(new_paths);
+                state.customer_paths = new_paths
             } else {
                 state.customers = [];
+                state.customer_paths = [];
             }
         },
         addStations: (state, payload) => {
@@ -898,7 +909,7 @@ const store = new Vuex.Store({
             return state.stations;
         },
         get_paths: state => {
-            return state.paths;
+            return state.transport_paths.concat(state.customer_paths);
         },
         get_waiting_time: state => {
             return state.waiting_time;
@@ -980,9 +991,11 @@ let color = {
     11: "rgb(255, 170, 0)",
     13: "rgb(0, 149, 255)",
     15: "rgb(0, 255, 15)",
+    41: "rgb(220, 166, 227)",
     "TRANSPORT_MOVING_TO_CUSTOMER": "rgb(255, 170, 0)",
     "TRANSPORT_MOVING_TO_DESTINATION": "rgb(0, 149, 255)",
-    "TRANSPORT_MOVING_TO_STATION": "rgb(0, 255, 15)"
+    "TRANSPORT_MOVING_TO_STATION": "rgb(0, 255, 15)",
+    "CUSTOMER_MOVING_TO_TRANSPORT": "rgb(220, 166, 227)"
 };
 
 function get_color(status) {
@@ -1008,7 +1021,11 @@ let statuses = {
     24: "CUSTOMER_ASSIGNED",
     //
     30: "FREE_STATION",
-    31: "BUSY_STATION"
+    31: "BUSY_STATION",
+    //
+    40: "CUSTOMER_WAITING_FOR_APPROVAL",
+    41: "CUSTOMER_MOVING_TO_TRANSPORT",
+    42: "TRANSPORT BOOKED"
 };
 
 function customer_popup(customer) {

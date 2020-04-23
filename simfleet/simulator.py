@@ -611,7 +611,7 @@ class SimulatorAgent(Agent):
             # OLD: return all([customer.is_in_destination() for customer in self.customer_agents.values()])
             return all([customer.is_in_final_destination() for customer in self.customer_agents.values()])
         else:
-            return Falses
+            return False
 
     async def run_controller(self, request):
         """

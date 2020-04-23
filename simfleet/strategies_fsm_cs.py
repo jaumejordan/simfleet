@@ -98,7 +98,7 @@ class TransportBookedState(TransportStrategyBehaviour, State):
         performative = msg.get_metadata("performative")
         # We can receive 3 types of messages
         # 1) Another booking request
-        if performative == REQUEST_PERFORMATIVE:
+        if performative == PROPOSE_PERFORMATIVE:
             await self.refuse_customer(content["customer_id"])
             self.set_next_state(TRANSPORT_BOOKED)
             return

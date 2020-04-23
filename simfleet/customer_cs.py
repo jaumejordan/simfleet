@@ -15,7 +15,7 @@ from simfleet.protocol import TRAVEL_PROTOCOL, QUERY_PROTOCOL, REQUEST_PERFORMAT
     REFUSE_PERFORMATIVE, CANCEL_PERFORMATIVE, PROPOSE_PERFORMATIVE, INFORM_PERFORMATIVE
 from simfleet.utils import CUSTOMER_WAITING, CUSTOMER_IN_DEST, CUSTOMER_IN_TRANSPORT, \
     TRANSPORT_IN_CUSTOMER_PLACE, CUSTOMER_LOCATION, StrategyBehaviour, request_path, chunk_path, \
-    TRANSPORT_MOVING_TO_CUSTOMER, status_to_str
+    TRANSPORT_MOVING_TO_CUSTOMER, status_to_str, CUSTOMER_MOVING_TO_TRANSPORT
 
 ONESECOND_IN_MS = 1000
 
@@ -328,13 +328,16 @@ class CustomerAgent(Agent):
         t = self.get_waiting_time()
         return {
             "id": self.agent_id,
-            "position": [float("{0:.6f}".format(coord)) for coord in self.current_pos],
+            "position": [float("{0:.6f}".format(coord)) for coord in self.get("current_pos")],
             "dest": [float("{0:.6f}".format(coord)) for coord in self.final_dest],
             "status": self.status,
-            "transport": self.transport_assigned.split("@")[0] if self.transport_assigned else None,
             "waiting": float("{0:.2f}".format(t)) if t else None,
-            "icon": self.icon
+            "icon": self.icon,
+            # new
+            "path": self.get("path"),
+            "transport": self.get("current_transport").split("@")[0] if self.get("current_transport") else None
         }
+        # "transport": self.transport_assigned.split("@")[0] if self.transport_assigned else None,
 
     async def cancel_transport(self, data=None):
         """
@@ -364,6 +367,8 @@ class CustomerAgent(Agent):
         It must change the appropriate value to trigger a callback
         """
         # TODO
+        self.set("path", None)
+        self.chunked_path = None
         logger.info("Customer {} arrived to the transport {} position".format(self.name,
                                                                               self.get("current_transport")))
         self.set("arrived_to_transport", True)
@@ -613,6 +618,7 @@ class CustomerStrategyBehaviour(StrategyBehaviour):
 
     async def go_to_transport(self, transport_id, dest):
         logger.info("Customer {} on route to transport {}".format(self.agent.name, transport_id))
+        self.agent.status = CUSTOMER_MOVING_TO_TRANSPORT
         self.agent.set("current_transport", transport_id)
         self.agent.current_transport_pos = dest
         logger.info("go_to_transport:::{} {}".format(self.get("current_transport"), self.agent.current_transport_pos))
