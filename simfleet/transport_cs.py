@@ -135,6 +135,19 @@ class TransportAgent(Agent):
     def set_status(self, state=TRANSPORT_WAITING):  #new
         self.status = state
 
+    async def send_status_fleetmanager(self):
+        msg = Message()
+        msg.to = str(self.fleetmanager_id)
+        msg.set_metadata("protocol", REQUEST_PROTOCOL)
+        msg.set_metadata("performative", INFORM_PERFORMATIVE)
+        msg.body = json.dumps({
+            "name": self.name,
+            "jid": str(self.jid),
+            "status": self.status,
+            "position": self.get_position()
+            })
+        await self.send(msg)
+
     def watch_value(self, key, callback):
         """
         Registers an observer callback to be run when a value is changed

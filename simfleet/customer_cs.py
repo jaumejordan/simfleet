@@ -543,7 +543,6 @@ class CustomerStrategyBehaviour(StrategyBehaviour):
         Args:
             content (dict): Optional content dictionary
         """
-        # TODO
         if content is None or len(content) == 0:
             content = {"customer_id": self.agent.jid}
         if self.agent.fleetmanagers is not None:
@@ -552,8 +551,6 @@ class CustomerStrategyBehaviour(StrategyBehaviour):
                 msg.to = str(fleetmanager)
                 msg.set_metadata("protocol", REQUEST_PROTOCOL)
                 msg.set_metadata("performative", REQUEST_PERFORMATIVE)
-                # msg.set_metadata("protocol", QUERY_PROTOCOL)
-                # msg.set_metadata("performative", REQUEST_PERFORMATIVE)
                 msg.body = json.dumps(content)
                 await self.send(msg)
             logger.info("Customer {} asked for a available transports to {}.".format(self.agent.name, fleetmanager))

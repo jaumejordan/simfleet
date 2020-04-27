@@ -8,7 +8,7 @@ from simfleet.customer_cs import CustomerStrategyBehaviour
 from simfleet.fleetmanager import FleetManagerStrategyBehaviour
 from simfleet.helpers import PathRequestException, distance_in_meters
 from simfleet.protocol import REQUEST_PERFORMATIVE, ACCEPT_PERFORMATIVE, REFUSE_PERFORMATIVE, INFORM_PERFORMATIVE, \
-    CANCEL_PERFORMATIVE, QUERY_PROTOCOL, PROPOSE_PERFORMATIVE
+    CANCEL_PERFORMATIVE, QUERY_PROTOCOL, REQUEST_PROTOCOL, PROPOSE_PERFORMATIVE, TRAVEL_PROTOCOL
 from simfleet.transport_cs import TransportStrategyBehaviour
 from simfleet.utils import TRANSPORT_WAITING, CUSTOMER_WAITING, TRANSPORT_BOOKED, TRANSPORT_MOVING_TO_DESTINATION, \
     CUSTOMER_WAITING_FOR_APPROVAL, CUSTOMER_MOVING_TO_TRANSPORT, CUSTOMER_IN_TRANSPORT, CUSTOMER_IN_DEST
@@ -23,6 +23,9 @@ class SendAvailableTransportsBehaviour(FleetManagerStrategyBehaviour):
     """
     Awaits customer's requests and replies with the lest of available transports
     """
+    async def on_start(self):
+        await super().on_start()
+        self.available_transports = {}
 
     async def run(self):
         if not self.agent.registration:
@@ -31,25 +34,36 @@ class SendAvailableTransportsBehaviour(FleetManagerStrategyBehaviour):
         msg = await self.receive(timeout=5)
         if msg:
             logger.info("Manager received message: {}".format(msg))
-            # protocol = msg.get_metadata("protocol")
-            # if protocol == QUERY_PROTOCOL:
-            #     performative = msg.get_metadata("performative")
-            #     if performative == REQUEST_PERFORMATIVE:
-            body = json.loads(msg.body)
-            reply = Message()
-            # get list of available transport agents
-            print(self.get_transport_agents())
-            available_transports = [(t, t.get("current_pos")) for t in self.get_transport_agents() if
-                                    t.status == TRANSPORT_WAITING]
-            # add list to content
-            content = {"transports": available_transports}
-            reply.to(body["customer_id"])
-            reply.set_metadata("protocol", QUERY_PROTOCOL)
-            reply.set_metadata("performative", REQUEST_PERFORMATIVE)
-            reply.body = content
-            # reply to sender (through send() or a custom method)
-            await self.send(reply)
-            logger.debug("Fleet manager sent list of transports to customer {}".format(body["customer_id"]))
+            protocol = msg.get_metadata("protocol")
+            if protocol == REQUEST_PROTOCOL:
+                performative = msg.get_metadata("performative")
+                if performative == REQUEST_PERFORMATIVE:  # Message from customer asking for transports
+                    body = json.loads(msg.body)
+                    reply = Message()
+                    content = self.available_transports
+                    reply.to = str(msg.sender)
+                    reply.set_metadata("protocol", QUERY_PROTOCOL)
+                    reply.set_metadata("performative", INFORM_PERFORMATIVE)
+                    reply.body = json.dumps(content)
+                    await self.send(reply)
+                    logger.debug("Fleet manager sent list of transports to customer {}".format(msg.sender))
+
+                # Status message from transport
+                elif performative == INFORM_PERFORMATIVE:
+                    logger.debug(f"FleetManager STATUS MESSAGE recieved: current transports = {self.available_transports.keys()} ***")
+                    body = json.loads(msg.body)
+                    if body["jid"] in self.available_transports:
+                        # If the transport is not waiting it is not available
+                        if body["status"] != TRANSPORT_WAITING:
+                            del self.available_transports[body["jid"]]
+                            logger.debug(f"DELETED {body['jid']} from available transports: current transports = {self.available_transports.keys()}")
+                    else:
+                        # Store new transport if it is waiting(=available)
+                        if body["status"] == TRANSPORT_WAITING:
+                            self.available_transports[body["jid"]] = body
+                            logger.debug(f"ADDED {body['jid']} to available transports: current transports = {self.available_transports.keys()}")
+
+                
 
 
 ################################################################
@@ -62,6 +76,7 @@ class TransportWaitingState(TransportStrategyBehaviour, State):
     async def on_start(self):
         await super().on_start()
         self.agent.status = TRANSPORT_WAITING
+        await self.agent.send_status_fleetmanager()
         logger.error("{} in Transport Waiting State".format(self.agent.jid))
 
     async def run(self):
@@ -86,6 +101,7 @@ class TransportBookedState(TransportStrategyBehaviour, State):
     async def on_start(self):
         await super().on_start()
         self.agent.status = TRANSPORT_BOOKED
+        await self.agent.send_status_fleetmanager()
         logger.warning("{} in Transport Booked State".format(self.agent.jid))
 
     async def run(self):
@@ -138,6 +154,7 @@ class TransportMovingToDestinationState(TransportStrategyBehaviour, State):
     async def on_start(self):
         await super().on_start()
         #self.agent.status = TRANSPORT_MOVING_TO_DESTINATION
+        #await self.agent.send_status_fleetmanager()
         logger.debug("{} in Transport Moving To Destination State".format(self.agent.jid))
 
     # Blocks the strategy behaviour (not the Transport Agent) until the transport agent has
@@ -205,11 +222,11 @@ class CustomerWaitingState(CustomerStrategyBehaviour, State):
 
         # Get list of available transports
         if self.agent.available_transports is None or len(self.agent.available_transports) < 1:
-            await self.send_get_transports()
+            await self.send_get_transports2()
 
             msg = await self.receive(timeout=5)
             if not msg:
-                self.set_next_state(TRANSPORT_WAITING)
+                self.set_next_state(CUSTOMER_WAITING)
                 return
             logger.info("Customer received message: {}".format(msg))
             try:
