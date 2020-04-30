@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 from loguru import logger
@@ -25,7 +26,7 @@ class SendAvailableTransportsBehaviour(FleetManagerStrategyBehaviour):
     """
     async def on_start(self):
         await super().on_start()
-        self.available_transports = {}
+        self.agent.available_transports = {}
 
     async def run(self):
         if not self.agent.registration:
@@ -40,7 +41,7 @@ class SendAvailableTransportsBehaviour(FleetManagerStrategyBehaviour):
                 if performative == REQUEST_PERFORMATIVE:  # Message from customer asking for transports
                     body = json.loads(msg.body)
                     reply = Message()
-                    content = self.available_transports
+                    content = self.agent.available_transports
                     reply.to = str(msg.sender)
                     reply.set_metadata("protocol", QUERY_PROTOCOL)
                     reply.set_metadata("performative", INFORM_PERFORMATIVE)
@@ -50,20 +51,20 @@ class SendAvailableTransportsBehaviour(FleetManagerStrategyBehaviour):
 
                 # Status message from transport
                 elif performative == INFORM_PERFORMATIVE:
-                    logger.debug(f"FleetManager STATUS MESSAGE recieved: current transports = {self.available_transports.keys()} ***")
+                    logger.debug(f"FleetManager STATUS MESSAGE received: current transports = {self.agent.available_transports.keys()} ***")
                     body = json.loads(msg.body)
-                    if body["jid"] in self.available_transports:
+                    if body["jid"] in self.agent.available_transports:
                         # If the transport is not waiting it is not available
                         if body["status"] != TRANSPORT_WAITING:
-                            del self.available_transports[body["jid"]]
-                            logger.debug(f"DELETED {body['jid']} from available transports: current transports = {self.available_transports.keys()}")
+                            del self.agent.available_transports[body["jid"]]
+                            logger.debug(f"DELETED {body['jid']} from available transports: current transports = {self.agent.available_transports.keys()}")
                     else:
                         # Store new transport if it is waiting(=available)
                         if body["status"] == TRANSPORT_WAITING:
-                            self.available_transports[body["jid"]] = body
-                            logger.debug(f"ADDED {body['jid']} to available transports: current transports = {self.available_transports.keys()}")
+                            self.agent.available_transports[body["jid"]] = body
+                            logger.debug(f"ADDED {body['jid']} to available transports: current transports = {self.agent.available_transports.keys()}")
 
-                
+
 
 
 ################################################################
@@ -222,7 +223,7 @@ class CustomerWaitingState(CustomerStrategyBehaviour, State):
 
         # Get list of available transports
         if self.agent.available_transports is None or len(self.agent.available_transports) < 1:
-            await self.send_get_transports2()
+            await self.send_get_transports()
 
             msg = await self.receive(timeout=5)
             if not msg:
@@ -231,6 +232,12 @@ class CustomerWaitingState(CustomerStrategyBehaviour, State):
             logger.info("Customer received message: {}".format(msg))
             try:
                 content = json.loads(msg.body)
+                # if the list of available transports is empty, the customer waits 5 seconds before asking for it again
+                if content == {}:
+                    logger.debug(f"Customer {self.agent.name} received empty available transports list. It will "
+                                   f" wait 5 seconds before asking again.")
+                    await asyncio.sleep(5)
+                    return self.set_next_state(CUSTOMER_WAITING)
             except TypeError:
                 content = {}
             performative = msg.get_metadata("performative")

@@ -430,7 +430,7 @@ class CustomerAgent(Agent):
         """
 
         async def run(self):
-            logger.warning("Running moving behaviour. Pos: {}".format(self.get("current_pos")))
+            logger.debug("Running moving behaviour. Pos: {}".format(self.get("current_pos")))
             await self.agent.step()
             self.period = self.agent.animation_speed / ONESECOND_IN_MS
             if self.agent.is_in_destination():
@@ -522,7 +522,7 @@ class CustomerStrategyBehaviour(StrategyBehaviour):
                                                                                           self.agent.directory_id,
                                                                                           self.agent.type_service))
 
-    async def send_get_transports(self, content=None):  # new
+    async def send_get_transports_directory(self, content=None):  # new
         if content is None or len(content) == 0:
             content = self.agent.request
         msg = Message()
@@ -535,7 +535,7 @@ class CustomerStrategyBehaviour(StrategyBehaviour):
                                                                                             self.agent.directory_id,
                                                                                             self.agent.request))
 
-    async def send_get_transports2(self, content=None):
+    async def send_get_transports(self, content=None):
         """
         Sends an ``spade.message.Message`` to the FleetManager to request a list of available transports.
         It uses the QUERY_PROTOCOL and the REQUEST_PERFORMATIVE.

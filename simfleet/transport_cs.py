@@ -129,10 +129,10 @@ class TransportAgent(Agent):
         """
         self.directory_id = directory_id
 
-    def set_type(self, transport_type): # new
+    def set_type(self, transport_type):  # new
         self.transport_type = transport_type
 
-    def set_status(self, state=TRANSPORT_WAITING):  #new
+    def set_status(self, state=TRANSPORT_WAITING):  # new
         self.status = state
 
     async def send_status_fleetmanager(self):
@@ -145,7 +145,7 @@ class TransportAgent(Agent):
             "jid": str(self.jid),
             "status": self.status,
             "position": self.get_position()
-            })
+        })
         await self.send(msg)
 
     def watch_value(self, key, callback):
@@ -232,29 +232,30 @@ class TransportAgent(Agent):
         self.set("path", None)
         self.chunked_path = None
         # if the transport is going to pick up the customer
-        if not self.is_customer_in_transport():  # self.status == TRANSPORT_MOVING_TO_CUSTOMER:
-            try:
-                # try to pick up the customer and move towards its destination
-                self.set("customer_in_transport", self.get("current_customer"))
-                await self.move_to(self.current_customer_dest)
-            except PathRequestException:
-                # if there is no path to customer's destination, cancel it
-                await self.cancel_customer()
-                self.status = TRANSPORT_WAITING
-            except AlreadyInDestination:
-                # if the transport is already in the customer's destination, drop the customer off
-                logger.error("++++++++++ transport {} is already in customers destination {}".format(self.name, self.current_customer_dest))
-                await self.drop_customer()
-            else:
-                # if there is no error moving to the destination,
-                # inform the customer that it has been picked up
-                await self.inform_customer(TRANSPORT_IN_CUSTOMER_PLACE)
-                self.status = TRANSPORT_MOVING_TO_DESTINATION
-                logger.info("Transport {} has picked up the customer {}.".format(self.agent_id,
-                                                                                 self.get("current_customer")))
-        # if the transport is going towards the destination
-        else:  # elif self.status == TRANSPORT_MOVING_TO_DESTINATION:
-            await self.drop_customer()
+        # if not self.is_customer_in_transport():  # self.status == TRANSPORT_MOVING_TO_CUSTOMER:
+        #     try:
+        #         # try to pick up the customer and move towards its destination
+        #         self.set("customer_in_transport", self.get("current_customer"))
+        #         await self.move_to(self.current_customer_dest)
+        #     except PathRequestException:
+        #         # if there is no path to customer's destination, cancel it
+        #         await self.cancel_customer()
+        #         self.status = TRANSPORT_WAITING
+        #     except AlreadyInDestination:
+        #         # if the transport is already in the customer's destination, drop the customer off
+        #         logger.error("++++++++++ transport {} is already in customers destination {}".format(self.name,
+        #                                                                                              self.current_customer_dest))
+        #         await self.drop_customer()
+        #     else:
+        #         # if there is no error moving to the destination,
+        #         # inform the customer that it has been picked up
+        #         await self.inform_customer(TRANSPORT_IN_CUSTOMER_PLACE)
+        #         self.status = TRANSPORT_MOVING_TO_DESTINATION
+        #         logger.info("Transport {} has picked up the customer {}.".format(self.agent_id,
+        #                                                                          self.get("current_customer")))
+        # # if the transport is going towards the destination
+        # else:  # elif self.status == TRANSPORT_MOVING_TO_DESTINATION:
+        await self.drop_customer()
 
     async def arrived_to_station(self, station_id=None):
         """
@@ -327,7 +328,7 @@ class TransportAgent(Agent):
         await self.inform_customer(CUSTOMER_IN_DEST)
         self.status = TRANSPORT_WAITING
         logger.info("Transport {} has dropped the customer {} in destination.".format(self.agent_id,
-                                                                                       self.get("current_customer")))
+                                                                                      self.get("current_customer")))
         self.set("current_customer", None)
         self.set("customer_in_transport", None)
 
@@ -593,7 +594,7 @@ class TransportAgent(Agent):
                 self.agent.remove_behaviour(self)
 
 
-class RegistrationBehaviour(CyclicBehaviour):
+class RegistrationInDirectoryBehaviour(CyclicBehaviour):
     async def on_start(self):
         logger.debug("Strategy {} started in directory".format(type(self).__name__))
 
@@ -635,7 +636,7 @@ class RegistrationBehaviour(CyclicBehaviour):
             logger.error("EXCEPTION in RegisterBehaviour of Station {}: {}".format(self.agent.name, e))
 
 
-class RegistrationBehaviourOld(CyclicBehaviour):
+class RegistrationBehaviour(CyclicBehaviour):
     async def on_start(self):
         logger.debug("Strategy {} started in transport".format(type(self).__name__))
 
@@ -695,42 +696,33 @@ class TransportStrategyBehaviour(StrategyBehaviour):
         self.agent.total_waiting_time = 0.0
 
     async def pick_up_customer(self, customer_id, origin, dest):
-        """
-        Starts a TRAVEL_PROTOCOL to pick up a customer and get him to his destination.
-        It automatically launches all the travelling process until the customer is
-        delivered. This travelling process includes to update the transport coordinates as it
-        moves along the path at the specified speed.
-
-        Args:
-            customer_id (str): the id of the customer
-            origin (list): the coordinates of the current location of the customer
-            dest (list): the coordinates of the target destination of the customer
-        """
-        # FOR THE CAR SHARING SYSTEM, WE WILL USE THIS METHOD ONCE THE CUSTOMER
-        # INFORMS THE TRANSPORT THAT IS HAS ARRIVED TO ITS POSITION. IN THAT WAY
-        # WE MAKE USE OF THE ORIGINAL IMPLEMENTATIONS.
-
-        # THE CALL SHOULD TRIGGER IMMEDIATELY THE AlreadyInDestination event
-        # THE TRANSPORT SHOULD THEN PICK UP THE CUSTOMER AND MOVE TO ITS DESTINATION
-
-        logger.info("Transport {} on route to customer {}".format(self.agent.name, customer_id))
-        reply = Message()
-        reply.to = customer_id
-        reply.set_metadata("performative", INFORM_PERFORMATIVE)
-        reply.set_metadata("protocol", TRAVEL_PROTOCOL)
-        content = {
-            "status": TRANSPORT_MOVING_TO_CUSTOMER
-        }
-        reply.body = json.dumps(content)
+        # Save customer attributes and travel destination
         self.set("current_customer", customer_id)
         self.agent.current_customer_orig = origin
         self.agent.current_customer_dest = dest
-        await self.send(reply)
-        self.agent.num_assignments += 1
-        try:
-            await self.agent.move_to(self.agent.current_customer_orig)
-        except AlreadyInDestination:
-            await self.agent.arrived_to_destination()
+
+        if not self.agent.is_customer_in_transport():
+            try:
+                # try to pick up the customer and move towards its destination
+                self.set("customer_in_transport", self.get("current_customer"))
+                await self.agent.move_to(self.agent.current_customer_dest)
+                self.agent.num_assignments += 1
+            except PathRequestException:
+                # if there is no path to customer's destination, cancel it
+                await self.agent.cancel_customer()
+                self.agent.status = TRANSPORT_WAITING
+            except AlreadyInDestination:
+                # if the transport is already in the customer's destination, drop the customer off
+                logger.error("++++++++++ transport {} is already in customers destination {}".format(
+                    self.agent.name, self.agent.current_customer_dest))
+                await self.agent.drop_customer()
+            else:
+                # if there is no error moving to the destination,
+                # inform the customer that it has been picked up
+                await self.agent.inform_customer(TRANSPORT_IN_CUSTOMER_PLACE)
+                self.agent.status = TRANSPORT_MOVING_TO_DESTINATION
+                logger.info("Transport {} has picked up the customer {}.".format(
+                    self.agent.agent_id, self.get("current_customer")))
 
     async def accept_customer(self, customer_id):
         """
