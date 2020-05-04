@@ -61,6 +61,8 @@ class CustomerAgent(Agent):
         self.animation_speed = ONESECOND_IN_MS
         self.distances = []
         self.durations = []
+        self.max_walking_dist = None # max distance (in meters) the customer accepts to walk
+        self.previous_closest_transport = None
 
         self.directory_id = None
         # type of the FleetManager (I think)
@@ -80,6 +82,16 @@ class CustomerAgent(Agent):
                 self.arrived_to_transport_event.set()
 
         self.arrived_to_transport_callback = arrived_to_transport_callback
+
+        self.set("arrived_to_destination", False)
+
+        self.arrived_to_destination_event = asyncio.Event(loop=self.loop)
+
+        def arrived_to_destination_callback(old, new):
+            if not self.arrived_to_destination_event.is_set() and new is True:
+                self.arrived_to_destination_event.set()
+
+        self.arrived_to_destination_callback = arrived_to_destination_callback
 
     async def setup(self):
         # CHECK IF IT NEEDS MODIFICATION
@@ -175,6 +187,10 @@ class CustomerAgent(Agent):
 
         """
         self.directory_id = directory_id
+
+    def set_max_walking_dist(self, distance):
+
+        self.max_walking_dist = distance
 
     def set_initial_position(self, coords):
         self.current_pos = coords
@@ -305,6 +321,22 @@ class CustomerAgent(Agent):
             return self.pickup_time - self.waiting_for_pickup_time
         return None
 
+    def can_walk(self, coords):
+        """
+        Returns a boolean indicating id the distance between the customer's current position and
+        the coordinates passed as a parameter is lower than the maximum walking distance of the agent
+
+        Returns:
+            boolean: If the customer is able to walk from their position to "coords"
+        """
+        if self.max_walking_dist is None:
+            return True
+        pos = self.get("current_pos")
+        dist = distance_in_meters(self.get("current_pos"), coords)
+        logger.error(f"My max walking distance is {self.max_walking_dist}")
+        logger.error(f"Customer's position {pos}, transport position {coords}, distance {dist}")
+        return distance_in_meters(self.get("current_pos"), coords) <= self.max_walking_dist
+
     def to_json(self):
         """
         Serializes the main information of a customer agent to a JSON format.
@@ -384,8 +416,7 @@ class CustomerAgent(Agent):
              AlreadyInDestination: if the transport is already in the destination coordinates.
         """
         # MUST BE MODIFIED TO ADAPT IT FOR CUSTOMER MOVEMENT TO BOOKED TRANSPORT
-        logger.info("---------------Customer {} MOVING TO transport {}".format(self.name,
-                                                                               self.get("current_transport")))
+        logger.debug("Customer {} MOVING TO transport {}".format(self.name, self.get("current_transport")))
         if self.get("current_pos") == dest:
             raise AlreadyInDestination
         counter = 5
@@ -472,6 +503,7 @@ class TravelBehaviour(CyclicBehaviour):
                 elif status == CUSTOMER_IN_DEST:
                     self.agent.status = CUSTOMER_IN_DEST
                     self.agent.end_time = time.time()
+                    self.set("arrived_to_destination", True)
                     logger.info("Customer {} arrived to destination after {} seconds."
                                 .format(self.agent.name, self.agent.total_time()))
                 # Move the customer exactly to the coordinates where the transport expects it to be
@@ -618,7 +650,7 @@ class CustomerStrategyBehaviour(StrategyBehaviour):
         self.agent.status = CUSTOMER_MOVING_TO_TRANSPORT
         self.agent.set("current_transport", transport_id)
         self.agent.current_transport_pos = dest
-        logger.info("go_to_transport:::{} {}".format(self.get("current_transport"), self.agent.current_transport_pos))
+        logger.debug("go_to_transport --> {} {}".format(self.get("current_transport"), self.agent.current_transport_pos))
         try:
             await self.agent.move_to(self.agent.current_transport_pos)
         except AlreadyInDestination:

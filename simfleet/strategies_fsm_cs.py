@@ -34,7 +34,7 @@ class SendAvailableTransportsBehaviour(FleetManagerStrategyBehaviour):
 
         msg = await self.receive(timeout=5)
         if msg:
-            logger.info("Manager received message: {}".format(msg))
+            logger.debug("Manager received message: {}".format(msg))
             protocol = msg.get_metadata("protocol")
             if protocol == REQUEST_PROTOCOL:
                 performative = msg.get_metadata("performative")
@@ -85,7 +85,7 @@ class TransportWaitingState(TransportStrategyBehaviour, State):
         if not msg:
             self.set_next_state(TRANSPORT_WAITING)
             return
-        logger.info("Transport {} received: {}".format(self.agent.jid, msg))
+        logger.debug("Transport {} received: {}".format(self.agent.jid, msg))
         content = json.loads(msg.body)
         performative = msg.get_metadata("performative")
         if performative == PROPOSE_PERFORMATIVE:
@@ -110,7 +110,7 @@ class TransportBookedState(TransportStrategyBehaviour, State):
         if not msg:
             self.set_next_state(TRANSPORT_WAITING)
             return
-        logger.info("Transport {} received: {}".format(self.agent.jid, msg.body))
+        logger.debug("Transport {} received: {}".format(self.agent.jid, msg.body))
         content = json.loads(msg.body)
         performative = msg.get_metadata("performative")
         # We can receive 3 types of messages
@@ -200,6 +200,7 @@ class CustomerWaitingState(CustomerStrategyBehaviour, State):
         await super().on_start()
         self.agent.status = CUSTOMER_WAITING
         logger.warning("{} in Customer Waiting State".format(self.agent.jid))
+        await asyncio.sleep(1)
 
     async def run(self):
         # Get fleet managers
@@ -229,7 +230,7 @@ class CustomerWaitingState(CustomerStrategyBehaviour, State):
             if not msg:
                 self.set_next_state(CUSTOMER_WAITING)
                 return
-            logger.info("Customer received message: {}".format(msg))
+            logger.debug("Customer received message: {}".format(msg))
             try:
                 content = json.loads(msg.body)
                 # if the list of available transports is empty, the customer waits 5 seconds before asking for it again
@@ -264,21 +265,35 @@ class CustomerWaitingState(CustomerStrategyBehaviour, State):
             for key in self.agent.available_transports.keys():
                 dic = self.agent.available_transports.get(key)
                 transport_positions.append((dic['jid'], dic['position']))
+            #######################
+            # for debugging purposes
+            for jid, pos in transport_positions:
+                logger.debug("Transport {} is {} meters away from customer {}".format(jid,
+                    distance_in_meters(self.agent.get_position(), pos), self.agent.name))
+            #######################
             closest_transport = min(transport_positions,
                                     key=lambda x: distance_in_meters(x[1], self.agent.get_position()))
+            # If the customer is receiving the same closes transport over and over and it can't walk to it,
+            # make it wait 5 seconds in between requests
+            if self.agent.previous_closest_transport is not None and self.agent.previous_closest_transport == closest_transport:
+                await asyncio.sleep(5)
+            self.agent.previous_closest_transport = closest_transport
             logger.info("Closest transport: {}".format(closest_transport))
             transport_id = closest_transport[0]
             transport_position = closest_transport[1]
+            # Check if the transport is close enough for the customer to walk to it
+            if not self.agent.can_walk(transport_position):
+                closest_transport = None
+                logger.info(f"Customer {self.agent.name} cannot walk to their closest transport")
             # delete that transport from the available_transports list
             del self.agent.available_transports[transport_id]
-            # self.agent.available_transports = [x for x in self.agent.available_transports if x[0] != transport_id]
             if closest_transport is not None:
                 await self.send_proposal(transport_id)  # maybe str(transport_id)
                 self.set_next_state(CUSTOMER_WAITING_FOR_APPROVAL)
                 return
             else:
-                logger.warning("Closest transport to customer {} was None".format(self.agent.name))
-                self.agent.available_transports = []
+                logger.debug("Closest transport to customer {} was None".format(self.agent.name))
+                # self.agent.available_transports = []
                 self.set_next_state(CUSTOMER_WAITING)
                 return
 
@@ -334,6 +349,9 @@ class CustomerMovingToTransportState(CustomerStrategyBehaviour, State):
         logger.warning("{} in Customer Moving To Transport State".format(self.agent.jid))
 
     async def run(self):
+        if self.agent.get("arrived_to_transport"):
+            logger.warning("Customer {} is already in their transport place".format(self.agent.jid))
+            return self.set_next_state(CUSTOMER_IN_TRANSPORT)
         self.agent.arrived_to_transport_event.clear()
         self.agent.watch_value("arrived_to_transport", self.agent.arrived_to_transport_callback)
         await self.agent.arrived_to_transport_event.wait()
@@ -345,11 +363,14 @@ class CustomerInTransportState(CustomerStrategyBehaviour, State):
     async def on_start(self):
         await super().on_start()
         #self.agent.status = CUSTOMER_IN_TRANSPORT
-        logger.debug("{} in Customer In Transport State".format(self.agent.jid))
+        logger.warning("{} in Customer In Transport State".format(self.agent.jid))
 
     async def run(self):
         await self.inform_transport()
         # block strategy execution
+        self.agent.arrived_to_destination_event.clear()
+        self.agent.watch_value("arrived_to_destination", self.agent.arrived_to_destination_callback)
+        await self.agent.arrived_to_destination_event.wait()
         return self.set_next_state(CUSTOMER_IN_DEST)
 
 
@@ -361,7 +382,8 @@ class CustomerInDestState(CustomerStrategyBehaviour, State):
         logger.debug("{} in Customer In Dest State".format(self.agent.jid))
 
     async def run(self):
-        return self.set_next_state(CUSTOMER_IN_DEST)
+        logger.info(f"Customer {self.agent.name} has reached their destination")
+        return # self.set_next_state(CUSTOMER_IN_DEST)
 
 
 class FSMCustomerStrategyBehaviour(FSMBehaviour):

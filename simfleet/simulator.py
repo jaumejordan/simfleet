@@ -172,13 +172,16 @@ class SimulatorAgent(Agent):
             strategy = customer.get("strategy")
             icon = customer.get("icon")
             delay = customer["delay"] if "delay" in customer else None
+            # New parameter to determine the maximum walking distance a customer finds reasonable
+            # to walk to get their car
+            max_walking_dist = customer["max_walking_dist"] if "max_walking_dist" in customer else None
 
             delayed = False
             if delay is not None:
                 delayed = True
 
             agent = self.create_customer_agent(name, password, fleet_type, position=position, target=target,
-                                               strategy=strategy, delayed=delayed)
+                                               strategy=strategy, delayed=delayed, max_walking_dist=max_walking_dist)
 
             self.set_icon(agent, icon, default="customer")
 
@@ -234,6 +237,9 @@ class SimulatorAgent(Agent):
         if self.config.max_time is None:
             return False
         return self.time_is_out() or self.all_customers_in_destination()
+
+        # for customer in self.customer_agents.values():
+
 
     def time_is_out(self):
         """
@@ -968,7 +974,8 @@ class SimulatorAgent(Agent):
 
         return agent
 
-    def create_customer_agent(self, name, password, fleet_type, position, strategy=None, target=None, delayed=False):
+    def create_customer_agent(self, name, password, fleet_type, position,
+                              strategy=None, target=None, delayed=False, max_walking_dist=None):
         """
         Create a customer agent.
 
@@ -995,6 +1002,10 @@ class SimulatorAgent(Agent):
         agent.set_initial_position(position)
 
         agent.set_target_position(target)
+
+        # NEW set maximum walking distance if defined
+        if max_walking_dist:
+            agent.set_max_walking_dist(max_walking_dist)
 
         if strategy:
             agent.strategy = load_class(strategy)
