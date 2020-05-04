@@ -17,10 +17,12 @@ from tabulate import tabulate
 from .customer_cs import CustomerAgent
 from .directory import DirectoryAgent
 from .fleetmanager import FleetManagerAgent
+from .helpers import distance_in_meters
 from .route import RouteAgent
 from .station import StationAgent
 from .transport_cs import TransportAgent
-from .utils import load_class, status_to_str, avg, request_path as async_request_path
+from .utils import load_class, status_to_str, avg, request_path as async_request_path, TRANSPORT_WAITING, \
+    CUSTOMER_WAITING
 from simfleet.strategies_fsm_cs import SendAvailableTransportsBehaviour, FSMCustomerStrategyBehaviour, FSMTransportStrategyBehaviour
 
 faker_factory = faker.Factory.create()
@@ -70,6 +72,10 @@ class SimulatorAgent(Agent):
         self.customer_strategy = None
         self.directory_strategy = None
         self.station_strategy = None
+
+        # attribute that indicates if the simulation finished because one
+        # or more customers could not get to any vehicle by walking
+        self.unfinished = False
 
         self.delayed_launch_agents = {}
 
@@ -236,9 +242,48 @@ class SimulatorAgent(Agent):
         """
         if self.config.max_time is None:
             return False
-        return self.time_is_out() or self.all_customers_in_destination()
 
-        # for customer in self.customer_agents.values():
+        if self.time_is_out() or self.all_customers_in_destination():
+            return True
+
+        # Check if all transports are available and, thus, not being used
+        positions = []
+        all_transports_free = True
+        all_transports_out_of_reach = False
+        for transport in self.transport_agents.values():
+            positions.append(transport.get_position())
+            if transport.status != TRANSPORT_WAITING:
+                all_transports_free = False
+                break
+
+        if not all_transports_free:
+            return False
+        else:
+            # Check, for every customer that is still waiting, if any of the vehicles is close
+            # enough for them to walk to them.
+            reachable_transports = []
+            for customer in self.customer_agents.values():
+                if customer.status == CUSTOMER_WAITING:
+                    for pos in positions:
+                        if customer.max_walking_dist is None:
+                            reachable_transports.append(True)
+                        elif distance_in_meters(customer.get_position(), pos) <= customer.max_walking_dist:
+                            reachable_transports.append(True)
+                        else:
+                            reachable_transports.append(False)
+
+            reachable = any(reachable_transports) # True if at least one customer can walk to a vehicle
+
+            # If there is a customer that may reach a vehicle, the simulation continues
+            if reachable:
+                return False
+            else:
+                # otherwise stop it, indicating the impossibility of that customer to get to their destination
+                self.unfinished = True
+                return True
+
+
+
 
 
     def time_is_out(self):
@@ -299,6 +344,10 @@ class SimulatorAgent(Agent):
 
         self.route_agent.stop().result()
         self.directory_agent.stop().result()
+
+        # inform the user that the simulation finished because no customer could reach an available vehicle
+        if self.unfinished:
+            logger.error("The remaining customers can not walk to any available transport. Terminating simulation.")
 
         logger.info("Terminating... ({0:.1f} seconds elapsed)".format(self.simulation_time))
 
