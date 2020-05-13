@@ -121,10 +121,9 @@ class TransportBookedState(TransportStrategyBehaviour, State):
             return
         # 2) Customer cancels request
         elif performative == CANCEL_PERFORMATIVE:
-            if self.agent.get("current_customer") == content["customer_id"]:
-                await self.deassign_customer()
-                self.set_next_state(TRANSPORT_WAITING)
-                return
+            await self.deassign_customer()
+            self.set_next_state(TRANSPORT_WAITING)
+            return
         # 3) Customer informs that they are in my position
         elif performative == INFORM_PERFORMATIVE:
             try:

@@ -246,6 +246,8 @@ class SimulatorAgent(Agent):
         if self.time_is_out() or self.all_customers_in_destination():
             return True
 
+        if len(self.customer_agents) == 0 or len(self.transport_agents) == 0:
+            return False
         # Check if all transports are available and, thus, not being used
         positions = []
         all_transports_free = True
