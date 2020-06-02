@@ -95,6 +95,21 @@ class TransportAgent(Agent):
 
         self.customer_in_transport_callback = customer_in_transport_callback
 
+        # List of actions
+        self.actions = [
+            {'agent': 'juaneltaxista', 'type': 'CUSTOMER',
+             'attributes': {'customer_id': 'pepeblack@localhost', 'customer_origin': [39.501382, -0.428753],
+                            'customer_dest': [39.466394, -0.324807]}},
+            {'agent': 'juaneltaxista', 'type': 'CUSTOMER',
+             'attributes': {'customer_id': 'hbrown@localhost', 'customer_origin': [39.501382, -0.418753],
+                            'customer_dest': [39.466394, -0.324807]}},
+            {'agent': 'juaneltaxista', 'type': 'CHARGING',
+             'attributes': {'station_id': 'station1@localhost', 'station_position': [39.463356, -0.376463]}},
+            {'agent': 'juaneltaxista', 'type': 'CUSTOMER',
+             'attributes': {'customer_id': 'jjdfkk@localhost', 'customer_origin': [39.501382, -0.438753],
+                            'customer_dest': [39.466394, -0.324807]}}
+        ]
+
     async def setup(self):
         try:
             template = Template()
@@ -114,6 +129,14 @@ class TransportAgent(Agent):
         if key in self.__observers:
             for callback in self.__observers[key]:
                 callback(old, value)
+
+    # NEW
+    '''
+    Returns the first action in the agent's action list
+    '''
+
+    def get_next_action(self):
+        return self.actions.pop(0)
 
     def sleep(self, seconds):
         # await asyncio.sleep(seconds)
