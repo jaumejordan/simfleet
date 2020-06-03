@@ -18,7 +18,7 @@ from .protocol import REQUEST_PROTOCOL, TRAVEL_PROTOCOL, PROPOSE_PERFORMATIVE, C
 from .utils import TRANSPORT_WAITING, TRANSPORT_MOVING_TO_CUSTOMER, TRANSPORT_IN_CUSTOMER_PLACE, \
     TRANSPORT_MOVING_TO_DESTINATION, TRANSPORT_IN_STATION_PLACE, TRANSPORT_CHARGING, \
     CUSTOMER_IN_DEST, CUSTOMER_LOCATION, TRANSPORT_MOVING_TO_STATION, chunk_path, request_path, StrategyBehaviour, \
-    TRANSPORT_NEEDS_CHARGING
+    TRANSPORT_NEEDS_CHARGING, TRANSPORT_RELOCATING
 
 MIN_AUTONOMY = 2
 ONESECOND_IN_MS = 1000
@@ -94,6 +94,17 @@ class TransportAgent(Agent):
                 self.customer_in_transport_event.set()
 
         self.customer_in_transport_callback = customer_in_transport_callback
+
+        # Transport relocated event
+        self.set("transport_relocated", None)
+
+        self.transport_relocated_event = asyncio.Event(loop=self.loop)
+
+        def transport_relocated_callback(old, new):
+            if not self.transport_relocated_event.is_set() and new is True:
+                self.transport_relocated_event.set()
+
+        self.transport_relocated_callback = transport_relocated_callback
 
         # List of actions
         self.actions = [
@@ -245,22 +256,25 @@ class TransportAgent(Agent):
         """
         self.set("path", None)
         self.chunked_path = None
-        if not self.is_customer_in_transport():  # self.status == TRANSPORT_MOVING_TO_CUSTOMER:
-            try:
-                self.set("customer_in_transport", self.get("current_customer"))
-                await self.move_to(self.current_customer_dest)
-            except PathRequestException:
-                await self.cancel_customer()
-                self.status = TRANSPORT_WAITING
-            except AlreadyInDestination:
+        if self.status == TRANSPORT_RELOCATING:
+            self.set("transport_relocated", True)
+        else:
+            if not self.is_customer_in_transport():  # self.status == TRANSPORT_MOVING_TO_CUSTOMER:
+                try:
+                    self.set("customer_in_transport", self.get("current_customer"))
+                    await self.move_to(self.current_customer_dest)
+                except PathRequestException:
+                    await self.cancel_customer()
+                    self.status = TRANSPORT_WAITING
+                except AlreadyInDestination:
+                    await self.drop_customer()
+                else:
+                    await self.inform_customer(TRANSPORT_IN_CUSTOMER_PLACE)
+                    self.status = TRANSPORT_MOVING_TO_DESTINATION
+                    logger.info("Transport {} has picked up the customer {}.".format(self.agent_id,
+                                                                                     self.get("current_customer")))
+            else:  # elif self.status == TRANSPORT_MOVING_TO_DESTINATION:
                 await self.drop_customer()
-            else:
-                await self.inform_customer(TRANSPORT_IN_CUSTOMER_PLACE)
-                self.status = TRANSPORT_MOVING_TO_DESTINATION
-                logger.info("Transport {} has picked up the customer {}.".format(self.agent_id,
-                                                                                 self.get("current_customer")))
-        else:  # elif self.status == TRANSPORT_MOVING_TO_DESTINATION:
-            await self.drop_customer()
 
     async def arrived_to_station(self, station_id=None):
         """

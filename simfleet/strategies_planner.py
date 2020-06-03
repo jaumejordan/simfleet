@@ -11,7 +11,7 @@ from simfleet.protocol import REQUEST_PERFORMATIVE, ACCEPT_PERFORMATIVE, REFUSE_
 from simfleet.transport import TransportStrategyBehaviour
 from simfleet.utils import TRANSPORT_WAITING, TRANSPORT_WAITING_FOR_APPROVAL, TRANSPORT_MOVING_TO_CUSTOMER, \
     TRANSPORT_NEEDS_CHARGING, TRANSPORT_MOVING_TO_STATION, TRANSPORT_IN_STATION_PLACE, TRANSPORT_CHARGING, \
-    TRANSPORT_CHARGED, CUSTOMER_WAITING, CUSTOMER_ASSIGNED
+    TRANSPORT_CHARGED, CUSTOMER_WAITING, CUSTOMER_ASSIGNED, TRANSPORT_RELOCATING
 
 
 ################################################################
@@ -56,7 +56,7 @@ class TransportGetActionState(TransportStrategyBehaviour, State):
         action_type = action.get('type')
         attributes = action.get('attributes')
         # If it is a charging action, extract station and position, start movement
-        if action_type == 'CHARGING':
+        if action_type == 'CHARGE':
             station = attributes.get('station_id')
             station_position = attributes.get('station_position')
             self.agent.current_station_dest = (station, station_position)
@@ -98,6 +98,21 @@ class TransportGetActionState(TransportStrategyBehaviour, State):
                 await self.cancel_proposal(customer_id)
                 # self.set_next_state(TRANSPORT_WAITING)
                 return
+        # If it is a relocation, extract new position, start movement
+        elif action_type == 'RELOCATE':
+            new_position = attributes.get('new_position')
+            try:
+                await self.agent.move_to(new_position)
+                self.set_next_state(TRANSPORT_RELOCATING)
+            except PathRequestException:
+                logger.error("Transport {} could not get a path to new position {}. Cancelling..."
+                             .format(self.agent.name, new_position))
+                return
+            except Exception as e:
+                logger.error("Unexpected error in transport {}: {}".format(self.agent.name, e))
+                # self.set_next_state(TRANSPORT_WAITING)
+                return
+
 
 
 class TransportMovingToStationState(TransportStrategyBehaviour, State):
@@ -197,6 +212,19 @@ class TransportMovingToCustomerState(TransportStrategyBehaviour, State):
         # no s'está accedint a aquesta part del codi
         return self.set_next_state(TRANSPORT_WAITING)
 
+class TransportRelocatingState(TransportStrategyBehaviour, State):
+
+    async def on_start(self):
+        await super().on_start()
+        self.agent.status = TRANSPORT_RELOCATING
+        logger.debug("{} in Transport Relocating State".format(self.agent.jid))
+
+    async def run(self):
+        self.agent.transport_relocated_event.clear()
+        self.agent.watch_value("transport_relocated", self.agent.transport_relocated_callback)
+        await self.agent.transport_relocated_event.wait()
+        return self.set_next_state(TRANSPORT_WAITING)
+
 
 class FSMTransportStrategyBehaviour(FSMBehaviour):
     def setup(self):
@@ -211,6 +239,8 @@ class FSMTransportStrategyBehaviour(FSMBehaviour):
         self.add_state(TRANSPORT_MOVING_TO_STATION, TransportMovingToStationState())
         self.add_state(TRANSPORT_IN_STATION_PLACE, TransportInStationState())
         self.add_state(TRANSPORT_CHARGING, TransportChargingState())
+
+        self.add_state(TRANSPORT_RELOCATING, TransportRelocatingState())
 
         # Create transitions
         self.add_transition(TRANSPORT_WAITING, TRANSPORT_MOVING_TO_STATION) # do charging action
