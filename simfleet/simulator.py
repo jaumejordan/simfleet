@@ -951,10 +951,9 @@ class SimulatorAgent(Agent):
                    "{0:.2f}".format(
                        t.total_charging_time),
                    status_to_str(t.status))
-                  for t in
-                  self.transport_agents.values()])
+                  for t in self.transport_agents.values()])
         except ValueError:
-            names, assignments, distances, waiting_in_station_time, charging_time, statuses = [], [], [], [], []
+            names, assignments, distances, waiting_in_station_time, charging_time, statuses = [], [], [], [], [], []
         df = pd.DataFrame.from_dict({"name": names,
                                      "assignments": assignments,
                                      "distance": distances,

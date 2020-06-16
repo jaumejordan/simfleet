@@ -190,7 +190,7 @@ class TransportMovingToDestinationState2(TransportStrategyBehaviour, State):
         # block behaviour until another coroutine calls set()
         while not self.agent.customer_in_transport_event.is_set():
             # listen to messages and reject them
-            msg = await self.receive(timeout=60)
+            msg = await self.receive(timeout=5)
             if msg:
                 logger.debug("Transport {} received: {}".format(self.agent.jid, msg.body))
                 content = json.loads(msg.body)

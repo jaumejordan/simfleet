@@ -34,7 +34,7 @@ class TransportAgent(Agent):
         super().__init__(agentjid, password)
 
         self.fleetmanager_id = None
-        self.route_id = None
+        self.route_host = None
         self.strategy = None
         self.running_strategy = False
 
@@ -68,7 +68,7 @@ class TransportAgent(Agent):
         self.waiting_in_queue_time = None
         self.charge_time = None
         self.total_waiting_time = None
-        self.total_charging_time = None
+        self.total_charging_time = 0
 
         # ATRIBUTES FOR EVENT AND CALLBACK MANAGEMENT
         # Customer in transport event. Triggered when the customer
@@ -463,7 +463,7 @@ class TransportAgent(Agent):
             >>> print(duration)
             3.24
         """
-        return await request_path(self, origin, destination, self.route_id)
+        return await request_path(self, origin, destination, self.route_host)
 
     def set_initial_position(self, coords):
         self.set("current_pos", coords)

@@ -35,7 +35,7 @@ class CustomerAgent(Agent):
         self.running_strategy = False
         self.fleet_type = None
         self.fleetmanagers = None
-        self.route_id = None
+        self.route_host = None
         self.status = CUSTOMER_WAITING
         self.current_pos = None
         self.final_dest = None
@@ -278,7 +278,7 @@ class CustomerAgent(Agent):
         Returns:
             list, float, float: A list of points that represent the path from origin to destination, the distance and the estimated duration
         """
-        return await request_path(self, origin, destination, self.route_id)
+        return await request_path(self, origin, destination, self.route_host)
 
     def total_time(self):
         """
