@@ -50,7 +50,7 @@ class CustomerAgent(Agent):
         self.is_launched = False
 
         # Attributes for movement
-        self.available_transports = []
+        self.available_transports = None
         self.set("current_transport", None)
         self.current_transport_pos = None
         self.set("current_pos", None)
@@ -333,8 +333,8 @@ class CustomerAgent(Agent):
             return True
         pos = self.get("current_pos")
         dist = distance_in_meters(self.get("current_pos"), coords)
-        logger.error(f"My max walking distance is {self.max_walking_dist}")
-        logger.error(f"Customer's position {pos}, transport position {coords}, distance {dist}")
+        logger.debug(f"{self.name} max walking distance is {self.max_walking_dist}")
+        logger.debug(f"Customer's position {pos}, transport position {coords}, distance {dist}")
         return distance_in_meters(self.get("current_pos"), coords) <= self.max_walking_dist
 
     def to_json(self):
@@ -403,6 +403,7 @@ class CustomerAgent(Agent):
         self.chunked_path = None
         logger.info("Customer {} arrived to the transport {} position".format(self.name,
                                                                               self.get("current_transport")))
+        logger.error(f"{self.name}::: length of distances: {len(self.distances)}, dist. walked to car: {sum(self.distances):.2f}")
         self.set("arrived_to_transport", True)
 
     async def move_to(self, dest):
@@ -506,6 +507,8 @@ class TravelBehaviour(CyclicBehaviour):
                     self.set("arrived_to_destination", True)
                     logger.info("Customer {} arrived to destination after {} seconds."
                                 .format(self.agent.name, self.agent.total_time()))
+                    logger.error(
+                        f"DESTINATION {self.agent.name}::: length of distances: {len(self.agent.distances)}, dist. walked to car: {sum(self.agent.distances):.2f}")
                 # Move the customer exactly to the coordinates where the transport expects it to be
                 elif status == CUSTOMER_LOCATION:
                     coords = content["location"]

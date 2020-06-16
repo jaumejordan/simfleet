@@ -8,6 +8,7 @@ from pathlib import Path
 
 import faker
 import pandas as pd
+import numpy as np
 from aiohttp import web as aioweb
 from loguru import logger
 from spade.agent import Agent
@@ -370,9 +371,8 @@ class SimulatorAgent(Agent):
         if self.config.simulation_name:
             df_avg["Simulation Name"] = self.config.simulation_name
             columns = ["Simulation Name"]
-        columns += ["Avg Customer Waiting Time", "Avg Customer Total Time", "Avg Transport Waiting Time",
-                    "Avg Distance",
-                    "Simulation Time"]
+        columns += ["Avg Customer Waiting Time", "Avg Customer Total Time", "Avg Customer Walking dist",
+                    "Walking dist std dev", "Avg Transport Waiting Time", "Avg Distance", "Simulation Time"]
         if self.config.max_time:
             df_avg["Max Time"] = self.config.max_time
             columns += ["Max Time"]
@@ -635,8 +635,10 @@ class SimulatorAgent(Agent):
             waiting = avg([customer.get_waiting_time() for customer in self.customer_agents.values()])
             total = avg(
                 [customer.total_time() for customer in self.customer_agents.values() if customer.total_time()])
+            walking = avg([sum(customer.distances) for customer in self.customer_agents.values()])
+            walking_stdev = np.std([sum(customer.distances) for customer in self.customer_agents.values()])
         else:
-            waiting, total = 0, 0
+            waiting, total, walking = 0, 0, 0
 
         if len(self.transport_agents) > 0:
             t_waiting = avg([transport.total_waiting_time for transport in self.transport_agents.values()])
@@ -648,7 +650,9 @@ class SimulatorAgent(Agent):
         return {
             "waiting": "{0:.2f}".format(waiting),
             "totaltime": "{0:.2f}".format(total),
+            "walking": "{0:.2f}".format(walking),
             "t_waiting": "{0:.2f}".format(t_waiting),
+            "walking_stdev": "{0:.2f}".format(walking_stdev),
             "distance": "{0:.2f}".format(distance),
             "finished": self.is_simulation_finished(),
             "is_running": self.simulation_running,
@@ -851,13 +855,17 @@ class SimulatorAgent(Agent):
             ``pandas.DataFrame``: the dataframe with the customers stats.
         """
         try:
-            names, waitings, totals, statuses = zip(*[(p.name, p.get_waiting_time(),
-                                                       p.total_time(), status_to_str(p.status))
-                                                      for p in self.customer_agents.values()])
+            names, walking_distance, waitings, totals, statuses = zip(*[(p.name, "{0:.2f}".format(sum(p.distances)),
+                                                       p.get_waiting_time(), p.total_time(),
+                                                       status_to_str(p.status)) for p in self.customer_agents.values()])
         except ValueError:
             names, waitings, totals, statuses = [], [], [], []
 
-        df = pd.DataFrame.from_dict({"name": names, "waiting_time": waitings, "total_time": totals, "status": statuses})
+        df = pd.DataFrame.from_dict({"name": names,
+                                     "walking_distance": walking_distance,
+                                     "waiting_time": waitings,
+                                     "total_time": totals,
+                                     "status": statuses})
         return df
 
     def get_transport_stats(self):
@@ -929,7 +937,7 @@ class SimulatorAgent(Agent):
         manager_df = self.get_manager_stats()
         manager_df = manager_df[["fleet_name", "transports_in_fleet", "type"]]
         customer_df = self.get_customer_stats()
-        customer_df = customer_df[["name", "waiting_time", "total_time", "status"]]
+        customer_df = customer_df[["name", "walking_distance", "waiting_time", "total_time", "status"]]
         transport_df = self.get_transport_stats()
         transport_df = transport_df[["name", "assignments", "distance", "waiting_in_station_time", "status"]]
         station_df = self.get_station_stats()
@@ -939,13 +947,16 @@ class SimulatorAgent(Agent):
         stats = self.get_stats()
         df_avg = pd.DataFrame.from_dict({"Avg Customer Waiting Time": [stats["waiting"]],
                                          "Avg Customer Total Time": [stats["totaltime"]],
+                                         "Avg Customer Walking dist": [stats["walking"]],
                                          "Avg Transport Waiting Time": [stats["t_waiting"]],
+                                         "Walking dist std dev": [stats["walking_stdev"]],
                                          "Avg Distance": [stats["distance"]],
                                          "Simulation Finished": [stats["finished"]],
                                          "Simulation Time": [self.get_simulation_time()]
                                          })
-        columns = ["Avg Customer Waiting Time", "Avg Customer Total Time", "Avg Transport Waiting Time", "Avg Distance",
-                   "Simulation Time", "Simulation Finished"]
+        columns = ["Avg Customer Waiting Time", "Avg Customer Total Time", "Avg Customer Walking dist",
+                   "Walking dist std dev", "Avg Transport Waiting Time", "Avg Distance", "Simulation Time",
+                   "Simulation Finished"]
         df_avg = df_avg[columns]
 
         return df_avg, transport_df, customer_df, manager_df, station_df
