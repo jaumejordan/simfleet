@@ -9,18 +9,22 @@ from typing import List
 
 import faker
 import pandas as pd
+import numpy as np
 from aiohttp import web as aioweb
 from loguru import logger
 from spade.agent import Agent
 from spade.behaviour import TimeoutBehaviour, OneShotBehaviour
 from tabulate import tabulate
 
-from .customer import CustomerAgent
+from .customer_cs import CustomerAgent
 from .directory import DirectoryAgent
 from .fleetmanager import FleetManagerAgent
+from .helpers import distance_in_meters
 from .station import StationAgent
-from .transport import TransportAgent
-from .utils import load_class, status_to_str, avg, request_path as async_request_path
+from .transport_cs import TransportAgent
+from .utils import load_class, status_to_str, avg, request_path as async_request_path, TRANSPORT_WAITING, \
+    CUSTOMER_WAITING
+from simfleet.strategies_fsm_cs import SendAvailableTransportsBehaviour, FSMCustomerStrategyBehaviour, FSMTransportStrategyBehaviour
 
 faker_factory = faker.Factory.create()
 
@@ -68,6 +72,10 @@ class SimulatorAgent(Agent):
         self.customer_strategy = None
         self.directory_strategy = None
         self.station_strategy = None
+
+        # attribute that indicates if the simulation finished because one
+        # or more customers could not get to any vehicle by walking
+        self.unfinished = False
 
         self.delayed_launch_agents = {}
 
@@ -212,13 +220,16 @@ class SimulatorAgent(Agent):
             strategy = customer.get("strategy")
             icon = customer.get("icon")
             delay = customer["delay"] if "delay" in customer else None
+            # New parameter to determine the maximum walking distance a customer finds reasonable
+            # to walk to get their car
+            max_walking_dist = customer["max_walking_dist"] if "max_walking_dist" in customer else None
 
             delayed = False
             if delay is not None:
                 delayed = True
 
             agent = self.create_customer_agent(name, password, fleet_type, position=position, target=target,
-                                               strategy=strategy, delayed=delayed)
+                                               strategy=strategy, delayed=delayed, max_walking_dist=max_walking_dist)
 
             self.set_icon(agent, icon, default="customer")
 
@@ -282,7 +293,51 @@ class SimulatorAgent(Agent):
         """
         if self.config.max_time is None:
             return False
-        return self.time_is_out() or self.all_customers_in_destination()
+
+        if self.time_is_out() or self.all_customers_in_destination():
+            return True
+
+        if len(self.customer_agents) == 0 or len(self.transport_agents) == 0:
+            return False
+        # Check if all transports are available and, thus, not being used
+        positions = []
+        all_transports_free = True
+        all_transports_out_of_reach = False
+        for transport in self.transport_agents.values():
+            positions.append(transport.get_position())
+            if transport.status != TRANSPORT_WAITING:
+                all_transports_free = False
+                break
+
+        if not all_transports_free:
+            return False
+        else:
+            # Check, for every customer that is still waiting, if any of the vehicles is close
+            # enough for them to walk to them.
+            reachable_transports = []
+            for customer in self.customer_agents.values():
+                if customer.status == CUSTOMER_WAITING:
+                    for pos in positions:
+                        if customer.max_walking_dist is None:
+                            reachable_transports.append(True)
+                        elif distance_in_meters(customer.get_position(), pos) <= customer.max_walking_dist:
+                            reachable_transports.append(True)
+                        else:
+                            reachable_transports.append(False)
+
+            reachable = any(reachable_transports) # True if at least one customer can walk to a vehicle
+
+            # If there is a customer that may reach a vehicle, the simulation continues
+            if reachable:
+                return False
+            else:
+                # otherwise stop it, indicating the impossibility of that customer to get to their destination
+                self.unfinished = True
+                return True
+
+
+
+
 
     def time_is_out(self):
         """
@@ -354,6 +409,10 @@ class SimulatorAgent(Agent):
 
         self.directory_agent.stop().result()
 
+        # inform the user that the simulation finished because no customer could reach an available vehicle
+        if self.unfinished:
+            logger.error("The remaining customers can not walk to any available transport. Terminating simulation.")
+
         logger.info("Terminating... ({0:.1f} seconds elapsed)".format(self.simulation_time))
 
         self.stop_agents()
@@ -373,8 +432,9 @@ class SimulatorAgent(Agent):
         if self.config.simulation_name:
             df_avg["Simulation Name"] = self.config.simulation_name
             columns = ["Simulation Name"]
-        columns += ["Avg Customer Waiting Time", "Avg Customer Total Time", "Avg Transport Waiting Time",
-                    "Avg Transport Charging Time", "Avg Distance", "Simulation Time"]
+        columns += ["Avg Customer Waiting Time", "Avg Customer Total Time", "Avg Customer Walking dist",
+                    "Walking dist std dev", "Avg Transport Waiting Time", "Avg Distance", "Simulation Time"]
+
         if self.config.max_time:
             df_avg["Max Time"] = self.config.max_time
             columns += ["Max Time"]
@@ -637,8 +697,10 @@ class SimulatorAgent(Agent):
             waiting = avg([customer.get_waiting_time() for customer in self.customer_agents.values()])
             total = avg(
                 [customer.total_time() for customer in self.customer_agents.values() if customer.total_time()])
+            walking = avg([sum(customer.distances) for customer in self.customer_agents.values()])
+            walking_stdev = np.std([sum(customer.distances) for customer in self.customer_agents.values()])
         else:
-            waiting, total = 0, 0
+            waiting, total, walking = 0, 0, 0
 
         if len(self.transport_agents) > 0:
             t_waiting = avg([transport.total_waiting_time for transport in self.transport_agents.values()])
@@ -652,7 +714,9 @@ class SimulatorAgent(Agent):
         return {
             "waiting": "{0:.2f}".format(waiting),
             "totaltime": "{0:.2f}".format(total),
+            "walking": "{0:.2f}".format(walking),
             "t_waiting": "{0:.2f}".format(t_waiting),
+            "walking_stdev": "{0:.2f}".format(walking_stdev),
             "t_charging": "{0:.2f}".format(t_charging),
             "distance": "{0:.2f}".format(distance),
             "finished": self.is_simulation_finished(),
@@ -668,8 +732,10 @@ class SimulatorAgent(Agent):
         Returns:`
             bool: whether the simulation has finished or not.
         """
+        # Now it has to check that all customers have arrived to their FINAL destinations
         if len(self.customer_agents) > 0:
-            return all([customer.is_in_destination() for customer in self.customer_agents.values()])
+            # OLD: return all([customer.is_in_destination() for customer in self.customer_agents.values()])
+            return all([customer.is_in_final_destination() for customer in self.customer_agents.values()])
         else:
             return False
 
@@ -854,13 +920,17 @@ class SimulatorAgent(Agent):
             ``pandas.DataFrame``: the dataframe with the customers stats.
         """
         try:
-            names, waitings, totals, statuses = zip(*[(p.name, p.get_waiting_time(),
-                                                       p.total_time(), status_to_str(p.status))
-                                                      for p in self.customer_agents.values()])
+            names, walking_distance, waitings, totals, statuses = zip(*[(p.name, "{0:.2f}".format(sum(p.distances)),
+                                                       p.get_waiting_time(), p.total_time(),
+                                                       status_to_str(p.status)) for p in self.customer_agents.values()])
         except ValueError:
             names, waitings, totals, statuses = [], [], [], []
 
-        df = pd.DataFrame.from_dict({"name": names, "waiting_time": waitings, "total_time": totals, "status": statuses})
+        df = pd.DataFrame.from_dict({"name": names,
+                                     "walking_distance": walking_distance,
+                                     "waiting_time": waitings,
+                                     "total_time": totals,
+                                     "status": statuses})
         return df
 
     def get_transport_stats(self):
@@ -937,7 +1007,7 @@ class SimulatorAgent(Agent):
         manager_df = self.get_manager_stats()
         manager_df = manager_df[["fleet_name", "transports_in_fleet", "type"]]
         customer_df = self.get_customer_stats()
-        customer_df = customer_df[["name", "waiting_time", "total_time", "status"]]
+        customer_df = customer_df[["name", "walking_distance", "waiting_time", "total_time", "status"]]
         transport_df = self.get_transport_stats()
         transport_df = transport_df[["name", "assignments", "distance", "waiting_in_station_time", "charging_time",
                                      "status"]]
@@ -949,14 +1019,16 @@ class SimulatorAgent(Agent):
         stats = self.get_stats()
         df_avg = pd.DataFrame.from_dict({"Avg Customer Waiting Time": [stats["waiting"]],
                                          "Avg Customer Total Time": [stats["totaltime"]],
+                                         "Avg Customer Walking dist": [stats["walking"]],
                                          "Avg Transport Waiting Time": [stats["t_waiting"]],
-                                         "Avg Transport Charging Time": [stats["t_charging"]],
+                                         "Walking dist std dev": [stats["walking_stdev"]],
                                          "Avg Distance": [stats["distance"]],
                                          "Simulation Finished": [stats["finished"]],
                                          "Simulation Time": [self.get_simulation_time()]
                                          })
-        columns = ["Avg Customer Waiting Time", "Avg Customer Total Time", "Avg Transport Waiting Time",
-                   "Avg Transport Charging Time", "Avg Distance", "Simulation Time", "Simulation Finished"]
+        columns = ["Avg Customer Waiting Time", "Avg Customer Total Time", "Avg Customer Walking dist",
+                   "Walking dist std dev", "Avg Transport Waiting Time", "Avg Distance", "Simulation Time",
+                   "Simulation Finished"]
         df_avg = df_avg[columns]
 
         return df_avg, transport_df, customer_df, manager_df, station_df
@@ -1037,7 +1109,8 @@ class SimulatorAgent(Agent):
 
         return agent
 
-    def create_customer_agent(self, name, password, fleet_type, position, strategy=None, target=None, delayed=False):
+    def create_customer_agent(self, name, password, fleet_type, position,
+                              strategy=None, target=None, delayed=False, max_walking_dist=None):
         """
         Create a customer agent.
 
@@ -1060,9 +1133,14 @@ class SimulatorAgent(Agent):
         agent.set_route_host(self.route_host)
         agent.set_directory(self.get_directory().jid)
 
-        agent.set_position(position)
+        # agent.set_position(position)  # NEW FOR CARSHARING (set_initial_position)
+        agent.set_initial_position(position)
 
         agent.set_target_position(target)
+
+        # NEW set maximum walking distance if defined
+        if max_walking_dist:
+            agent.set_max_walking_dist(max_walking_dist)
 
         if strategy:
             agent.strategy = load_class(strategy)
