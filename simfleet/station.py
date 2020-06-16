@@ -307,6 +307,7 @@ class RegistrationBehaviour(CyclicBehaviour):
                 if performative == ACCEPT_PERFORMATIVE:
                     self.set_registration(True)
                     logger.debug("Registration in the directory")
+                    self.kill()
         except CancelledError:
             logger.debug("Cancelling async tasks...")
         except Exception as e:
