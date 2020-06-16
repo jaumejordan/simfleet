@@ -170,14 +170,14 @@ class CustomerAgent(Agent):
         """
         self.fleetmanagers = fleetmanagers
 
-    def set_route_agent(self, route_id):
+    def set_route_host(self, route_host):
         """
-        Sets the route agent JID address
+        Sets the route host server address
         Args:
-            route_id (str): the route agent jid
+            route_host (str): the route host server address
 
         """
-        self.route_id = route_id
+        self.route_host = route_host
 
     def set_directory(self, directory_id):
         """
