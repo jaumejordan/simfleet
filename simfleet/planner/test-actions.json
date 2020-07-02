@@ -1,0 +1,413 @@
+{
+    "pacoautobusero": {
+        "PICK-UP": [
+            {
+                "agent": "pacoautobusero",
+                "type": "PICK-UP",
+                "attributes": {
+                    "customer_id": "hbrown@localhost",
+                    "customer_origin": [
+                        39.501382,
+                        -0.418753
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "pacoautobusero",
+                "type": "PICK-UP",
+                "attributes": {
+                    "customer_id": "pepeblack@localhost",
+                    "customer_origin": [
+                        39.501382,
+                        -0.428753
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "pacoautobusero",
+                "type": "PICK-UP",
+                "attributes": {
+                    "customer_id": "jjdfkk@localhost",
+                    "customer_origin": [
+                        39.501382,
+                        -0.438753
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            }
+        ],
+        "MOVE-TO-DEST": [
+            {
+                "agent": "pacoautobusero",
+                "type": "MOVE-TO-DEST",
+                "attributes": {
+                    "customer_id": "hbrown@localhost",
+                    "customer_origin": [
+                        39.501382,
+                        -0.418753
+                    ],
+                    "customer_dest": [
+                        39.466394,
+                        -0.324807
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "pacoautobusero",
+                "type": "MOVE-TO-DEST",
+                "attributes": {
+                    "customer_id": "pepeblack@localhost",
+                    "customer_origin": [
+                        39.501382,
+                        -0.428753
+                    ],
+                    "customer_dest": [
+                        39.466394,
+                        -0.324807
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "pacoautobusero",
+                "type": "MOVE-TO-DEST",
+                "attributes": {
+                    "customer_id": "jjdfkk@localhost",
+                    "customer_origin": [
+                        39.501382,
+                        -0.438753
+                    ],
+                    "customer_dest": [
+                        39.466394,
+                        -0.324807
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            }
+        ],
+        "MOVE-TO-STATION": [
+            {
+                "agent": "pacoautobusero",
+                "type": "MOVE-TO-STATION",
+                "attributes": {
+                    "station_id": "station1@localhost",
+                    "station_position": [
+                        39.463356,
+                        -0.376463
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            }
+        ],
+        "CHARGE": [
+            {
+                "agent": "pacoautobusero",
+                "type": "CHARGE",
+                "attributes": {
+                    "station_id": "station1@localhost"
+                },
+                "statistics": {
+                    "time": null
+                }
+            }
+        ]
+    },
+    "romeroelmadero": {
+        "PICK-UP": [
+            {
+                "agent": "romeroelmadero",
+                "type": "PICK-UP",
+                "attributes": {
+                    "customer_id": "hbrown@localhost",
+                    "customer_origin": [
+                        39.501382,
+                        -0.418753
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "romeroelmadero",
+                "type": "PICK-UP",
+                "attributes": {
+                    "customer_id": "pepeblack@localhost",
+                    "customer_origin": [
+                        39.501382,
+                        -0.428753
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "romeroelmadero",
+                "type": "PICK-UP",
+                "attributes": {
+                    "customer_id": "jjdfkk@localhost",
+                    "customer_origin": [
+                        39.501382,
+                        -0.438753
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            }
+        ],
+        "MOVE-TO-DEST": [
+            {
+                "agent": "romeroelmadero",
+                "type": "MOVE-TO-DEST",
+                "attributes": {
+                    "customer_id": "hbrown@localhost",
+                    "customer_origin": [
+                        39.501382,
+                        -0.418753
+                    ],
+                    "customer_dest": [
+                        39.466394,
+                        -0.324807
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "romeroelmadero",
+                "type": "MOVE-TO-DEST",
+                "attributes": {
+                    "customer_id": "pepeblack@localhost",
+                    "customer_origin": [
+                        39.501382,
+                        -0.428753
+                    ],
+                    "customer_dest": [
+                        39.466394,
+                        -0.324807
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "romeroelmadero",
+                "type": "MOVE-TO-DEST",
+                "attributes": {
+                    "customer_id": "jjdfkk@localhost",
+                    "customer_origin": [
+                        39.501382,
+                        -0.438753
+                    ],
+                    "customer_dest": [
+                        39.466394,
+                        -0.324807
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            }
+        ],
+        "MOVE-TO-STATION": [
+            {
+                "agent": "romeroelmadero",
+                "type": "MOVE-TO-STATION",
+                "attributes": {
+                    "station_id": "station1@localhost",
+                    "station_position": [
+                        39.463356,
+                        -0.376463
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            }
+        ],
+        "CHARGE": [
+            {
+                "agent": "romeroelmadero",
+                "type": "CHARGE",
+                "attributes": {
+                    "station_id": "station1@localhost"
+                },
+                "statistics": {
+                    "time": null
+                }
+            }
+        ]
+    },
+    "juaneltaxista": {
+        "PICK-UP": [
+            {
+                "agent": "juaneltaxista",
+                "type": "PICK-UP",
+                "attributes": {
+                    "customer_id": "hbrown@localhost",
+                    "customer_origin": [
+                        39.501382,
+                        -0.418753
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "juaneltaxista",
+                "type": "PICK-UP",
+                "attributes": {
+                    "customer_id": "pepeblack@localhost",
+                    "customer_origin": [
+                        39.501382,
+                        -0.428753
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "juaneltaxista",
+                "type": "PICK-UP",
+                "attributes": {
+                    "customer_id": "jjdfkk@localhost",
+                    "customer_origin": [
+                        39.501382,
+                        -0.438753
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            }
+        ],
+        "MOVE-TO-DEST": [
+            {
+                "agent": "juaneltaxista",
+                "type": "MOVE-TO-DEST",
+                "attributes": {
+                    "customer_id": "hbrown@localhost",
+                    "customer_origin": [
+                        39.501382,
+                        -0.418753
+                    ],
+                    "customer_dest": [
+                        39.466394,
+                        -0.324807
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "juaneltaxista",
+                "type": "MOVE-TO-DEST",
+                "attributes": {
+                    "customer_id": "pepeblack@localhost",
+                    "customer_origin": [
+                        39.501382,
+                        -0.428753
+                    ],
+                    "customer_dest": [
+                        39.466394,
+                        -0.324807
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "juaneltaxista",
+                "type": "MOVE-TO-DEST",
+                "attributes": {
+                    "customer_id": "jjdfkk@localhost",
+                    "customer_origin": [
+                        39.501382,
+                        -0.438753
+                    ],
+                    "customer_dest": [
+                        39.466394,
+                        -0.324807
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            }
+        ],
+        "MOVE-TO-STATION": [
+            {
+                "agent": "juaneltaxista",
+                "type": "MOVE-TO-STATION",
+                "attributes": {
+                    "station_id": "station1@localhost",
+                    "station_position": [
+                        39.463356,
+                        -0.376463
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            }
+        ],
+        "CHARGE": [
+            {
+                "agent": "juaneltaxista",
+                "type": "CHARGE",
+                "attributes": {
+                    "station_id": "station1@localhost"
+                },
+                "statistics": {
+                    "time": null
+                }
+            }
+        ]
+    }
+}
