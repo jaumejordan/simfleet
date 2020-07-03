@@ -174,7 +174,9 @@ class Planner:
             if node.end_time < self.table_of_goals.get(key):
                 h += 1
 
-        return g + h
+        f_value = g + h
+        node.value = f_value
+        return f_value
 
     def run(self):
         # CREATION OF INITIAL NODES
@@ -229,6 +231,12 @@ class Planner:
             node = self.open_nodes.pop()
             self.generate_children(node)
         # TO BE CONTINUED...
+
+    def create_customer_node(self):
+        return Node()
+
+    def create_charge_node(self):
+        return Node()
 
 
 def initialize():
