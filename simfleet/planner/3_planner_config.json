@@ -18,7 +18,7 @@
             "password": "secret",
             "name": "pacoautobusero",
             "autonomy": 40,
-            "current_autonomy": 1,
+            "current_autonomy": 19,
             "icon": "bus"
         },
         {
