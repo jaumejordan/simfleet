@@ -70,11 +70,11 @@ class Node:
         # If there is parent, inherit attributes
         else:
             self.parent = parent
-            self.agent_pos = parent.agent_pos
-            self.agent_autonomy = parent.agent_autonomy
-            self.init_time = parent.end_time
-            self.actions = parent.actions
-            self.completed_goals = parent.completed_goals
+            self.agent_pos = parent.agent_pos.copy()
+            self.agent_autonomy = parent.agent_autonomy #.copy()
+            self.init_time = parent.end_time #.copy()
+            self.actions = parent.actions.copy()
+            self.completed_goals = parent.completed_goals.copy()
 
         # Independent values for every node
         #   own f-value
@@ -138,6 +138,7 @@ class Planner:
         # Best solution to prune tree
         self.best_solution = None
         self.best_solution_value = -math.inf
+        self.solution_nodes = []
 
     # Reads plan of every agent (joint plan) and fills the corresponding table of goals
     # If the joint plan is empty, creates an entry per customer and initialises its
@@ -243,7 +244,7 @@ class Planner:
 
     def run(self):
         # CREATION OF INITIAL NODES
-        if VERBOSE > 2:
+        if VERBOSE > 1:
             print("Creating initial nodes...")
         #   We assume that autonomy is full at beginning, so initially we'll just consider
         #   one pick up action per every possible goal
@@ -346,7 +347,8 @@ class Planner:
             print(f'{len(self.open_nodes):5d} nodes have been created')
             print(self.open_nodes)
         # MAIN LOOP
-        if VERBOSE > 2:
+        if VERBOSE > 1:
+            print("###################################################################################################")
             print("Starting MAIN LOOP...")
 
         i = 0
@@ -375,6 +377,9 @@ class Planner:
             customer_children = len(parent.children)
             if VERBOSE > 1:
                 print(f'{customer_children:5d} customer children have been created')
+
+            # print("CHECKING THAT THE PARENT WASN'T MODIFIED DURING CUSTOMER CHILDREN GENERATION")
+            # parent.print_node()
             # if we consider charging actions AND during the creation of customer nodes there was a customer
             # that could not be reached because of autonomy, create charge nodes.
             if consider_charge and generate_charging:
@@ -392,6 +397,7 @@ class Planner:
             if not parent.children:
                 if VERBOSE > 1:
                     print("The node had no children, so it is a SOLUTION node")
+                    self.solution_nodes.append((parent, parent.value))
                 if self.best_solution_value < parent.value:
                     if VERBOSE > 1:
                         print(f'The value of the best solution node increased from '
@@ -399,11 +405,19 @@ class Planner:
                     self.best_solution = parent
                     self.best_solution_value = parent.value
 
-            # print(self.open_nodes)
-            # for tuple in self.open_nodes:
-            #     node = tuple[1]
-            #     print(node.print_node())
         # END OF MAIN LOOP
+        if VERBOSE > 1:
+            print("###################################################################################################")
+            print("\nEnd of MAIN LOOP")
+            print(f'{len(self.solution_nodes):5d} solution nodes found')
+            print("Solution nodes:",self.solution_nodes)
+            n = 1
+            for tup in self.solution_nodes:
+                print("\nSolution",n)
+                tup[0].print_node()
+                n += 1
+            print("Best solution node:")
+            self.best_solution.print_node()
 
         # When the process finishes, extract plan from the best solution node
         # with its corresponding table of goals
