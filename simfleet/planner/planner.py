@@ -7,11 +7,6 @@ import math
 
 from generators_utils import has_enough_autonomy, calculate_km_expense
 
-# heapq.heappush(customers, (2, "Harry"))
-# heapq.heappush(customers, (3, "Charles"))
-# heapq.heappush(customers, (1, "Riya"))
-# heapq.heappush(customers, (4, "Stacy"))
-
 SPEED = 2000  # km/h
 STARTING_FARE = 1.45
 PRICE_PER_KM = 1.08
@@ -147,6 +142,8 @@ class Planner:
         if not self.joint_plan:
             for customer in self.config_dic.get("customers"):
                 self.table_of_goals[customer.get("name")] = math.inf
+        # else: extract from joint plan
+        # TODO
 
     def fill_statistics(self, action, current_pos=None, current_autonomy=None):
         if action.get('type') == 'PICK-UP':
@@ -218,25 +215,41 @@ class Planner:
         benefits = 0
         for action in node.actions:
             if action.get('type') == 'MOVE-TO-DEST':
-                benefits += STARTING_FARE + action.get('statistics').get('dist') / 1000 * PRICE_PER_KM
+                benefits += STARTING_FARE + (action.get('statistics').get('dist') / 1000) * PRICE_PER_KM
         # Costs
         costs = 0
         for action in node.actions:
             # For actions that entail a movement, pay a penalty per km (10%)
             if action.get('type') != 'CHARGE':
-                costs += PENALTY * action.get('statistics').get('dist') / 1000
+            #i f action.get('type') not in ['MOVE-TO-STATION', 'CHARGE']:
+                costs += PENALTY * (action.get('statistics').get('dist') / 1000)
             # For actions that entail charging, pay for the charged electricity
+            # TODO
             # price increase if congestion (implementar a futur)
             else:
                 costs += PRICE_PER_kWh * action.get('statistics').get('need')
         # Utility (or g value) = benefits - costs
         g = benefits - costs
+        if g < 0:
+            print("THE COSTS ARE HIGHER THANT THE BENEFITS")
+
 
         # Calculate h value w.r.t Table of Goals + node end time
         h = 0
         for key in self.table_of_goals.keys():
-            if node.end_time < self.table_of_goals.get(key):
-                h += 1
+            if key not in node.already_served():
+                if node.end_time < self.table_of_goals.get(key):
+                    # extract distance of customer trip
+                    customer_actions = self.actions_dic.get(self.agent_id).get('MOVE-TO-DEST')
+                    customer_actions = [a for a in customer_actions if a.get('attributes').get('customer_id') == key]
+                    action = customer_actions[0]
+                    p1 = action.get('attributes').get('customer_origin')
+                    p2 = action.get('attributes').get('customer_dest')
+                    route = self.get_route(p1, p2)
+                    dist = route.get('distance')
+                    h += STARTING_FARE + (dist / 1000) * PRICE_PER_KM
+                # calculate benefits
+                #h += 0
 
         f_value = g + h
         node.value = f_value
@@ -308,7 +321,7 @@ class Planner:
             # Evaluate node
             value = self.evaluate_node(node)
             # Push node in the priority queue
-            heapq.heappush(self.open_nodes, (-1 * value, node))
+            heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
 
         # Once there is one node per possible customer action, if there was a customer action not possible to complete
         # because of autonomy, generate nodes with charging actions in every station
@@ -341,7 +354,7 @@ class Planner:
                 # Evaluate node
                 value = self.evaluate_node(node)
                 # Push node in the priority queue
-                heapq.heappush(self.open_nodes, (-1 * value, node))
+                heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
 
         if VERBOSE > 1:
             print(f'{len(self.open_nodes):5d} nodes have been created')
@@ -352,14 +365,21 @@ class Planner:
             print("Starting MAIN LOOP...")
 
         i = 0
+        # Si volem evitar que es planifique per a recollir només a un % de customer...
+        # TODO
         while self.open_nodes:
             i += 1
             if VERBOSE > 1:
                 print(f'\nIteration {i:5d}.')
-                print("Open nodes:", self.open_nodes)
+                print("Open nodes:", len(self.open_nodes), self.open_nodes)
             # print("I'M IN THE MAIN LOOP")
             tup = heapq.heappop(self.open_nodes)
-            parent = tup[1]
+            value = tup[0]
+            if value < self.best_solution_value:
+                if VERBOSE > 1:
+                    print(f'The node f_value is lower than the best solution value')
+                    continue
+            parent = tup[2]
             if VERBOSE > 1:
                 print("Node", tup, "popped from the open_nodes")
                 parent.print_node()
@@ -495,13 +515,13 @@ class Planner:
             # print('-------------------------------')
 
             # If the value is below the best solution value, add node to open_nodes
-            # if value > self.best_solution_value:
-            # Add node to parent's children
-            parent.children.append(node)
-            # print('Amount of children of parent', str(len(parent.children)))
-            # print(f'##############################\n')
-            # Push node in the priority queue
-            heapq.heappush(self.open_nodes, (-1 * value, node))
+            if value > self.best_solution_value:
+                # Add node to parent's children
+                parent.children.append(node)
+                # print('Amount of children of parent', str(len(parent.children)))
+                # print(f'##############################\n')
+                # Push node in the priority queue
+                heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
 
         return generate_charging
 
@@ -529,11 +549,11 @@ class Planner:
             value = self.evaluate_node(node)
 
             # If the value is below the best solution value, add node to open_nodes
-            # if value > self.best_solution_value:
-            # Add node to parent's children
-            parent.children.append(node)
-            # Push node in the priority queue
-            heapq.heappush(self.open_nodes, (-1 * value, node))
+            if value > self.best_solution_value:
+                # Add node to parent's children
+                parent.children.append(node)
+                # Push node in the priority queue
+                heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
 
 
 def initialize():
