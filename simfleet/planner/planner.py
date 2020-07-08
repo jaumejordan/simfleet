@@ -18,6 +18,8 @@ PRICE_PER_KM = 1.08
 PENALTY = 0.1  # 10% of the traveled km
 PRICE_PER_kWh = 0.0615
 
+VERBOSE = 2  # 2, 1 or 0 according to verbosity level
+
 
 def meters_to_seconds(distance_in_meters):
     # km/h to m/s
@@ -84,14 +86,30 @@ class Node:
     def set_end_time(self):
         self.end_time = self.init_time + sum(a.get('statistics').get('time') for a in self.actions)
 
+    def already_served(self):
+        res = []
+        for tup in self.completed_goals:
+            res.append(tup[0])
+        return res
+
     def print_node(self):
+        action_string = ""
+        for a in self.actions:
+            if a.get('type') in ['PICK-UP', 'MOVE-TO-DEST']:
+                action_string += str((a.get('type'), a.get('attributes').get('customer_id'))) + ", "
+            else:
+                action_string += str((a.get('type'), a.get('attributes').get('station_id'))) + ", "
         print(
-            f'(\tposition:\t{self.agent_pos}\n\tautonomy:\t{self.agent_autonomy}\n\tactions:\t{self.actions}\t),\t{self.value}')
-        if self.children:
-            print(f'children -----------------------')
-            for n in self.children:
-                n.print_node()
-            print(f'--------------------------------')
+            f'(\tagent_position:\t{self.agent_pos}\n'
+            f'\tagent_autonomy:\t{self.agent_autonomy}\n'
+            f'\tactions:\t[{action_string}]\n'
+            f'\tinit_time:\t{self.init_time:.4f}\n'
+            f'\tend_time:\t{self.end_time:.4f}\n'
+            f'\tvalue:\t{self.value:.4f}\n'
+            f'\tcompleted_goals:\t{self.completed_goals}\n'
+            f'\thas parent?:\t{self.parent is not None}\n'
+            f'\thas children?:\t{len(self.children)}\t)'
+        )
 
 
 class Planner:
@@ -119,7 +137,7 @@ class Planner:
         self.joint_plan = joint_plan
         # Best solution to prune tree
         self.best_solution = None
-        self.best_solution_value = math.inf
+        self.best_solution_value = -math.inf
 
     # Reads plan of every agent (joint plan) and fills the corresponding table of goals
     # If the joint plan is empty, creates an entry per customer and initialises its
@@ -225,6 +243,8 @@ class Planner:
 
     def run(self):
         # CREATION OF INITIAL NODES
+        if VERBOSE > 2:
+            print("Creating initial nodes...")
         #   We assume that autonomy is full at beginning, so initially we'll just consider
         #   one pick up action per every possible goal
         agent_actions = self.actions_dic.get(self.agent_id)
@@ -282,7 +302,7 @@ class Planner:
             node.agent_pos = node.actions[-1].get('attributes').get('customer_dest')
 
             # Add served customer to completed_goals
-            node.completed_goals.append(node.actions[-1].get('attributes').get('customer_id'))
+            node.completed_goals.append((node.actions[-1].get('attributes').get('customer_id'), pick_up_time))
 
             # Evaluate node
             value = self.evaluate_node(node)
@@ -322,38 +342,67 @@ class Planner:
                 # Push node in the priority queue
                 heapq.heappush(self.open_nodes, (-1 * value, node))
 
-        print(self.open_nodes)
-        for tuple in self.open_nodes:
-            node = tuple[1]
-            print(node.print_node())
-
+        if VERBOSE > 1:
+            print(f'{len(self.open_nodes):5d} nodes have been created')
+            print(self.open_nodes)
         # MAIN LOOP
+        if VERBOSE > 2:
+            print("Starting MAIN LOOP...")
+
+        i = 0
         while self.open_nodes:
-            node = heapq.heappop(self.open_nodes)[1]
+            i += 1
+            if VERBOSE > 1:
+                print(f'\nIteration {i:5d}.')
+                print("Open nodes:", self.open_nodes)
+            # print("I'M IN THE MAIN LOOP")
+            tup = heapq.heappop(self.open_nodes)
+            parent = tup[1]
+            if VERBOSE > 1:
+                print("Node", tup, "popped from the open_nodes")
+                parent.print_node()
             # If the last action is a customer service, consider charging
             # otherwise consider ONLY customer actions (avoids consecutive charging actions)
             consider_charge = False
-            if node.actions[-1].get('type') == 'MOVE-TO-DEST':
+            if parent.actions[-1].get('type') == 'MOVE-TO-DEST':
                 consider_charge = True
 
+            if VERBOSE > 1:
+                print("Generating CUSTOMER children nodes...")
             # Generate one child node per customer left to serve and return whether some customer could not be
             # picked up because of autonomy
-            generate_charging = self.create_customer_nodes(node)
+            generate_charging = self.create_customer_nodes(parent)
+            customer_children = len(parent.children)
+            if VERBOSE > 1:
+                print(f'{customer_children:5d} customer children have been created')
             # if we consider charging actions AND during the creation of customer nodes there was a customer
             # that could not be reached because of autonomy, create charge nodes.
             if consider_charge and generate_charging:
-                self.create_charge_nodes(node)
+                if VERBOSE > 1:
+                    print("Generating CHARGE children nodes...")
+                self.create_charge_nodes(parent)
+                charge_children = len(parent.children) - customer_children
+                if VERBOSE > 1:
+                    print(f'{charge_children:5d} charge children have been created')
+
+            # if VERBOSE > 1:
+            #     print(f'{len(parent.children):5d} children have been created')
 
             # If after this process the node has no children, it is a solution Node
-            if not node.children:
-                if self.best_solution_value < node.value:
-                    self.best_solution = node
-                    self.best_solution_value = node.value
+            if not parent.children:
+                if VERBOSE > 1:
+                    print("The node had no children, so it is a SOLUTION node")
+                if self.best_solution_value < parent.value:
+                    if VERBOSE > 1:
+                        print(f'The value of the best solution node increased from '
+                              f'{self.best_solution_value:.4f} to {parent.value:.4f}')
+                    self.best_solution = parent
+                    self.best_solution_value = parent.value
 
-        print(self.open_nodes)
-        for tuple in self.open_nodes:
-            node = tuple[1]
-            print(node.print_node())
+            # print(self.open_nodes)
+            # for tuple in self.open_nodes:
+            #     node = tuple[1]
+            #     print(node.print_node())
         # END OF MAIN LOOP
 
         # When the process finishes, extract plan from the best solution node
@@ -367,15 +416,20 @@ class Planner:
         generate_charging = False
 
         # Remove served customers from actions
-        for a in pick_up_actions:
-            if a.get('attributes').get('customer_id') in parent.completed_goals:
-                pick_up_actions.remove(a)
-        for a in move_to_dest_actions:
-            if a.get('attributes').get('customer_id') in parent.completed_goals:
-                move_to_dest_actions.remove(a)
+        pick_up_actions = [a for a in pick_up_actions if
+                           a.get('attributes').get('customer_id') not in parent.already_served()]
+        move_to_dest_actions = [a for a in move_to_dest_actions if
+                                a.get('attributes').get('customer_id') not in parent.already_served()]
 
         for tup in get_customer_couples(pick_up_actions, move_to_dest_actions):
             node = Node(parent)
+
+            ####################################################
+            # print(f'##############################\nCreating child node from parent node')
+            # print('Parent\n',parent.print_node())
+            # print('-------------------------------')
+            # print('Child\n',node.print_node())
+            ####################################################
 
             # Fill actions statistics
             #  Calculates the time and distance according to agent's current pos/autonomy
@@ -391,6 +445,9 @@ class Planner:
                 generate_charging = True
                 # delete node object
                 node = None
+                # print('-------------------------------')
+                # print('Child not enough autonomy')
+                # print('-------------------------------')
                 break
 
             # Calculate pick_up time and check table of goals
@@ -400,6 +457,9 @@ class Planner:
             if not self.reachable_goal(customer_id, pick_up_time):
                 # delete node object
                 node = None
+                # print('-------------------------------')
+                # print('Child customer non reachable')
+                # print('-------------------------------')
                 break
 
             # Once the actions are set, calculate node end time
@@ -411,17 +471,23 @@ class Planner:
             node.agent_pos = node.actions[-1].get('attributes').get('customer_dest')
 
             # Add served customer to completed_goals
-            node.completed_goals.append(node.actions[-1].get('attributes').get('customer_id'))
+            node.completed_goals.append((node.actions[-1].get('attributes').get('customer_id'), pick_up_time))
 
             # Evaluate node
             value = self.evaluate_node(node)
 
+            # print('-------------------------------')
+            # print('Child after new action addition\n', node.print_node())
+            # print('-------------------------------')
+
             # If the value is below the best solution value, add node to open_nodes
-            if value < self.best_solution_value:
-                # Add node to parent's children
-                parent.children.append(node)
-                # Push node in the priority queue
-                heapq.heappush(self.open_nodes, (-1 * value, node))
+            # if value > self.best_solution_value:
+            # Add node to parent's children
+            parent.children.append(node)
+            # print('Amount of children of parent', str(len(parent.children)))
+            # print(f'##############################\n')
+            # Push node in the priority queue
+            heapq.heappush(self.open_nodes, (-1 * value, node))
 
         return generate_charging
 
@@ -435,8 +501,8 @@ class Planner:
 
             # Fill actions statistics
             #  Calculates the time and distance according to agent's current pos/autonomy
-            node.actions = [self.fill_statistics(tup[0], current_pos=node.agent_pos),
-                            self.fill_statistics(tup[1], current_autonomy=node.agent_autonomy)]
+            node.actions += [self.fill_statistics(tup[0], current_pos=node.agent_pos),
+                             self.fill_statistics(tup[1], current_autonomy=node.agent_autonomy)]
 
             # Once the actions are set, calculate node end time
             node.set_end_time()
@@ -449,11 +515,11 @@ class Planner:
             value = self.evaluate_node(node)
 
             # If the value is below the best solution value, add node to open_nodes
-            if value < self.best_solution_value:
-                # Add node to parent's children
-                parent.children.append(node)
-                # Push node in the priority queue
-                heapq.heappush(self.open_nodes, (-1 * value, node))
+            # if value > self.best_solution_value:
+            # Add node to parent's children
+            parent.children.append(node)
+            # Push node in the priority queue
+            heapq.heappush(self.open_nodes, (-1 * value, node))
 
 
 def initialize():
