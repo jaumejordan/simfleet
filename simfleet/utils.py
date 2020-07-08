@@ -107,7 +107,8 @@ class RequestRouteBehaviour(OneShotBehaviour):
             path, distance, duration = await request_route_to_server(self.origin, self.destination, self.route_host)
             response_time = time.time() - response_time
             if path is None:
-                logger.error("There was an unknown error requesting the route. Response time={}".format(response_time))
+                logger.error("There was an unknown error requesting the route from {} to {}. Response time={}".format(
+                    self.origin, self.destination, response_time))
                 self.exit_code = {"type": "error"}
                 self.kill()
                 return
@@ -273,4 +274,5 @@ async def request_route_to_server(origin, destination, route_host="http://router
             path.append(destination)
         return path, distance, duration
     except Exception as e:
+        logger.exception("Exception while getting route with call {}. Exception: {}".format(url, e))
         return None, None, None
