@@ -6,6 +6,7 @@ import json
 import math
 
 from generators_utils import has_enough_autonomy, calculate_km_expense
+from plan import Plan, PlanEntry
 
 SPEED = 2000  # km/h
 STARTING_FARE = 1.45
@@ -94,6 +95,8 @@ class Node:
                 action_string += str((a.get('type'), a.get('attributes').get('customer_id'))) + ", "
             else:
                 action_string += str((a.get('type'), a.get('attributes').get('station_id'))) + ", "
+            if a == self.actions[-1]:
+                action_string = action_string[:-2]
         print(
             f'(\tagent_position:\t{self.agent_pos}\n'
             f'\tagent_autonomy:\t{self.agent_autonomy}\n'
@@ -134,6 +137,8 @@ class Planner:
         self.best_solution = None
         self.best_solution_value = -math.inf
         self.solution_nodes = []
+
+        self.plan = None
 
     # Reads plan of every agent (joint plan) and fills the corresponding table of goals
     # If the joint plan is empty, creates an entry per customer and initialises its
@@ -296,7 +301,7 @@ class Planner:
                 generate_charging = True
                 # delete node object
                 node = None
-                break
+                continue
 
             # Calculate pick_up time and check table of goals
             pick_up_time = node.init_time + node.actions[-2].get('statistics').get('time')
@@ -305,7 +310,7 @@ class Planner:
             if not self.reachable_goal(customer_id, pick_up_time):
                 # delete node object
                 node = None
-                break
+                continue
 
             # Once the actions are set, calculate node end time
             node.set_end_time()
@@ -316,7 +321,14 @@ class Planner:
             node.agent_pos = node.actions[-1].get('attributes').get('customer_dest')
 
             # Add served customer to completed_goals
-            node.completed_goals.append((node.actions[-1].get('attributes').get('customer_id'), pick_up_time))
+            init = node.init_time
+            pick_up_duration = node.actions[-2].get('statistics').get('time')
+            print(
+                f'Node init time is {init} and the pick_up took {pick_up_duration} seconds so the pick_up_time is {init + pick_up_duration}')
+            print(f'as you can see here {node.actions[-2]}')
+            node.completed_goals.append(
+                (node.actions[-1].get('attributes').get('customer_id'), init + pick_up_duration))
+            #node.completed_goals.append((node.actions[-1].get('attributes').get('customer_id'), pick_up_time))
 
             # Evaluate node
             value = self.evaluate_node(node)
@@ -439,9 +451,14 @@ class Planner:
             print("Best solution node:")
             self.best_solution.print_node()
 
+
+        print(self.best_solution.actions)
+
         # When the process finishes, extract plan from the best solution node
         # with its corresponding table of goals
         self.extract_plan(self.best_solution)
+
+        self.plan.print_plan()
 
     def create_customer_nodes(self, parent):
         agent_actions = self.actions_dic.get(self.agent_id)
@@ -458,13 +475,6 @@ class Planner:
         for tup in get_customer_couples(pick_up_actions, move_to_dest_actions):
             node = Node(parent)
 
-            ####################################################
-            # print(f'##############################\nCreating child node from parent node')
-            # print('Parent\n',parent.print_node())
-            # print('-------------------------------')
-            # print('Child\n',node.print_node())
-            ####################################################
-
             # Fill actions statistics
             #  Calculates the time and distance according to agent's current pos/autonomy
             node.actions += [self.fill_statistics(tup[0], current_pos=node.agent_pos),
@@ -479,10 +489,7 @@ class Planner:
                 generate_charging = True
                 # delete node object
                 node = None
-                # print('-------------------------------')
-                # print('Child not enough autonomy')
-                # print('-------------------------------')
-                break
+                continue
 
             # Calculate pick_up time and check table of goals
             pick_up_time = node.init_time + node.actions[-2].get('statistics').get('time')
@@ -491,10 +498,7 @@ class Planner:
             if not self.reachable_goal(customer_id, pick_up_time):
                 # delete node object
                 node = None
-                # print('-------------------------------')
-                # print('Child customer non reachable')
-                # print('-------------------------------')
-                break
+                continue
 
             # Once the actions are set, calculate node end time
             node.set_end_time()
@@ -505,7 +509,10 @@ class Planner:
             node.agent_pos = node.actions[-1].get('attributes').get('customer_dest')
 
             # Add served customer to completed_goals
-            node.completed_goals.append((node.actions[-1].get('attributes').get('customer_id'), pick_up_time))
+            init = node.init_time
+            pick_up_duration = node.actions[-2].get('statistics').get('time')
+            print(f'Node init time is {init} and the pick_up took {pick_up_duration} seconds so the pick_up_time is {init+pick_up_duration}')
+            node.completed_goals.append((node.actions[-1].get('attributes').get('customer_id'), init+pick_up_duration))
 
             # Evaluate node
             value = self.evaluate_node(node)
@@ -555,6 +562,8 @@ class Planner:
                 # Push node in the priority queue
                 heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
 
+    def extract_plan(self, node):
+        self.plan = Plan(node.actions, node.value, node.completed_goals)
 
 def initialize():
     config_dic = {}
@@ -597,11 +606,3 @@ if __name__ == '__main__':
                       agent_autonomy=agent_autonomy)
     planner.create_table_of_goals()
     planner.run()
-    n1 = Node(None)
-    n1.agent_pos = -90
-    n1.agent_autonomy = 32
-
-    n2 = Node(n1)
-    n1.children.append(n2)
-
-    n1.print_node()
