@@ -40,11 +40,11 @@ This project is partially supported by grant APOSTD/2018/010 of the Generalitat 
 
 .. raw:: html
 
-    <img src="http://innova.gva.es/documents/162777557/162777722/FSE+vertical+castellano.png/" height="100px">
+    <img src="http://innova.gva.es/documents/162777557/162777722/FSE+vertical+castellano.png/" height="200px">
 
 .. raw:: html
 
-    <img src="http://innova.gva.es/documents/161863198/168456476/LOGO+CONS.+INNOVACI%C3%93.jpg/" height="100px">
+    <img src="http://innova.gva.es/documents/161863198/168456476/LOGO+CONS.+INNOVACI%C3%93.jpg/" height="200px">
 
 
 .. _Cookiecutter: https://github.com/audreyr/cookiecutter
