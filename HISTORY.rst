@@ -2,6 +2,17 @@
 History
 =======
 
+1.0.2 (2020-07-11)
+------------------
+
+* Batched simulation with gather included.
+* Eliminated route agent, requests direct to the server.
+* FSM strategies working (and recommended to use).
+* Only sending the request for stations once.
+* Web interface for Windows fixed.
+* Minor bug fixes.
+* Updated credits.
+
 1.0.1 (2019-11-07)
 ------------------
 
