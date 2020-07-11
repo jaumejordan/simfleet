@@ -36,6 +36,17 @@ Credits
 
 This package was created with Cookiecutter_ and the `audreyr/cookiecutter-pypackage`_ project template.
 
+This project is partially supported by grant APOSTD/2018/010 of the Generalitat Valenciana and Fondo Social Europeo.
+
+.. raw:: html
+
+    <img src="http://innova.gva.es/documents/162777557/162777722/FSE+vertical+castellano.png/" height="200px">
+
+.. raw:: html
+
+    <img src="http://innova.gva.es/documents/161863198/168456476/LOGO+CONS.+INNOVACI%C3%93.jpg/" height="200px">
+
+
 .. _Cookiecutter: https://github.com/audreyr/cookiecutter
 .. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
 .. _SPADE: https://github.com/javipalanca/spade
