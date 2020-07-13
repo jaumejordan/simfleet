@@ -7,12 +7,7 @@ import math
 
 from generators_utils import has_enough_autonomy, calculate_km_expense
 from plan import Plan, PlanEntry
-
-SPEED = 2000  # km/h
-STARTING_FARE = 1.45
-PRICE_PER_KM = 1.08
-PENALTY = 0.1  # 10% of the traveled km
-PRICE_PER_kWh = 0.0615
+from constants import SPEED, STARTING_FARE, PRICE_PER_kWh, PENALTY, PRICE_PER_KM
 
 VERBOSE = 2  # 2, 1 or 0 according to verbosity level
 
@@ -112,7 +107,7 @@ class Node:
 
 class Planner:
     def __init__(self, config_dic, actions_dic, routes_dic, agent_id, agent_pos, agent_max_autonomy, agent_autonomy,
-                 joint_plan=None):
+                 previous_plan=None, joint_plan=None):
 
         # Precalculated routes and actions
         self.config_dic = config_dic
@@ -137,8 +132,13 @@ class Planner:
         self.best_solution = None
         self.best_solution_value = -math.inf
         self.solution_nodes = []
-
+        if previous_plan is not None:
+            self.previous_plan = previous_plan
+        else:
+            self.previous_plan = None
         self.plan = None
+
+        self.create_table_of_goals()
 
     # Reads plan of every agent (joint plan) and fills the corresponding table of goals
     # If the joint plan is empty, creates an entry per customer and initialises its
@@ -517,16 +517,10 @@ class Planner:
             # Evaluate node
             value = self.evaluate_node(node)
 
-            # print('-------------------------------')
-            # print('Child after new action addition\n', node.print_node())
-            # print('-------------------------------')
-
             # If the value is below the best solution value, add node to open_nodes
             if value > self.best_solution_value:
                 # Add node to parent's children
                 parent.children.append(node)
-                # print('Amount of children of parent', str(len(parent.children)))
-                # print(f'##############################\n')
                 # Push node in the priority queue
                 heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
 
@@ -604,5 +598,5 @@ if __name__ == '__main__':
                       agent_pos=agent_pos,
                       agent_max_autonomy=agent_max_autonomy,
                       agent_autonomy=agent_autonomy)
-    planner.create_table_of_goals()
+    # planner.create_table_of_goals()
     planner.run()
