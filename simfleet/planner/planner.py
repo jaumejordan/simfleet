@@ -75,7 +75,11 @@ class Node:
         self.children = []
 
     def set_end_time(self):
-        self.end_time = self.init_time + sum(a.get('statistics').get('time') for a in self.actions)
+        if self.parent is None:
+            self.end_time = self.init_time + sum(a.get('statistics').get('time') for a in self.actions)
+        else:
+            self.end_time = sum(a.get('statistics').get('time') for a in self.actions)
+        # We are adding the time of the parent's inherited action, which have been already added
 
     def already_served(self):
         res = []
@@ -126,7 +130,7 @@ class Planner:
         self.open_nodes = []
         # Joint plan
         if joint_plan is None:
-            joint_plan = []
+            joint_plan = {}
         self.joint_plan = joint_plan
         # Best solution to prune tree
         self.best_solution = None
@@ -144,11 +148,16 @@ class Planner:
     # If the joint plan is empty, creates an entry per customer and initialises its
     # pick-up time to infinity
     def create_table_of_goals(self):
-        if not self.joint_plan:
+        if len(self.joint_plan) == 0:
             for customer in self.config_dic.get("customers"):
                 self.table_of_goals[customer.get("name")] = math.inf
-        # else: extract from joint plan
-        # TODO
+        else: #extract from joint plan
+            for customer in self.joint_plan.get('table_of_goals').keys():
+                tup = self.joint_plan.get('table_of_goals').get(customer)
+                if tup is None:
+                    self.table_of_goals[customer] = math.inf
+                else:
+                    self.table_of_goals[customer] = tup[1] # tup[0] transport_agent, tup[1] pick_up_time
 
     def fill_statistics(self, action, current_pos=None, current_autonomy=None):
         if action.get('type') == 'PICK-UP':
@@ -209,6 +218,7 @@ class Planner:
                 return s.get('power')
 
     def reachable_goal(self, customer_id, pick_up_time):
+
         return self.table_of_goals.get(customer_id) > pick_up_time
 
     # Returns the f value of a node
@@ -235,8 +245,8 @@ class Planner:
                 costs += PRICE_PER_kWh * action.get('statistics').get('need')
         # Utility (or g value) = benefits - costs
         g = benefits - costs
-        if g < 0:
-            print("THE COSTS ARE HIGHER THANT THE BENEFITS")
+        #if g < 0:
+            # print("THE COSTS ARE HIGHER THANT THE BENEFITS")
 
 
         # Calculate h value w.r.t Table of Goals + node end time
@@ -323,9 +333,9 @@ class Planner:
             # Add served customer to completed_goals
             init = node.init_time
             pick_up_duration = node.actions[-2].get('statistics').get('time')
-            print(
-                f'Node init time is {init} and the pick_up took {pick_up_duration} seconds so the pick_up_time is {init + pick_up_duration}')
-            print(f'as you can see here {node.actions[-2]}')
+            #print(
+            #    f'Node init time is {init} and the pick_up took {pick_up_duration} seconds so the pick_up_time is {init + pick_up_duration}')
+            # print(f'as you can see here {node.actions[-2]}')
             node.completed_goals.append(
                 (node.actions[-1].get('attributes').get('customer_id'), init + pick_up_duration))
             #node.completed_goals.append((node.actions[-1].get('attributes').get('customer_id'), pick_up_time))
@@ -453,6 +463,7 @@ class Planner:
 
 
         print(self.best_solution.actions)
+        print(self.best_solution.completed_goals)
 
         # When the process finishes, extract plan from the best solution node
         # with its corresponding table of goals
@@ -511,7 +522,8 @@ class Planner:
             # Add served customer to completed_goals
             init = node.init_time
             pick_up_duration = node.actions[-2].get('statistics').get('time')
-            print(f'Node init time is {init} and the pick_up took {pick_up_duration} seconds so the pick_up_time is {init+pick_up_duration}')
+            # TODO correct pick-up time calculation
+            # print(f'Node init time is {init} and the pick_up took {pick_up_duration} seconds so the pick_up_time is {init+pick_up_duration}')
             node.completed_goals.append((node.actions[-1].get('attributes').get('customer_id'), init+pick_up_duration))
 
             # Evaluate node

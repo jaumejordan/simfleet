@@ -32,7 +32,7 @@
             "password": "secret",
             "name": "romeroelmadero",
             "autonomy": 30,
-            "current_autonomy": 1,
+            "current_autonomy": 20,
             "icon": "police"
         },
         {
@@ -46,7 +46,7 @@
             "password": "secret",
             "name": "juaneltaxista",
             "autonomy": 35,
-            "current_autonomy": 1,
+            "current_autonomy": 20,
             "icon": "taxi"
         }
     ],
