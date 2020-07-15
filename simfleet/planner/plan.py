@@ -28,12 +28,22 @@ class Plan:
         return [entry.action for entry in self.entries]
 
     def print_plan(self):
-        print(f'{"init time":10s}  ||  {"action":35s}  ||  {"duration":10s}')
-        print("-------------------------------------------------------------------")
+        print(f'{"init time":10s}  ||  {"action":50s}  ||  {"end time":10s}  ||  {"duration":10s}')
+        print("--------------------------------------------------------------------------------------------")
         for e in self.entries:
             e.print_simple()
         end_time = self.entries[-1].init_time + self.entries[-1].duration
-        print(f'{end_time:10.4f}  ::  {"****** END-OF-PLAN *****":35s}  ::  {"":10s}')
+        print(f'{end_time:10.4f}  ::  {"****** END-OF-PLAN *****":50s}  ::  {"":10s}')
+
+    def to_string_plan(self):
+        s = "\n"
+        s += f'{"init time":10s}  ||  {"action":50s}  ||  {"end time":10s}  ||  {"duration":10s}\n'
+        s +="--------------------------------------------------------------------------------------------\n"
+        for e in self.entries:
+            s += e.to_string_simple()
+        end_time = self.entries[-1].init_time + self.entries[-1].duration
+        s += f'{end_time:10.4f}  ::  {"****** END-OF-PLAN *****":50s}\n'
+        return s
 
 
 class PlanEntry:
@@ -41,27 +51,30 @@ class PlanEntry:
         self.init_time = init_time
         self.action = action
         self.duration = duration
+        self.end_time = init_time + duration
 
     def print(self):
-        print(f'{self.init_time:.4f}  ::  {self.action}  ::  {self.duration:4f}')
+        print(f'{self.init_time:.4f}  ::  {self.action}  ::  {self.end_time:.4f}  ||  {self.duration:.4f}')
 
     def print_simple(self):
         action_string=""
         if self.action.get('type') in ['PICK-UP', 'MOVE-TO-DEST']:
-            action_string += str((self.action.get('type'), self.action.get('attributes').get('customer_id')))
+            action_string += str(
+                (self.action.get('agent'), self.action.get('type'), self.action.get('attributes').get('customer_id')))
         else:
-            action_string += str((self.action.get('type'), self.action.get('attributes').get('station_id')))
+            action_string += str(
+                (self.action.get('agent'), self.action.get('type'), self.action.get('attributes').get('station_id')))
 
-        print(f'{self.init_time:10.4f}  ::  {action_string:35s}  ::  {self.duration:10.4f}')
+        print(f'{self.init_time:10.4f}  ::  {action_string:50s}  ::  {self.end_time:10.4f}  ||  {self.duration:10.4f}')
 
     def to_string_simple(self):
         action_string=""
         if self.action.get('type') in ['PICK-UP', 'MOVE-TO-DEST']:
-            action_string += str((self.action.get('type'), self.action.get('attributes').get('customer_id')))
+            action_string += str((self.action.get('agent'), self.action.get('type'), self.action.get('attributes').get('customer_id')))
         else:
-            action_string += str((self.action.get('type'), self.action.get('attributes').get('station_id')))
+            action_string += str((self.action.get('agent'), self.action.get('type'), self.action.get('attributes').get('station_id')))
 
-        return f'{self.init_time:10.4f}  ::  {action_string:35s}  ::  {self.duration:10.4f}\n'
+        return f'{self.init_time:10.4f}  ::  {action_string:50s}  ::  {self.end_time:10.4f}  ||  {self.duration:10.4f}\n'
 
 
 class JointPlan:
@@ -69,13 +82,13 @@ class JointPlan:
         self.entries = entries
 
     def print_plan(self):
-        s = ""
-        s += f'{"init time":10s}  ||  {"action":35s}  ||  {"duration":10s}\n'
-        s +="-------------------------------------------------------------------\n"
+        s = "\n"
+        s += f'{"init time":10s}  ||  {"action":50s}  ||  {"end time":10s}  ||  {"duration":10s}\n'
+        s +="--------------------------------------------------------------------------------------------\n"
         for e in self.entries:
             s += e.to_string_simple()
         end_time = self.entries[-1].init_time + self.entries[-1].duration
-        s += f'{end_time:10.4f}  ::  {"****** END-OF-PLAN *****":35s}  ::  {"":10s}\n'
+        s += f'{end_time:10.4f}  ::  {"****** END-OF-PLAN *****":50s}\n'
         return s
 
 class Action:

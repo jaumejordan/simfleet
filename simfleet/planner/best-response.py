@@ -175,9 +175,74 @@ class BestResponse:
         for transport in self.joint_plan.get('no_change').keys():
             stop = stop and self.joint_plan.get('no_change').get(transport)
         return stop
-        #return not all(self.joint_plan["no_change"])
+        # return not all(self.joint_plan["no_change"])
 
-    # Best Response algorithm
+    def create_initial_plans(self):
+        for a in self.agents:
+            agent_id = a.get('id')
+            logger.info(f"Agent \'{agent_id}\''s turn")
+            logger.info("-------------------------------------------------------------------------")
+            logger.info(f"Creating first plan for agent {agent_id}")
+            planner = self.create_planner(a)
+            planner.run()
+            new_plan = planner.plan
+            logger.info(f"Plan found: {new_plan.to_string_plan()}")
+            self.update_joint_plan(agent_id, new_plan)
+            if new_plan is None:
+                new_utility = 0
+            else:
+                new_utility = self.evaluate_plan(new_plan)
+
+            if new_utility == 0:
+                logger.warning(
+                    f"Agent {agent_id} could not find any plan"
+                )
+            else:
+                logger.info(f"Agent {agent_id} found a plan with utility {new_utility:.4f}")
+
+    def propose_plan(self, a):
+        agent_id = a.get('id')
+        logger.info(f"Agent \'{agent_id}\''s turn")
+        logger.info("-------------------------------------------------------------------------")
+        # Get plan from previous round
+        prev_plan = self.get_individual_plan(a)
+        # if previous plan is None (or Empty), indicates the agent could not find a plan in the previous round
+        if prev_plan is None:
+            a = 1
+        else:
+            a = 2
+
+    def print_game_state(self):
+        # joint_plan = {"no_change": {}, "joint": None, "table_of_goals": {}, "individual": {}}
+        logger.debug("#########################################################################")
+        logger.debug("CURRENT GAME STATE")
+
+        logger.debug("\n")
+        logger.debug("Individual plans:")
+        for agent in self.joint_plan.get('individual').keys():
+            plan = self.joint_plan.get('individual').get(agent)
+            if plan is None:
+                logger.debug(f"{agent:20s} : NO PLAN")
+            else:
+                logger.debug(f"{agent:20s} : Plan with {len(plan.entries):2d} entries and utility {plan.utility:.4f}")
+                logger.debug(plan.to_string_plan())
+
+        logger.debug("\n")
+        logger.debug("Joint plan:")
+        logger.debug(self.joint_plan.get("joint").print_plan())
+
+        logger.debug("\n")
+        logger.debug("Table of goals:")
+        for customer in self.joint_plan.get('table_of_goals').keys():
+            logger.debug(f"{customer:20s} : {self.joint_plan.get('table_of_goals').get(customer)}")
+
+        logger.debug("\n")
+        logger.debug("No change in plan:")
+        for agent in self.joint_plan.get('no_change').keys():
+            logger.debug(f"{agent:20s} : {self.joint_plan.get('no_change').get(agent)}")
+
+        logger.debug("#########################################################################")
+
     def run(self):
         # Read dictionary data
         self.initialize()
@@ -185,13 +250,61 @@ class BestResponse:
         self.create_agents()
 
         # Assign random order
-        random.shuffle(self.agents)
+        # random.shuffle(self.agents)
+        logger.debug("ATTENTION, NOT RANDOMIZING ORDER")
         logger.debug(f"Random order {self.agents}")
 
         # Initialize data structure
         self.init_joint_plan()
 
         game_turn = 0
+
+        while game_turn < 1:
+            game_turn += 1
+            logger.info("*************************************************************************")
+            logger.info(f"\t\t\t\t\t\t\tBest Response turn {game_turn}")
+            logger.info("*************************************************************************")
+            # First turn of the game, agents propose their initial plan
+            if game_turn == 1:
+                self.create_initial_plans()
+                self.print_game_state()
+            # In the following turns, the agents may have one of this two:
+            # 1) A previous plan
+            # 2) An empty plan, because it can't do any action that increases its utility
+            if game_turn > 1:
+                continue
+
+    # Best Response algorithm
+    def run_old(self):
+        # Read dictionary data
+        self.initialize()
+        # Create players
+        self.create_agents()
+
+        # Assign random order
+        # random.shuffle(self.agents)
+        logger.debug("ATTENTION, NOT RANDOMIZING ORDER")
+        logger.debug(f"Random order {self.agents}")
+
+        # Initialize data structure
+        self.init_joint_plan()
+
+        game_turn = 0
+
+        while game_turn < 1:
+            game_turn += 1
+            logger.info("*************************************************************************")
+            logger.info(f"\t\t\t\t\t\t\tBest Response turn {game_turn}")
+            logger.info("*************************************************************************")
+            # First turn of the game, agents propose their initial plan
+            if game_turn == 1:
+                self.create_initial_plans()
+                self.print_game_state()
+            # In the following turns, the agents may have one of this two:
+            # 1) A previous plan
+            # 2) An empty plan, because it can't do any action that increases its utility
+            if game_turn > 1:
+                continue
         while not self.stop():
             game_turn += 1
             logger.info("*************************************************************************")
@@ -212,7 +325,7 @@ class BestResponse:
                     updated_utility = self.evaluate_plan(prev_plan)
                     if prev_utility != updated_utility:
                         logger.info(f"Agent {agent_id} had it's plan utility reduced "
-                            f"from {prev_utility:.4f} to {updated_utility:.4f}")
+                                    f"from {prev_utility:.4f} to {updated_utility:.4f}")
                     else:
                         logger.info(f"The utility of agent's {agent_id} plan has not changed")
                     # New plan proposal
@@ -220,10 +333,17 @@ class BestResponse:
                     planner.run()
                     new_plan = planner.plan
                     self.update_joint_plan(agent_id, new_plan)
-                    new_utility = self.evaluate_plan(new_plan)
+                    if new_plan is None:
+                        new_utility = 0
+                    else:
+                        new_utility = self.evaluate_plan(new_plan)
                     # If the utility is the same, assume plan did not change
                     # TODO compare plans action by action not just by their utility
-                    if new_utility != updated_utility:
+                    if new_utility == 0:
+                        logger.warning(
+                            f"Agent {agent_id} could not find any plan"
+                        )
+                    elif new_utility != updated_utility:
                         logger.info(
                             f"Agent {agent_id} found new plan with utility {new_utility:.4f}")
                         logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
@@ -239,14 +359,22 @@ class BestResponse:
                     planner.run()
                     new_plan = planner.plan
                     self.update_joint_plan(agent_id, new_plan)
-                    new_utility = self.evaluate_plan(new_plan)
-                    logger.info(
-                        f"Agent {agent_id} found a plan with utility {new_utility:.4f}")
+                    if new_plan is None:
+                        new_utility = 0
+                    else:
+                        new_utility = self.evaluate_plan(new_plan)
+
+                    if new_utility == 0:
+                        logger.warning(
+                            f"Agent {agent_id} could not find any plan"
+                        )
+                    else:
+                        logger.info(f"Agent {agent_id} found a plan with utility {new_utility:.4f}")
 
                 logger.info("-------------------------------------------------------------------------")
 
-if __name__ == '__main__':
 
+if __name__ == '__main__':
     br = BestResponse()
     br.run()
 # begin process

@@ -6,10 +6,11 @@ import json
 import math
 
 from generators_utils import has_enough_autonomy, calculate_km_expense
+from loguru import logger
 from plan import Plan, PlanEntry
 from constants import SPEED, STARTING_FARE, PRICE_PER_kWh, PENALTY, PRICE_PER_KM
 
-VERBOSE = 2  # 2, 1 or 0 according to verbosity level
+VERBOSE = 0  # 2, 1 or 0 according to verbosity level
 
 
 def meters_to_seconds(distance_in_meters):
@@ -26,7 +27,7 @@ def get_customer_couples(pick_up_actions, move_to_dest_actions):
         customer_id = a.get('attributes').get('customer_id')
         for b in move_to_dest_actions:
             if b.get('attributes').get('customer_id') == customer_id:
-                res.append((a, b))
+                res.append((a.copy(), b.copy()))
     return res
 
 
@@ -37,7 +38,7 @@ def get_station_couples(move_to_station_actions, charge_actions):
         station_id = a.get('attributes').get('station_id')
         for b in charge_actions:
             if b.get('attributes').get('station_id') == station_id:
-                res.append((a, b))
+                res.append((a.copy(), b.copy()))
     return res
 
 
@@ -62,8 +63,8 @@ class Node:
         else:
             self.parent = parent
             self.agent_pos = parent.agent_pos.copy()
-            self.agent_autonomy = parent.agent_autonomy #.copy()
-            self.init_time = parent.end_time #.copy()
+            self.agent_autonomy = parent.agent_autonomy  # .copy()
+            self.init_time = parent.end_time  # .copy()
             self.actions = parent.actions.copy()
             self.completed_goals = parent.completed_goals.copy()
 
@@ -75,11 +76,17 @@ class Node:
         self.children = []
 
     def set_end_time(self):
-        if self.parent is None:
-            self.end_time = self.init_time + sum(a.get('statistics').get('time') for a in self.actions)
-        else:
-            self.end_time = sum(a.get('statistics').get('time') for a in self.actions)
+        # if self.parent is None:
+        #     self.end_time = self.init_time + sum(a.get('statistics').get('time') for a in self.actions)
+        # else:
+        self.end_time = sum(a.get('statistics').get('time') for a in self.actions)
         # We are adding the time of the parent's inherited action, which have been already added
+
+    def set_completed_goals(self):
+        # check last two actions and add goal accordingly
+        # for action in self.actions:
+        #     if action.
+        return
 
     def already_served(self):
         res = []
@@ -94,6 +101,8 @@ class Node:
                 action_string += str((a.get('type'), a.get('attributes').get('customer_id'))) + ", "
             else:
                 action_string += str((a.get('type'), a.get('attributes').get('station_id'))) + ", "
+
+            # if its the last action, remove ", "
             if a == self.actions[-1]:
                 action_string = action_string[:-2]
         print(
@@ -107,6 +116,45 @@ class Node:
             f'\thas parent?:\t{self.parent is not None}\n'
             f'\thas children?:\t{len(self.children)}\t)'
         )
+
+    def print_node_action_info(self):
+        action_string = ""
+        for a in self.actions:
+            action_string += str(a) + "\n"
+        print(
+            f'(\tagent_position:\t{self.agent_pos}\n'
+            f'\tagent_autonomy:\t{self.agent_autonomy}\n'
+            f'\tactions:\t[\n{action_string}]\n'
+            f'\tinit_time:\t{self.init_time:.4f}\n'
+            f'\tend_time:\t{self.end_time:.4f}\n'
+            f'\tvalue:\t{self.value:.4f}\n'
+            f'\tcompleted_goals:\t{self.completed_goals}\n'
+            f'\thas parent?:\t{self.parent is not None}\n'
+            f'\thas children?:\t{len(self.children)}\t)'
+        )
+
+
+def check_tree(leaf_node):
+    node = leaf_node
+    i = -1
+    while node.parent is not None:
+        i += 1
+        print("-------------------------------------------------------------------")
+        print(f"Generation -{i:2d}")
+        node.print_node_action_info()
+        plan = Plan(node.actions, node.value, node.completed_goals)
+        plan.print_plan()
+        print("-------------------------------------------------------------------")
+
+        node = node.parent
+
+    i += 1
+    print("-------------------------------------------------------------------")
+    print(f"Generation -{i:2d}")
+    node.print_node_action_info()
+    plan = Plan(node.actions, node.value, node.completed_goals)
+    plan.print_plan()
+    print("-------------------------------------------------------------------")
 
 
 class Planner:
@@ -151,13 +199,13 @@ class Planner:
         if len(self.joint_plan) == 0:
             for customer in self.config_dic.get("customers"):
                 self.table_of_goals[customer.get("name")] = math.inf
-        else: #extract from joint plan
+        else:  # extract from joint plan
             for customer in self.joint_plan.get('table_of_goals').keys():
                 tup = self.joint_plan.get('table_of_goals').get(customer)
                 if tup is None:
                     self.table_of_goals[customer] = math.inf
                 else:
-                    self.table_of_goals[customer] = tup[1] # tup[0] transport_agent, tup[1] pick_up_time
+                    self.table_of_goals[customer] = tup[1]  # tup[0] transport_agent, tup[1] pick_up_time
 
     def fill_statistics(self, action, current_pos=None, current_autonomy=None):
         if action.get('type') == 'PICK-UP':
@@ -236,7 +284,7 @@ class Planner:
         for action in node.actions:
             # For actions that entail a movement, pay a penalty per km (10%)
             if action.get('type') != 'CHARGE':
-            #i f action.get('type') not in ['MOVE-TO-STATION', 'CHARGE']:
+                # i f action.get('type') not in ['MOVE-TO-STATION', 'CHARGE']:
                 costs += PENALTY * (action.get('statistics').get('dist') / 1000)
             # For actions that entail charging, pay for the charged electricity
             # TODO
@@ -245,9 +293,8 @@ class Planner:
                 costs += PRICE_PER_kWh * action.get('statistics').get('need')
         # Utility (or g value) = benefits - costs
         g = benefits - costs
-        #if g < 0:
-            # print("THE COSTS ARE HIGHER THANT THE BENEFITS")
-
+        # if g < 0:
+        # print("THE COSTS ARE HIGHER THANT THE BENEFITS")
 
         # Calculate h value w.r.t Table of Goals + node end time
         h = 0
@@ -264,7 +311,7 @@ class Planner:
                     dist = route.get('distance')
                     h += STARTING_FARE + (dist / 1000) * PRICE_PER_KM
                 # calculate benefits
-                #h += 0
+                # h += 0
 
         f_value = g + h
         node.value = f_value
@@ -276,10 +323,16 @@ class Planner:
             print("Creating initial nodes...")
         #   We assume that autonomy is full at beginning, so initially we'll just consider
         #   one pick up action per every possible goal
-        agent_actions = self.actions_dic.get(self.agent_id)
+        agent_actions = self.actions_dic.get(self.agent_id).copy()
+
+        logger.critical(F"iNITIAL ACTIONS DIC: \n{agent_actions}")
 
         pick_up_actions = agent_actions.get("PICK-UP")
         move_to_dest_actions = agent_actions.get("MOVE-TO-DEST")
+
+        logger.warning(f"Pick-up actions:\n{pick_up_actions}")
+        logger.warning(f"Move-to-dest actions:\n{move_to_dest_actions}")
+
 
         # # Fill actions statistics
         # #   Calculates the time and distance according to agent's current pos/autonomy
@@ -292,6 +345,7 @@ class Planner:
         # Create the corresponding node per action
         #   Create node, fill values, evaluate, add to priority queue if possible
         for tup in get_customer_couples(pick_up_actions, move_to_dest_actions):
+            logger.debug(f"We are considering the creation of a node with actions:\n\t{tup[0]}\nand\t{tup[1]}")
             node = Node()
             node.agent_pos = self.agent_pos
             node.agent_autonomy = self.agent_autonomy
@@ -300,6 +354,17 @@ class Planner:
             #  Calculates the time and distance according to agent's current pos/autonomy
             node.actions = [self.fill_statistics(tup[0], current_pos=node.agent_pos),
                             self.fill_statistics(tup[1])]
+
+            logger.critical(F"ACTIONS DIC after statistics: \n{agent_actions}")
+            # action1 = self.fill_statistics(tup[0], current_pos=node.agent_pos)
+            # action2 = self.fill_statistics(tup[1])
+            #
+            # logger.debug("\n")
+            # logger.debug(f"After filling the statistics, action look like:\n\t{action1}\nand\t{action2}")
+
+            logger.debug("\n")
+            logger.debug(f"After filling the statistics, action look like:\n\t{node.actions[-2]}\nand\t{node.actions[-1]}")
+
 
             # Check if there's enough autonomy to do the customer action
             #   only if initial autonomy is not full (implementar a futur)
@@ -324,6 +389,10 @@ class Planner:
 
             # Once the actions are set, calculate node end time
             node.set_end_time()
+
+            logger.debug("\n")
+            logger.debug(f"After setting end time, action look like:\n\t{node.actions[-2]}\nand\t{node.actions[-1]}")
+
             # Update position and autonomy
             node.agent_autonomy -= calculate_km_expense(node.agent_pos,
                                                         node.actions[-1].get('attributes').get('customer_origin'),
@@ -333,21 +402,31 @@ class Planner:
             # Add served customer to completed_goals
             init = node.init_time
             pick_up_duration = node.actions[-2].get('statistics').get('time')
-            #print(
-            #    f'Node init time is {init} and the pick_up took {pick_up_duration} seconds so the pick_up_time is {init + pick_up_duration}')
-            # print(f'as you can see here {node.actions[-2]}')
+            print(
+                f'Node init time is {init} and the pick_up took {pick_up_duration} seconds so the pick_up_time is {init + pick_up_duration}')
+            print(f'as you can see here {node.actions[-2]}')
             node.completed_goals.append(
                 (node.actions[-1].get('attributes').get('customer_id'), init + pick_up_duration))
-            #node.completed_goals.append((node.actions[-1].get('attributes').get('customer_id'), pick_up_time))
+            # node.completed_goals.append((node.actions[-1].get('attributes').get('customer_id'), pick_up_time))
 
             # Evaluate node
             value = self.evaluate_node(node)
+
+            logger.debug("\n")
+            logger.debug(f"After evaluating node, action look like:\n\t{node.actions[-2]}\nand\t{node.actions[-1]}")
             # Push node in the priority queue
             heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
 
+            logger.debug("\n")
+            logger.debug("\n")
+            agent_actions = None
         # Once there is one node per possible customer action, if there was a customer action not possible to complete
         # because of autonomy, generate nodes with charging actions in every station
         if generate_charging:
+            agent_actions = self.actions_dic.get(self.agent_id).copy()
+
+            logger.warning(f"Agent actions after making it none in generate_charging:\n{agent_actions}")
+
             move_to_station_actions = agent_actions.get("MOVE-TO-STATION")
             charge_actions = agent_actions.get("CHARGE")
 
@@ -392,19 +471,20 @@ class Planner:
         while self.open_nodes:
             i += 1
             if VERBOSE > 1:
-                print(f'\nIteration {i:5d}.')
-                print("Open nodes:", len(self.open_nodes), self.open_nodes)
+                logger.info(f'\nIteration {i:5d}.')
+                logger.info("Open nodes:", len(self.open_nodes), self.open_nodes)
             # print("I'M IN THE MAIN LOOP")
             tup = heapq.heappop(self.open_nodes)
             value = tup[0]
             if value < self.best_solution_value:
                 if VERBOSE > 1:
-                    print(f'The node f_value is lower than the best solution value')
+                    logger.info(f'The node f_value is lower than the best solution value')
                     continue
             parent = tup[2]
             if VERBOSE > 1:
-                print("Node", tup, "popped from the open_nodes")
-                parent.print_node()
+                logger.info("Node", tup, "popped from the open_nodes")
+                # parent.print_node()
+                parent.print_node_action_info()
             # If the last action is a customer service, consider charging
             # otherwise consider ONLY customer actions (avoids consecutive charging actions)
             consider_charge = False
@@ -452,30 +532,37 @@ class Planner:
             print("###################################################################################################")
             print("\nEnd of MAIN LOOP")
             print(f'{len(self.solution_nodes):5d} solution nodes found')
-            print("Solution nodes:",self.solution_nodes)
+            print("Solution nodes:", self.solution_nodes)
             n = 1
             for tup in self.solution_nodes:
-                print("\nSolution",n)
+                print("\nSolution", n)
                 tup[0].print_node()
                 n += 1
             print("Best solution node:")
             self.best_solution.print_node()
 
-
-        print(self.best_solution.actions)
-        print(self.best_solution.completed_goals)
-
         # When the process finishes, extract plan from the best solution node
         # with its corresponding table of goals
-        self.extract_plan(self.best_solution)
+        if self.best_solution is not None:
+            # print(self.best_solution.actions)
+            # print(self.best_solution.completed_goals)
+            #
+            # self.extract_plan(self.best_solution)
+            # self.plan.print_plan()
 
-        self.plan.print_plan()
+            check_tree(self.best_solution)
 
     def create_customer_nodes(self, parent):
         agent_actions = self.actions_dic.get(self.agent_id)
+
+        logger.error(f"Agent actions:\n{agent_actions}")
+
         pick_up_actions = agent_actions.get("PICK-UP")
         move_to_dest_actions = agent_actions.get("MOVE-TO-DEST")
         generate_charging = False
+
+        logger.warning(f"Pick-up actions:\n{pick_up_actions}")
+        logger.warning(f"Move-to-dest actions:\n{move_to_dest_actions}")
 
         # Remove served customers from actions
         pick_up_actions = [a for a in pick_up_actions if
@@ -483,13 +570,26 @@ class Planner:
         move_to_dest_actions = [a for a in move_to_dest_actions if
                                 a.get('attributes').get('customer_id') not in parent.already_served()]
 
+        logger.warning(f"Pick-up actions after filtering:\n{pick_up_actions}")
+        logger.warning(f"Move-to-dest actions after filtering:\n{move_to_dest_actions}")
+
         for tup in get_customer_couples(pick_up_actions, move_to_dest_actions):
+            logger.debug(f"We are considering the creation of a node with actions:\n\t{tup[0]}\nand\t{tup[1]}")
             node = Node(parent)
+
+            logger.debug(f"Node position {node.agent_pos} and autonomy {node.agent_autonomy}")
+            logger.debug(f"Node actions so far {node.actions}")
 
             # Fill actions statistics
             #  Calculates the time and distance according to agent's current pos/autonomy
             node.actions += [self.fill_statistics(tup[0], current_pos=node.agent_pos),
                              self.fill_statistics(tup[1])]
+
+            logger.debug(f"Node actions after addition {node.actions}")
+
+            logger.debug("\n")
+            logger.debug(
+                f"After filling the statistics, action look like:\n\t{node.actions[-2]}\nand\t{node.actions[-1]}")
 
             # Check if there's enough autonomy to do the customer action
             customer_origin = node.actions[-2].get("attributes").get("customer_origin")
@@ -513,6 +613,10 @@ class Planner:
 
             # Once the actions are set, calculate node end time
             node.set_end_time()
+
+            logger.debug("\n")
+            logger.debug(f"After setting end time, action look like:\n\t{node.actions[-2]}\nand\t{node.actions[-1]}")
+
             # Update position and autonomy
             node.agent_autonomy -= calculate_km_expense(node.agent_pos,
                                                         node.actions[-1].get('attributes').get('customer_origin'),
@@ -524,10 +628,14 @@ class Planner:
             pick_up_duration = node.actions[-2].get('statistics').get('time')
             # TODO correct pick-up time calculation
             # print(f'Node init time is {init} and the pick_up took {pick_up_duration} seconds so the pick_up_time is {init+pick_up_duration}')
-            node.completed_goals.append((node.actions[-1].get('attributes').get('customer_id'), init+pick_up_duration))
+            node.completed_goals.append(
+                (node.actions[-1].get('attributes').get('customer_id'), init + pick_up_duration))
 
             # Evaluate node
             value = self.evaluate_node(node)
+
+            logger.debug("\n")
+            logger.debug(f"After evaluating node, action look like:\n\t{node.actions[-2]}\nand\t{node.actions[-1]}")
 
             # If the value is below the best solution value, add node to open_nodes
             if value > self.best_solution_value:
@@ -535,6 +643,9 @@ class Planner:
                 parent.children.append(node)
                 # Push node in the priority queue
                 heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
+
+            logger.debug("\n")
+            logger.debug("\n")
 
         return generate_charging
 
@@ -570,6 +681,7 @@ class Planner:
 
     def extract_plan(self, node):
         self.plan = Plan(node.actions, node.value, node.completed_goals)
+
 
 def initialize():
     config_dic = {}
