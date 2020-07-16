@@ -529,10 +529,11 @@ class Planner:
             # print(self.best_solution.actions)
             # print(self.best_solution.completed_goals)
             #
-            # self.extract_plan(self.best_solution)
-            # self.plan.print_plan()
+            self.extract_plan(self.best_solution)
+            if VERBOSE > 0:
+                logger.info(self.plan.to_string_plan())
 
-            check_tree(self.best_solution)
+            # check_tree(self.best_solution)
 
     def create_customer_nodes(self, parent):
         dic_file = open("test-actions.json", "r")

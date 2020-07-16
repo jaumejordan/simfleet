@@ -209,6 +209,7 @@ class BestResponse:
         # if previous plan is None (or Empty), indicates the agent could not find a plan in the previous round
         if prev_plan is None:
             a = 1
+            logger.info(f"Agent {agent_id} has no previous plan")
         else:
             a = 2
 
