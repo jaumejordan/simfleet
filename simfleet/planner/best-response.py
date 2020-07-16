@@ -211,7 +211,49 @@ class BestResponse:
             a = 1
             logger.info(f"Agent {agent_id} has no previous plan")
         else:
-            a = 2
+            # Get previous plan utility
+            prev_utility = prev_plan.utility
+            # Calculate updated utility w.r.t. other agent's plans
+            updated_utility = self.evaluate_plan(prev_plan)
+            if prev_utility != updated_utility:
+                logger.info(f"Agent {agent_id} had it's plan utility reduced "
+                            f"from {prev_utility:.4f} to {updated_utility:.4f}")
+            else:
+                logger.info(f"The utility of agent's {agent_id} plan has not changed")
+
+        # Propose new plan as best response to joint plan
+        planner = self.create_planner(a)
+        planner.run()
+        new_plan = planner.plan
+        # TODO leave joint plan update for later; Why? Because if the plan found has negative utility (only costs)
+        # we don't want to add it to the joint plan but instead substitute it by an empty plan (None).
+        # Currently we need to update the joint plan to then evaluate the agent's new plan and determine if its
+        # final utility would be negative or not. Consequently, the joint plas has already been updated with actions_
+        # that report no benefit to the agent and must be deleted.
+        self.update_joint_plan(agent_id, new_plan) # <-- this must be relocated
+        if new_plan is None:
+            new_utility = 0
+            # if both the previous and new plans where None, indicate that the agent did not change its proposal
+            if prev_plan is None:
+                self.joint_plan["no_change"][agent_id] = True
+        else:
+            # TODO create evaluation that does not require to update joint_plan first
+            new_utility = self.evaluate_plan(new_plan)
+
+        # If the utility is the same, assume plan did not change
+        # TODO compare plans action by action not just by their utility
+        if new_utility == 0:
+            logger.warning(
+                f"Agent {agent_id} could not find any plan"
+            )
+        elif new_utility != updated_utility:
+            logger.info(
+                f"Agent {agent_id} found new plan with utility {new_utility:.4f}")
+            logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
+
+        else:
+            logger.info(f"Agent {agent_id} could not find a better plan")
+            self.joint_plan["no_change"][agent_id] = True
 
     def print_game_state(self):
         # joint_plan = {"no_change": {}, "joint": None, "table_of_goals": {}, "individual": {}}
@@ -259,8 +301,8 @@ class BestResponse:
         self.init_joint_plan()
 
         game_turn = 0
-
-        while game_turn < 1:
+        # TODO add real stop condition (its game turns now because of testing)
+        while game_turn < 3:
             game_turn += 1
             logger.info("*************************************************************************")
             logger.info(f"\t\t\t\t\t\t\tBest Response turn {game_turn}")
@@ -268,12 +310,14 @@ class BestResponse:
             # First turn of the game, agents propose their initial plan
             if game_turn == 1:
                 self.create_initial_plans()
-                self.print_game_state()
             # In the following turns, the agents may have one of this two:
             # 1) A previous plan
             # 2) An empty plan, because it can't do any action that increases its utility
             if game_turn > 1:
-                continue
+                for a in self.agents:
+                    self.propose_plan(a)
+                    # TODO when agents can't find plans, their previous plans get deleted --> correct this
+            self.print_game_state()
 
     # Best Response algorithm
     def run_old(self):
@@ -292,7 +336,7 @@ class BestResponse:
 
         game_turn = 0
 
-        while game_turn < 1:
+        while game_turn < 2:
             game_turn += 1
             logger.info("*************************************************************************")
             logger.info(f"\t\t\t\t\t\t\tBest Response turn {game_turn}")
