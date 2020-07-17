@@ -29,7 +29,7 @@ class Plan:
 
     def print_plan(self):
         print(f'{"init time":10s}  ||  {"action":50s}  ||  {"end time":10s}  ||  {"duration":10s}')
-        print("--------------------------------------------------------------------------------------------")
+        s +="-------------------------------------------------------------------------------------------------\n"
         for e in self.entries:
             e.print_simple()
         end_time = self.entries[-1].init_time + self.entries[-1].duration
@@ -38,7 +38,7 @@ class Plan:
     def to_string_plan(self):
         s = "\n"
         s += f'{"init time":10s}  ||  {"action":50s}  ||  {"end time":10s}  ||  {"duration":10s}\n'
-        s +="--------------------------------------------------------------------------------------------\n"
+        s +="-------------------------------------------------------------------------------------------------\n"
         for e in self.entries:
             s += e.to_string_simple()
         end_time = self.entries[-1].init_time + self.entries[-1].duration
@@ -84,7 +84,7 @@ class JointPlan:
     def print_plan(self):
         s = "\n"
         s += f'{"init time":10s}  ||  {"action":50s}  ||  {"end time":10s}  ||  {"duration":10s}\n'
-        s +="--------------------------------------------------------------------------------------------\n"
+        s +="-------------------------------------------------------------------------------------------------\n"
         for e in self.entries:
             s += e.to_string_simple()
         end_time = self.entries[-1].init_time + self.entries[-1].duration

@@ -10,7 +10,7 @@ from loguru import logger
 from plan import Plan, PlanEntry
 from constants import SPEED, STARTING_FARE, PRICE_PER_kWh, PENALTY, PRICE_PER_KM
 
-VERBOSE = 2  # 2, 1 or 0 according to verbosity level
+VERBOSE = 0  # 2, 1 or 0 according to verbosity level
 
 
 def meters_to_seconds(distance_in_meters):
