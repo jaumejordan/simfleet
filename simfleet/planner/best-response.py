@@ -66,13 +66,13 @@ class BestResponse:
 
     # Given a transport agent, creates its associated Planner object
     def create_planner(self, agent):
-        prev_plan = self.joint_plan.get('individual').get(agent.get('id'))
+        # prev_plan = self.joint_plan.get('individual').get(agent.get('id'))
         agent_planner = Planner(self.config_dic, self.actions_dic, self.routes_dic,
                                 agent_id=agent.get('id'),
                                 agent_pos=agent.get('initial_position'),
                                 agent_max_autonomy=agent.get('max_autonomy'),
                                 agent_autonomy=agent.get('current_autonomy'),
-                                previous_plan=prev_plan, joint_plan=self.joint_plan)
+                                previous_plan=None, joint_plan=self.joint_plan)
         return agent_planner
 
     # Returns true if the transport agent has an individual plan in the joint plan
@@ -126,14 +126,45 @@ class BestResponse:
         # Update agent's individual plan
         self.joint_plan["individual"][agent_id] = new_plan
         self.joint_plan["no_change"][agent_id] = False
-        # Update table_of_goals to match with individual plans
-        self.update_table_of_goals()
         # Extract every individual plan action to build the joint plan
         self.extract_joint_plan()
+        # Update table_of_goals to match with individual plans
+        self.update_table_of_goals()
+
+    def update_table_of_goals(self):
+        # Restart table of table_of_goals
+        for customer in self.config_dic.get("customers"):
+            customer_id = customer.get('name')
+            self.joint_plan["table_of_goals"][customer_id] = None
+        aux = {}
+
+        for entry in self.joint_plan.get("joint").entries:
+            action = entry.action
+            if action.get('type') == 'PICK-UP':
+                agent = action.get('agent')
+                customer = action.get('attributes').get('customer_id')
+                pick_up_time = entry.end_time
+                if aux.get(customer) is None:
+                    aux[customer] = []
+                # for each customer, add tuples with every transport that serves him with pick-up time
+                aux[customer].append((agent, pick_up_time))
+
+        # Then, compare all pick up times for a single customer and decide which transport arrives before
+        for customer in aux.keys():
+            earliest = min(aux.get(customer), key=lambda x: x[1])
+            # Input in the table of goals a tuple with the serving transport id and pick-up time
+            self.joint_plan['table_of_goals'][customer] = earliest
+
+
 
     # Reads all tables of goals of individual plans and creates a global table of goals indicating, per each customer
     # the serving transport and the pick-up time
-    def update_table_of_goals(self):
+    def update_table_of_goals_old(self):
+        # Restart table of table_of_goals
+        for customer in self.config_dic.get("customers"):
+            customer_id = customer.get('name')
+            self.joint_plan["table_of_goals"][customer_id] = None
+
         aux = {}
         # Check table of goals of every individual plan
 
@@ -208,7 +239,6 @@ class BestResponse:
         prev_plan = self.get_individual_plan(a)
         # if previous plan is None (or Empty), indicates the agent could not find a plan in the previous round
         if prev_plan is None:
-            a = 1
             logger.info(f"Agent {agent_id} has no previous plan")
         else:
             # Get previous plan utility
@@ -216,7 +246,7 @@ class BestResponse:
             # Calculate updated utility w.r.t. other agent's plans
             updated_utility = self.evaluate_plan(prev_plan)
             if prev_utility != updated_utility:
-                logger.info(f"Agent {agent_id} had it's plan utility reduced "
+                logger.warning(f"Agent {agent_id} had its plan utility reduced "
                             f"from {prev_utility:.4f} to {updated_utility:.4f}")
             else:
                 logger.info(f"The utility of agent's {agent_id} plan has not changed")
@@ -232,6 +262,7 @@ class BestResponse:
         # that report no benefit to the agent and must be deleted.
         self.update_joint_plan(agent_id, new_plan) # <-- this must be relocated
         if new_plan is None:
+            # do not update the joint plan, but add
             new_utility = 0
             # if both the previous and new plans where None, indicate that the agent did not change its proposal
             if prev_plan is None:
@@ -247,7 +278,7 @@ class BestResponse:
                 f"Agent {agent_id} could not find any plan"
             )
         elif new_utility != updated_utility:
-            logger.info(
+            logger.warning(
                 f"Agent {agent_id} found new plan with utility {new_utility:.4f}")
             logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
 
@@ -302,7 +333,7 @@ class BestResponse:
 
         game_turn = 0
         # TODO add real stop condition (its game turns now because of testing)
-        while game_turn < 3:
+        while not self.stop(): #game_turn < 3:
             game_turn += 1
             logger.info("*************************************************************************")
             logger.info(f"\t\t\t\t\t\t\tBest Response turn {game_turn}")
@@ -318,6 +349,8 @@ class BestResponse:
                     self.propose_plan(a)
                     # TODO when agents can't find plans, their previous plans get deleted --> correct this
             self.print_game_state()
+
+        logger.info("END OF GAME")
 
     # Best Response algorithm
     def run_old(self):
@@ -369,7 +402,7 @@ class BestResponse:
                     prev_utility = prev_plan.utility
                     updated_utility = self.evaluate_plan(prev_plan)
                     if prev_utility != updated_utility:
-                        logger.info(f"Agent {agent_id} had it's plan utility reduced "
+                        logger.warning(f"Agent {agent_id} had its plan utility reduced "
                                     f"from {prev_utility:.4f} to {updated_utility:.4f}")
                     else:
                         logger.info(f"The utility of agent's {agent_id} plan has not changed")
@@ -389,7 +422,7 @@ class BestResponse:
                             f"Agent {agent_id} could not find any plan"
                         )
                     elif new_utility != updated_utility:
-                        logger.info(
+                        logger.warning(
                             f"Agent {agent_id} found new plan with utility {new_utility:.4f}")
                         logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
 

@@ -10,7 +10,7 @@ from loguru import logger
 from plan import Plan, PlanEntry
 from constants import SPEED, STARTING_FARE, PRICE_PER_kWh, PENALTY, PRICE_PER_KM
 
-VERBOSE = 0  # 2, 1 or 0 according to verbosity level
+VERBOSE = 2  # 2, 1 or 0 according to verbosity level
 
 
 def meters_to_seconds(distance_in_meters):
@@ -97,12 +97,12 @@ class Node:
     #def node_to_string(self):
 
     def print_node(self):
-        action_string = ""
+        action_string = "\n"
         for a in self.actions:
             if a.get('type') in ['PICK-UP', 'MOVE-TO-DEST']:
-                action_string += str((a.get('type'), a.get('attributes').get('customer_id'))) + ", "
+                action_string += str((a.get('agent'), a.get('type'), a.get('attributes').get('customer_id'))) + ",\n"
             else:
-                action_string += str((a.get('type'), a.get('attributes').get('station_id'))) + ", "
+                action_string += str((a.get('agent'), a.get('type'), a.get('attributes').get('station_id'))) + ",\n"
 
             # if its the last action, remove ", "
             if a == self.actions[-1]:
@@ -200,14 +200,16 @@ class Planner:
     def create_table_of_goals(self):
         if len(self.joint_plan) == 0:
             for customer in self.config_dic.get("customers"):
-                self.table_of_goals[customer.get("name")] = math.inf
+                self.table_of_goals[customer.get("name")] = (None, math.inf)
         else:  # extract from joint plan
             for customer in self.joint_plan.get('table_of_goals').keys():
                 tup = self.joint_plan.get('table_of_goals').get(customer)
                 if tup is None:
-                    self.table_of_goals[customer] = math.inf
+                    self.table_of_goals[customer] = (None, math.inf)
                 else:
-                    self.table_of_goals[customer] = tup[1]  # tup[0] transport_agent, tup[1] pick_up_time
+                    self.table_of_goals[customer] = (tup[0], tup[1])
+                    # self.table_of_goals[customer] = tup[1]  # tup[0] transport_agent, tup[1] pick_up_time
+        logger.info(f"Initial table of goals:\n{self.table_of_goals}")
 
     def fill_statistics(self, action, current_pos=None, current_autonomy=None):
         if action.get('type') == 'PICK-UP':
@@ -268,8 +270,13 @@ class Planner:
                 return s.get('power')
 
     def reachable_goal(self, customer_id, pick_up_time):
-
-        return self.table_of_goals.get(customer_id) > pick_up_time
+        tup = self.table_of_goals.get(customer_id)
+        if tup[0] == self.agent_id:
+            return True
+        elif pick_up_time < tup[1]:
+            return True
+        return False
+        # return self.table_of_goals.get(customer_id) > pick_up_time
 
     # Returns the f value of a node
     def evaluate_node(self, node):
@@ -302,7 +309,7 @@ class Planner:
         h = 0
         for key in self.table_of_goals.keys():
             if key not in node.already_served():
-                if node.end_time < self.table_of_goals.get(key):
+                if node.end_time < self.table_of_goals.get(key)[1]:
                     # extract distance of customer trip
                     customer_actions = self.actions_dic.get(self.agent_id).get('MOVE-TO-DEST')
                     customer_actions = [a for a in customer_actions if a.get('attributes').get('customer_id') == key]
@@ -362,20 +369,20 @@ class Planner:
             customer_origin = node.actions[-2].get("attributes").get("customer_origin")
             customer_dest = node.actions[-1].get("attributes").get("customer_dest")
 
-            if not has_enough_autonomy(node.agent_autonomy, node.agent_pos, customer_origin, customer_dest):
-                # activate generation of station initial nodes
-                generate_charging = True
-                # delete node object
-                node = None
-                continue
-
             # Calculate pick_up time and check table of goals
             pick_up_time = node.init_time + node.actions[-2].get('statistics').get('time')
             customer_id = node.actions[-2].get('attributes').get('customer_id')
             # customer_id = node.actions[-2].get('attributes').get('customer_id').split('@')[0]
             if not self.reachable_goal(customer_id, pick_up_time):
                 # delete node object
-                node = None
+                del node
+                continue
+
+            if not has_enough_autonomy(node.agent_autonomy, node.agent_pos, customer_origin, customer_dest):
+                # activate generation of station initial nodes
+                generate_charging = True
+                # delete node object
+                del node
                 continue
 
             # Once the actions are set, calculate node end time
@@ -454,19 +461,19 @@ class Planner:
             i += 1
             if VERBOSE > 1:
                 logger.info(f'\nIteration {i:5d}.')
-                logger.info("Open nodes:", len(self.open_nodes), self.open_nodes)
+                logger.info(f"Open nodes: {len(self.open_nodes)} {self.open_nodes}")
             # print("I'M IN THE MAIN LOOP")
             tup = heapq.heappop(self.open_nodes)
-            value = tup[0]
+            value = -tup[0]
             if value < self.best_solution_value:
                 if VERBOSE > 1:
-                    logger.info(f'The node f_value is lower than the best solution value')
+                    logger.info(f'The node f_value {value:.4f} is lower than the best solution value {self.best_solution_value:.4f}')
                     continue
             parent = tup[2]
             if VERBOSE > 1:
                 logger.info("Node", tup, "popped from the open_nodes")
-                # parent.print_node()
-                parent.print_node_action_info()
+                parent.print_node()
+                # parent.print_node_action_info()
             # If the last action is a customer service, consider charging
             # otherwise consider ONLY customer actions (avoids consecutive charging actions)
             consider_charge = False
@@ -514,11 +521,11 @@ class Planner:
             logger.info("###################################################################################################")
             logger.info("\nEnd of MAIN LOOP")
             logger.info(f'{len(self.solution_nodes):5d} solution nodes found')
-            logger.info("Solution nodes:", self.solution_nodes)
+            # logger.info("Solution nodes:", self.solution_nodes)
             n = 1
             for tup in self.solution_nodes:
-                logger.info("\nSolution", n)
-                tup[0].print_node()
+                # logger.info("\nSolution", n)
+                # tup[0].print_node()
                 n += 1
             logger.info("Best solution node:")
             self.best_solution.print_node()
@@ -530,8 +537,8 @@ class Planner:
             # print(self.best_solution.completed_goals)
             #
             self.extract_plan(self.best_solution)
-            if VERBOSE > 0:
-                logger.info(self.plan.to_string_plan())
+            # if VERBOSE > 0:
+                # logger.info(self.plan.to_string_plan())
 
             # check_tree(self.best_solution)
 
@@ -567,20 +574,20 @@ class Planner:
             customer_origin = node.actions[-2].get("attributes").get("customer_origin")
             customer_dest = node.actions[-1].get("attributes").get("customer_dest")
 
-            if not has_enough_autonomy(node.agent_autonomy, node.agent_pos, customer_origin, customer_dest):
-                # activate generation of station initial nodes
-                generate_charging = True
-                # delete node object
-                node = None
-                continue
-
             # Calculate pick_up time and check table of goals
             pick_up_time = node.init_time + node.actions[-2].get('statistics').get('time')
             customer_id = node.actions[-2].get('attributes').get('customer_id')
             # customer_id = node.actions[-2].get('attributes').get('customer_id').split('@')[0]
             if not self.reachable_goal(customer_id, pick_up_time):
                 # delete node object
-                node = None
+                del node
+                continue
+
+            if not has_enough_autonomy(node.agent_autonomy, node.agent_pos, customer_origin, customer_dest):
+                # activate generation of station initial nodes
+                generate_charging = True
+                # delete node object
+                del node
                 continue
 
             # Once the actions are set, calculate node end time
@@ -602,8 +609,8 @@ class Planner:
             # Evaluate node
             value = self.evaluate_node(node)
 
-            # If the value is below the best solution value, add node to open_nodes
-            if value > self.best_solution_value:
+            # If the value is higher than best solution value, add node to open_nodes
+            if True: #value > self.best_solution_value:
                 # Add node to parent's children
                 parent.children.append(node)
                 # Push node in the priority queue
@@ -639,6 +646,10 @@ class Planner:
             node.agent_pos = node.actions[-2].get('attributes').get('station_position')
 
             # Evaluate node
+            # TODO if after evaluating the node, there is no h value; i.e: there are no more customers to pick up
+            # delete this node and mark parent as solution. How? No idea...
+            # This is to avoid plans that end up charging for nothing, since they reduce the utility and, in some cases,
+            # make the planner choose objectively worse alternatives.
             value = self.evaluate_node(node)
 
             # If the value is below the best solution value, add node to open_nodes
