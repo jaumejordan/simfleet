@@ -107,12 +107,12 @@ class RequestRouteBehaviour(OneShotBehaviour):
             path, distance, duration = await request_route_to_server(self.origin, self.destination, self.route_host)
             response_time = time.time() - response_time
             if path is None:
-                logger.error("There was an unknown error requesting the route from {} to {}. Response time={}".format(
-                    self.origin, self.destination, response_time))
+                logger.error("There was an unknown error requesting the route from {} to {}. Response time={:.6f}"
+                             .format(self.origin, self.destination, response_time))
                 self.exit_code = {"type": "error"}
                 self.kill()
                 return
-            logger.debug("Got route in response time={}".format(response_time))
+            logger.debug("Got route in response time={:.6f}".format(response_time))
             reply_content = {
                 "path": path,
                 "distance": distance,
@@ -123,7 +123,10 @@ class RequestRouteBehaviour(OneShotBehaviour):
 
         except Exception as e:
             response_time = time.time() - response_time
-            logger.error("Exception requesting route, response time={}, error: {} ".format(response_time, e))
+            logger.error("Exception requesting route, response time={:.6f}, error: {} ".format(response_time, e))
+            self.exit_code = {"type": "error"}
+            self.kill()
+            return
 
 
 async def request_path(agent, origin, destination, route_host):
