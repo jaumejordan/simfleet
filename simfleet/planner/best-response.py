@@ -262,6 +262,9 @@ class BestResponse:
         # Currently we need to update the joint plan to then evaluate the agent's new plan and determine if its
         # final utility would be negative or not. Consequently, the joint plas has already been updated with actions_
         # that report no benefit to the agent and must be deleted.
+        # UPDATE: Amb les comprovacions d'autonomia i pick up time invertides, no es deurien de calcular plans amb
+        # utilitat negativa tant a sovint, encara que podria passar si les autonomies inicials d'alguns vehicles son
+        # molt baixes i les d'altres no, fent que els primers carreguen mentre els altres es queden tots els clients.
         self.update_joint_plan(agent_id, new_plan) # <-- this must be relocated
         if new_plan is None:
             # do not update the joint plan, but add

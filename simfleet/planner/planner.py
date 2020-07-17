@@ -610,7 +610,8 @@ class Planner:
             value = self.evaluate_node(node)
 
             # If the value is higher than best solution value, add node to open_nodes
-            if True: #value > self.best_solution_value:
+            if value > self.best_solution_value:
+            # if True:
                 # Add node to parent's children
                 parent.children.append(node)
                 # Push node in the priority queue
