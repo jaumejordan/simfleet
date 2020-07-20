@@ -10,7 +10,7 @@ from loguru import logger
 from plan import Plan, PlanEntry
 from constants import SPEED, STARTING_FARE, PRICE_PER_kWh, PENALTY, PRICE_PER_KM
 
-VERBOSE = 0  # 2, 1 or 0 according to verbosity level
+VERBOSE = 2  # 2, 1 or 0 according to verbosity level
 
 
 def meters_to_seconds(distance_in_meters):
@@ -330,125 +330,16 @@ class Planner:
         # CREATION OF INITIAL NODES
         if VERBOSE > 1:
             logger.info("Creating initial nodes...")
-        #   We assume that autonomy is full at beginning, so initially we'll just consider
-        #   one pick up action per every possible goal
-        dic_file = open("test-actions.json", "r")
-        actions_dic = json.load(dic_file)
-        agent_actions = actions_dic.get(self.agent_id)
 
-        #agent_actions = self.actions_dic.get(self.agent_id).copy()
+        generate_charging = self.create_customer_nodes()
 
-        pick_up_actions = agent_actions.get("PICK-UP")
-        move_to_dest_actions = agent_actions.get("MOVE-TO-DEST")
-
-        # # Fill actions statistics
-        # #   Calculates the time and distance according to agent's current pos/autonomy
-        # pick_up_actions = [self.fill_statistics(a, current_pos=self.agent_pos) for a in pick_up_actions]
-        # move_to_dest_actions = [self.fill_statistics(a) for a in move_to_dest_actions]
-
-        # Var to control if generating initial chargin nodes is necessary
-        generate_charging = False
-
-        # Create the corresponding node per action
-        #   Create node, fill values, evaluate, add to priority queue if possible
-        for tup in get_customer_couples(pick_up_actions, move_to_dest_actions):
-            node = Node()
-            node.agent_pos = self.agent_pos.copy()
-            node.agent_autonomy = self.agent_autonomy
-
-            # Fill actions statistics
-            action1 = tup[0].copy()
-            action2 = tup[1].copy()
-            #  Calculates the time and distance according to agent's current pos/autonomy
-            action1 = self.fill_statistics(action1, current_pos=node.agent_pos)
-            action2 = self.fill_statistics(action2)
-
-            node.actions = [action1, action2]
-
-            # Check if there's enough autonomy to do the customer action
-            customer_origin = node.actions[-2].get("attributes").get("customer_origin")
-            customer_dest = node.actions[-1].get("attributes").get("customer_dest")
-
-            # Calculate pick_up time and check table of goals
-            pick_up_time = node.init_time + node.actions[-2].get('statistics').get('time')
-            customer_id = node.actions[-2].get('attributes').get('customer_id')
-            # customer_id = node.actions[-2].get('attributes').get('customer_id').split('@')[0]
-            if not self.reachable_goal(customer_id, pick_up_time):
-                # delete node object
-                del node
-                continue
-
-            if not has_enough_autonomy(node.agent_autonomy, node.agent_pos, customer_origin, customer_dest):
-                # activate generation of station initial nodes
-                generate_charging = True
-                # delete node object
-                del node
-                continue
-
-            # Once the actions are set, calculate node end time
-            node.set_end_time()
-
-            # Update position and autonomy
-            node.agent_autonomy -= calculate_km_expense(node.agent_pos,
-                                                        node.actions[-1].get('attributes').get('customer_origin'),
-                                                        node.actions[-1].get('attributes').get('customer_dest'))
-            node.agent_pos = node.actions[-1].get('attributes').get('customer_dest')
-
-            # Add served customer to completed_goals
-            init = node.init_time
-            pick_up_duration = node.actions[-2].get('statistics').get('time')
-            # print(
-            #     f'Node init time is {init} and the pick_up took {pick_up_duration} seconds so the pick_up_time is {init + pick_up_duration}')
-            # print(f'as you can see here {node.actions[-2]}')
-            node.completed_goals.append(
-                (node.actions[-1].get('attributes').get('customer_id'), init + pick_up_duration))
-
-            # Evaluate node
-            value = self.evaluate_node(node)
-
-            # Push node in the priority queue
-            heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
-
-        # Once there is one node per possible customer action, if there was a customer action not possible to complete
-        # because of autonomy, generate nodes with charging actions in every station
         if generate_charging:
-            dic_file = open("test-actions.json", "r")
-            actions_dic = json.load(dic_file)
-            agent_actions = actions_dic.get(self.agent_id)
-            #agent_actions = self.actions_dic.get(self.agent_id).copy()
-
-            move_to_station_actions = agent_actions.get("MOVE-TO-STATION")
-            charge_actions = agent_actions.get("CHARGE")
-
-            for tup in get_station_couples(move_to_station_actions, charge_actions):
-                node = Node()
-                node.agent_pos = self.agent_pos
-                node.agent_autonomy = self.agent_autonomy
-
-                # Fill actions statistics
-                action1 = tup[0].copy()
-                action2 = tup[1].copy()
-                #  Calculates the time and distance according to agent's current pos/autonomy
-                action1 = self.fill_statistics(action1, current_pos=node.agent_pos)
-                action2 = self.fill_statistics(action2, current_autonomy=node.agent_autonomy)
-
-                node.actions = [action1, action2]
-
-                # Once the actions are set, calculate node end time
-                node.set_end_time()
-
-                # Update position and autonomy after charge
-                node.agent_autonomy = self.agent_max_autonomy
-                node.agent_pos = node.actions[-2].get('attributes').get('station_position')
-
-                # Evaluate node
-                value = self.evaluate_node(node)
-                # Push node in the priority queue
-                heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
+            self.create_charge_nodes()
 
         if VERBOSE > 1:
             logger.info(f'{len(self.open_nodes):5d} nodes have been created')
             logger.info(self.open_nodes)
+
         # MAIN LOOP
         if VERBOSE > 1:
             logger.info("###################################################################################################")
@@ -542,7 +433,7 @@ class Planner:
 
             # check_tree(self.best_solution)
 
-    def create_customer_nodes(self, parent):
+    def create_customer_nodes(self, parent=None):
         dic_file = open("test-actions.json", "r")
         actions_dic = json.load(dic_file)
         agent_actions = actions_dic.get(self.agent_id)
@@ -553,13 +444,19 @@ class Planner:
         generate_charging = False
 
         # Remove served customers from actions
-        pick_up_actions = [a for a in pick_up_actions if
-                           a.get('attributes').get('customer_id') not in parent.already_served()]
-        move_to_dest_actions = [a for a in move_to_dest_actions if
-                                a.get('attributes').get('customer_id') not in parent.already_served()]
+        if parent is not None:
+            pick_up_actions = [a for a in pick_up_actions if
+                               a.get('attributes').get('customer_id') not in parent.already_served()]
+            move_to_dest_actions = [a for a in move_to_dest_actions if
+                                    a.get('attributes').get('customer_id') not in parent.already_served()]
 
         for tup in get_customer_couples(pick_up_actions, move_to_dest_actions):
-            node = Node(parent)
+            if parent is None:
+                node = Node()
+                node.agent_pos = self.agent_pos.copy()
+                node.agent_autonomy = self.agent_autonomy
+            else:
+                node = Node(parent)
 
             # Fill actions statistics
             action1 = tup[0].copy()
@@ -602,7 +499,6 @@ class Planner:
             # Add served customer to completed_goals
             init = node.init_time
             pick_up_duration = node.actions[-2].get('statistics').get('time')
-            # TODO correct pick-up time calculation
             node.completed_goals.append(
                 (node.actions[-1].get('attributes').get('customer_id'), init + pick_up_duration))
 
@@ -611,15 +507,15 @@ class Planner:
 
             # If the value is higher than best solution value, add node to open_nodes
             if value > self.best_solution_value:
-            # if True:
                 # Add node to parent's children
-                parent.children.append(node)
+                if parent is not None:
+                    parent.children.append(node)
                 # Push node in the priority queue
                 heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
 
         return generate_charging
 
-    def create_charge_nodes(self, parent):
+    def create_charge_nodes(self, parent=None):
         dic_file = open("test-actions.json", "r")
         actions_dic = json.load(dic_file)
         agent_actions = actions_dic.get(self.agent_id)
@@ -628,7 +524,12 @@ class Planner:
         charge_actions = agent_actions.get("CHARGE")
 
         for tup in get_station_couples(move_to_station_actions, charge_actions):
-            node = Node(parent)
+            if parent is None:
+                node = Node()
+                node.agent_pos = self.agent_pos
+                node.agent_autonomy = self.agent_autonomy
+            else:
+                node = Node(parent)
 
             # Fill actions statistics
             action1 = tup[0].copy()
@@ -655,8 +556,9 @@ class Planner:
 
             # If the value is below the best solution value, add node to open_nodes
             if value > self.best_solution_value:
-                # Add node to parent's children
-                parent.children.append(node)
+                if parent is not None:
+                    # Add node to parent's children
+                    parent.children.append(node)
                 # Push node in the priority queue
                 heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
 

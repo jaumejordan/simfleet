@@ -29,7 +29,7 @@ class Plan:
 
     def print_plan(self):
         print(f'{"init time":10s}  ||  {"action":50s}  ||  {"end time":10s}  ||  {"duration":10s}')
-        s +="-------------------------------------------------------------------------------------------------\n"
+        print("-------------------------------------------------------------------------------------------------\n")
         for e in self.entries:
             e.print_simple()
         end_time = self.entries[-1].init_time + self.entries[-1].duration
@@ -44,6 +44,13 @@ class Plan:
         end_time = self.entries[-1].init_time + self.entries[-1].duration
         s += f'{end_time:10.4f}  ::  {"****** END-OF-PLAN *****":50s}\n'
         return s
+
+    def equals(self, o):
+        equal = self.utility == o.utility
+        equal = equal and (len(self.entries) == len(o.entries))
+        for i in range(len(self.entries)):
+            equal = equal and self.entries[i].equals(o.entries[i])
+        return equal
 
 
 class PlanEntry:
@@ -75,6 +82,10 @@ class PlanEntry:
             action_string += str((self.action.get('agent'), self.action.get('type'), self.action.get('attributes').get('station_id')))
 
         return f'{self.init_time:10.4f}  ::  {action_string:50s}  ::  {self.end_time:10.4f}  ||  {self.duration:10.4f}\n'
+
+    def equals(self, o):
+        return self.init_time == o.init_time and self.action == o.action and \
+               self.duration == o.duration and self.end_time == o.end_time
 
 
 class JointPlan:
