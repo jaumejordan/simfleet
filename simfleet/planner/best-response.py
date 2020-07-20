@@ -155,8 +155,6 @@ class BestResponse:
             # Input in the table of goals a tuple with the serving transport id and pick-up time
             self.joint_plan['table_of_goals'][customer] = earliest
 
-
-
     # Reads all tables of goals of individual plans and creates a global table of goals indicating, per each customer
     # the serving transport and the pick-up time
     def update_table_of_goals_old(self):
@@ -248,7 +246,7 @@ class BestResponse:
             updated_utility = self.evaluate_plan(prev_plan)
             if prev_utility != updated_utility:
                 logger.warning(f"Agent {agent_id} had its plan utility reduced "
-                            f"from {prev_utility:.4f} to {updated_utility:.4f}")
+                               f"from {prev_utility:.4f} to {updated_utility:.4f}")
             else:
                 logger.info(f"The utility of agent's {agent_id} plan has not changed")
 
@@ -265,7 +263,7 @@ class BestResponse:
         # UPDATE: Amb les comprovacions d'autonomia i pick up time invertides, no es deurien de calcular plans amb
         # utilitat negativa tant a sovint, encara que podria passar si les autonomies inicials d'alguns vehicles son
         # molt baixes i les d'altres no, fent que els primers carreguen mentre els altres es queden tots els clients.
-        self.update_joint_plan(agent_id, new_plan) # <-- this must be relocated
+        # <-- this must be relocated
         if new_plan is None:
             # do not update the joint plan, but add
             new_utility = 0
@@ -273,22 +271,33 @@ class BestResponse:
             if prev_plan is None:
                 self.joint_plan["no_change"][agent_id] = True
         else:
-            # TODO create evaluation that does not require to update joint_plan first
-            new_utility = self.evaluate_plan(new_plan)
+            # Maybe not necessary anymore --> TODO create evaluation that does not require to update joint_plan first
+            # No need to evaluate new plan, its utility comes in its plan.utility attribute (from node evaluation)
+            # TODO comprovar afirmació anterior per a tot tipus de casos
+            # new_utility = self.evaluate_plan(new_plan)
+            new_utility = new_plan.utility
+            # new_plan_utility = new_plan.utility
 
         # If the utility is the same, assume plan did not change
         # TODO compare plans action by action not just by their utility
-        if new_utility == 0:
+        # Case 1) Agent finds no plan or a plan with negative utility (only costs)
+        if new_utility <= 0:
             logger.warning(
                 f"Agent {agent_id} could not find any plan"
             )
+            self.update_joint_plan(agent_id, new_plan=None)
+            logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
+        # Case 2) Agent finds a new plan that improves its utility
         elif new_utility != updated_utility:
+            # logger.error(f"The value of the plan is {new_plan_utility:.4f}")
             logger.warning(
                 f"Agent {agent_id} found new plan with utility {new_utility:.4f}")
             logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
-
+            self.update_joint_plan(agent_id, new_plan)
+        # Case 3) Agent finds the same plan it had proposed before
         else:
-            logger.info(f"Agent {agent_id} could not find a better plan (it found the same one than in the previous round)")
+            logger.info(
+                f"Agent {agent_id} could not find a better plan (it found the same one than in the previous round)")
             self.joint_plan["no_change"][agent_id] = True
 
     def print_game_state(self):
@@ -338,7 +347,7 @@ class BestResponse:
         self.init_joint_plan()
 
         game_turn = 0
-        while not self.stop(): #game_turn < 3:
+        while not self.stop():  # game_turn < 3:
             game_turn += 1
             logger.info("*************************************************************************")
             logger.info(f"\t\t\t\t\t\t\tBest Response turn {game_turn}")

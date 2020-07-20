@@ -10,7 +10,7 @@ from loguru import logger
 from plan import Plan, PlanEntry
 from constants import SPEED, STARTING_FARE, PRICE_PER_kWh, PENALTY, PRICE_PER_KM
 
-VERBOSE = 2  # 2, 1 or 0 according to verbosity level
+VERBOSE = 0  # 2, 1 or 0 according to verbosity level
 
 
 def meters_to_seconds(distance_in_meters):
@@ -271,10 +271,13 @@ class Planner:
 
     def reachable_goal(self, customer_id, pick_up_time):
         tup = self.table_of_goals.get(customer_id)
+        # TODO revisar
         if tup[0] == self.agent_id:
-            return True
+           return True
         elif pick_up_time < tup[1]:
             return True
+        # if pick_up_time < tup[1]:
+        #     return True
         return False
         # return self.table_of_goals.get(customer_id) > pick_up_time
 
