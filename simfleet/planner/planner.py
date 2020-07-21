@@ -59,7 +59,7 @@ class Node:
             #   completed goals: list with names of already served customers
             self.completed_goals = []
 
-        # If there is parent, inherit attributes
+        # If there is parent, inherit attributes esto que le dije a un señor: Sujetemela... Sus cercanos soltaron una risa de esta contenida, el señor me miro y puso un gesto de molestia, entonces yo le dije: "La botella señor, la botella" entonc
         else:
             self.parent = parent
             self.agent_pos = parent.agent_pos[:]
@@ -282,7 +282,7 @@ class Planner:
         # return self.table_of_goals.get(customer_id) > pick_up_time
 
     # Returns the f value of a node
-    def evaluate_node(self, node):
+    def evaluate_node(self, node, solution=False):
         # Calculate g value w.r.t Joint plan + node actions
         # taking into account charging congestions (implementar a futur)
         g = 0
@@ -305,25 +305,23 @@ class Planner:
                 costs += PRICE_PER_kWh * action.get('statistics').get('need')
         # Utility (or g value) = benefits - costs
         g = benefits - costs
-        # if g < 0:
-        # print("THE COSTS ARE HIGHER THANT THE BENEFITS")
 
         # Calculate h value w.r.t Table of Goals + node end time
         h = 0
-        for key in self.table_of_goals.keys():
-            if key not in node.already_served():
-                if node.end_time < self.table_of_goals.get(key)[1]:
-                    # extract distance of customer trip
-                    customer_actions = self.actions_dic.get(self.agent_id).get('MOVE-TO-DEST')
-                    customer_actions = [a for a in customer_actions if a.get('attributes').get('customer_id') == key]
-                    action = customer_actions[0]
-                    p1 = action.get('attributes').get('customer_origin')
-                    p2 = action.get('attributes').get('customer_dest')
-                    route = self.get_route(p1, p2)
-                    dist = route.get('distance')
-                    h += STARTING_FARE + (dist / 1000) * PRICE_PER_KM
-                # calculate benefits
-                # h += 0
+        # If the node is a solution, its h value is 0
+        if not solution:
+            for key in self.table_of_goals.keys():
+                if key not in node.already_served():
+                    if node.end_time < self.table_of_goals.get(key)[1]:
+                        # extract distance of customer trip
+                        customer_actions = self.actions_dic.get(self.agent_id).get('MOVE-TO-DEST')
+                        customer_actions = [a for a in customer_actions if a.get('attributes').get('customer_id') == key]
+                        action = customer_actions[0]
+                        p1 = action.get('attributes').get('customer_origin')
+                        p2 = action.get('attributes').get('customer_dest')
+                        route = self.get_route(p1, p2)
+                        dist = route.get('distance')
+                        h += STARTING_FARE + (dist / 1000) * PRICE_PER_KM
 
         f_value = g + h
         node.value = f_value
@@ -362,7 +360,7 @@ class Planner:
             if value < self.best_solution_value:
                 if VERBOSE > 1:
                     logger.info(f'The node f_value {value:.4f} is lower than the best solution value {self.best_solution_value:.4f}')
-                    continue
+                continue
             parent = tup[2]
             if VERBOSE > 1:
                 logger.info("Node", tup, "popped from the open_nodes")
@@ -402,13 +400,17 @@ class Planner:
             if not parent.children:
                 if VERBOSE > 1:
                     logger.info("The node had no children, so it is a SOLUTION node")
-                    self.solution_nodes.append((parent, parent.value))
-                if self.best_solution_value < parent.value:
-                    if VERBOSE > 1:
-                        logger.info(f'The value of the best solution node increased from '
-                              f'{self.best_solution_value:.4f} to {parent.value:.4f}')
-                    self.best_solution = parent
-                    self.best_solution_value = parent.value
+
+                # Modify node f-value to utility value (h = 0)
+                self.evaluate_node(parent, solution=True)
+                self.solution_nodes.append((parent, parent.value))
+                self.check_update_best_solution(parent)
+                # if self.best_solution_value < parent.value:
+                #     if VERBOSE > 1:
+                #         logger.info(f'The value of the best solution node increased from '
+                #               f'{self.best_solution_value:.4f} to {parent.value:.4f}')
+                #     self.best_solution = parent
+                #     self.best_solution_value = parent.value
 
         # END OF MAIN LOOP
         if VERBOSE > 1:
@@ -437,6 +439,7 @@ class Planner:
             # check_tree(self.best_solution)
 
     def create_customer_nodes(self, parent=None):
+
         dic_file = open("test-actions.json", "r")
         actions_dic = json.load(dic_file)
         agent_actions = actions_dic.get(self.agent_id)
@@ -516,6 +519,12 @@ class Planner:
                 # Push node in the priority queue
                 heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
 
+            # EVALUATE NODE AS SOLUTION NODE AND SAVE IT AS SOLUTION
+            utility = self.evaluate_node(node, solution=True)
+
+            self.solution_nodes.append((node, node.value))
+            self.check_update_best_solution(node)
+
         return generate_charging
 
     def create_charge_nodes(self, parent=None):
@@ -565,6 +574,14 @@ class Planner:
                 # Push node in the priority queue
                 heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
 
+    def check_update_best_solution(self, node):
+        if self.best_solution_value < node.value:
+            if VERBOSE > 1:
+                logger.info(f'The value of the best solution node increased from '
+                            f'{self.best_solution_value:.4f} to {node.value:.4f}')
+            self.best_solution = node
+            self.best_solution_value = node.value
+
     def extract_plan(self, node):
         self.plan = Plan(node.actions, node.value, node.completed_goals)
 
@@ -593,7 +610,7 @@ if __name__ == '__main__':
 
     config_dic, global_actions, routes_dic = initialize()
 
-    agent_id = 'pacoautobusero'
+    agent_id = 'Poli'
     agent_pos = agent_max_autonomy = None
     for transport in config_dic.get('transports'):
         if transport.get('name') == agent_id:

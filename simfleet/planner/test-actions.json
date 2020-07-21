@@ -1,11 +1,11 @@
 {
-    "pacoautobusero": {
+    "Bus": {
         "PICK-UP": [
             {
-                "agent": "pacoautobusero",
+                "agent": "Bus",
                 "type": "PICK-UP",
                 "attributes": {
-                    "customer_id": "hbrown",
+                    "customer_id": "customer 1",
                     "customer_origin": [
                         39.501382,
                         -0.418753
@@ -17,10 +17,10 @@
                 }
             },
             {
-                "agent": "pacoautobusero",
+                "agent": "Bus",
                 "type": "PICK-UP",
                 "attributes": {
-                    "customer_id": "pepeblack",
+                    "customer_id": "customer 2",
                     "customer_origin": [
                         39.501382,
                         -0.428753
@@ -32,10 +32,10 @@
                 }
             },
             {
-                "agent": "pacoautobusero",
+                "agent": "Bus",
                 "type": "PICK-UP",
                 "attributes": {
-                    "customer_id": "jjdfkk",
+                    "customer_id": "customer 3",
                     "customer_origin": [
                         39.501382,
                         -0.438753
@@ -49,10 +49,10 @@
         ],
         "MOVE-TO-DEST": [
             {
-                "agent": "pacoautobusero",
+                "agent": "Bus",
                 "type": "MOVE-TO-DEST",
                 "attributes": {
-                    "customer_id": "hbrown",
+                    "customer_id": "customer 1",
                     "customer_origin": [
                         39.501382,
                         -0.418753
@@ -68,10 +68,10 @@
                 }
             },
             {
-                "agent": "pacoautobusero",
+                "agent": "Bus",
                 "type": "MOVE-TO-DEST",
                 "attributes": {
-                    "customer_id": "pepeblack",
+                    "customer_id": "customer 2",
                     "customer_origin": [
                         39.501382,
                         -0.428753
@@ -87,10 +87,10 @@
                 }
             },
             {
-                "agent": "pacoautobusero",
+                "agent": "Bus",
                 "type": "MOVE-TO-DEST",
                 "attributes": {
-                    "customer_id": "jjdfkk",
+                    "customer_id": "customer 3",
                     "customer_origin": [
                         39.501382,
                         -0.438753
@@ -108,7 +108,7 @@
         ],
         "MOVE-TO-STATION": [
             {
-                "agent": "pacoautobusero",
+                "agent": "Bus",
                 "type": "MOVE-TO-STATION",
                 "attributes": {
                     "station_id": "station1",
@@ -125,7 +125,7 @@
         ],
         "CHARGE": [
             {
-                "agent": "pacoautobusero",
+                "agent": "Bus",
                 "type": "CHARGE",
                 "attributes": {
                     "station_id": "station1"
@@ -137,13 +137,13 @@
             }
         ]
     },
-    "romeroelmadero": {
+    "Poli": {
         "PICK-UP": [
             {
-                "agent": "romeroelmadero",
+                "agent": "Poli",
                 "type": "PICK-UP",
                 "attributes": {
-                    "customer_id": "hbrown",
+                    "customer_id": "customer 1",
                     "customer_origin": [
                         39.501382,
                         -0.418753
@@ -155,10 +155,10 @@
                 }
             },
             {
-                "agent": "romeroelmadero",
+                "agent": "Poli",
                 "type": "PICK-UP",
                 "attributes": {
-                    "customer_id": "pepeblack",
+                    "customer_id": "customer 2",
                     "customer_origin": [
                         39.501382,
                         -0.428753
@@ -170,10 +170,10 @@
                 }
             },
             {
-                "agent": "romeroelmadero",
+                "agent": "Poli",
                 "type": "PICK-UP",
                 "attributes": {
-                    "customer_id": "jjdfkk",
+                    "customer_id": "customer 3",
                     "customer_origin": [
                         39.501382,
                         -0.438753
@@ -187,10 +187,10 @@
         ],
         "MOVE-TO-DEST": [
             {
-                "agent": "romeroelmadero",
+                "agent": "Poli",
                 "type": "MOVE-TO-DEST",
                 "attributes": {
-                    "customer_id": "hbrown",
+                    "customer_id": "customer 1",
                     "customer_origin": [
                         39.501382,
                         -0.418753
@@ -206,10 +206,10 @@
                 }
             },
             {
-                "agent": "romeroelmadero",
+                "agent": "Poli",
                 "type": "MOVE-TO-DEST",
                 "attributes": {
-                    "customer_id": "pepeblack",
+                    "customer_id": "customer 2",
                     "customer_origin": [
                         39.501382,
                         -0.428753
@@ -225,10 +225,10 @@
                 }
             },
             {
-                "agent": "romeroelmadero",
+                "agent": "Poli",
                 "type": "MOVE-TO-DEST",
                 "attributes": {
-                    "customer_id": "jjdfkk",
+                    "customer_id": "customer 3",
                     "customer_origin": [
                         39.501382,
                         -0.438753
@@ -246,7 +246,7 @@
         ],
         "MOVE-TO-STATION": [
             {
-                "agent": "romeroelmadero",
+                "agent": "Poli",
                 "type": "MOVE-TO-STATION",
                 "attributes": {
                     "station_id": "station1",
@@ -263,7 +263,7 @@
         ],
         "CHARGE": [
             {
-                "agent": "romeroelmadero",
+                "agent": "Poli",
                 "type": "CHARGE",
                 "attributes": {
                     "station_id": "station1"
@@ -275,13 +275,13 @@
             }
         ]
     },
-    "juaneltaxista": {
+    "Taxi": {
         "PICK-UP": [
             {
-                "agent": "juaneltaxista",
+                "agent": "Taxi",
                 "type": "PICK-UP",
                 "attributes": {
-                    "customer_id": "hbrown",
+                    "customer_id": "customer 1",
                     "customer_origin": [
                         39.501382,
                         -0.418753
@@ -293,10 +293,10 @@
                 }
             },
             {
-                "agent": "juaneltaxista",
+                "agent": "Taxi",
                 "type": "PICK-UP",
                 "attributes": {
-                    "customer_id": "pepeblack",
+                    "customer_id": "customer 2",
                     "customer_origin": [
                         39.501382,
                         -0.428753
@@ -308,10 +308,10 @@
                 }
             },
             {
-                "agent": "juaneltaxista",
+                "agent": "Taxi",
                 "type": "PICK-UP",
                 "attributes": {
-                    "customer_id": "jjdfkk",
+                    "customer_id": "customer 3",
                     "customer_origin": [
                         39.501382,
                         -0.438753
@@ -325,10 +325,10 @@
         ],
         "MOVE-TO-DEST": [
             {
-                "agent": "juaneltaxista",
+                "agent": "Taxi",
                 "type": "MOVE-TO-DEST",
                 "attributes": {
-                    "customer_id": "hbrown",
+                    "customer_id": "customer 1",
                     "customer_origin": [
                         39.501382,
                         -0.418753
@@ -344,10 +344,10 @@
                 }
             },
             {
-                "agent": "juaneltaxista",
+                "agent": "Taxi",
                 "type": "MOVE-TO-DEST",
                 "attributes": {
-                    "customer_id": "pepeblack",
+                    "customer_id": "customer 2",
                     "customer_origin": [
                         39.501382,
                         -0.428753
@@ -363,10 +363,10 @@
                 }
             },
             {
-                "agent": "juaneltaxista",
+                "agent": "Taxi",
                 "type": "MOVE-TO-DEST",
                 "attributes": {
-                    "customer_id": "jjdfkk",
+                    "customer_id": "customer 3",
                     "customer_origin": [
                         39.501382,
                         -0.438753
@@ -384,7 +384,7 @@
         ],
         "MOVE-TO-STATION": [
             {
-                "agent": "juaneltaxista",
+                "agent": "Taxi",
                 "type": "MOVE-TO-STATION",
                 "attributes": {
                     "station_id": "station1",
@@ -401,7 +401,7 @@
         ],
         "CHARGE": [
             {
-                "agent": "juaneltaxista",
+                "agent": "Taxi",
                 "type": "CHARGE",
                 "attributes": {
                     "station_id": "station1"

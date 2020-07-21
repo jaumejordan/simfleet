@@ -16,9 +16,9 @@
                 -0.364888
             ],
             "password": "secret",
-            "name": "pacoautobusero",
+            "name": "Bus",
             "autonomy": 40,
-            "current_autonomy": 19,
+            "current_autonomy": 1,
             "icon": "bus"
         },
         {
@@ -30,9 +30,9 @@
                 -0.403929
             ],
             "password": "secret",
-            "name": "romeroelmadero",
+            "name": "Poli",
             "autonomy": 30,
-            "current_autonomy": 20,
+            "current_autonomy": 1,
             "icon": "police"
         },
         {
@@ -44,9 +44,9 @@
                 -0.409929
             ],
             "password": "secret",
-            "name": "juaneltaxista",
+            "name": "Taxi",
             "autonomy": 35,
-            "current_autonomy": 20,
+            "current_autonomy": 1,
             "icon": "taxi"
         }
     ],
@@ -61,7 +61,7 @@
                 -0.418753
             ],
             "password": "secret",
-            "name": "hbrown",
+            "name": "customer 1",
             "fleet_type": "taxi"
         },
         {
@@ -74,7 +74,7 @@
                 -0.428753
             ],
             "password": "secret",
-            "name": "pepeblack",
+            "name": "customer 2",
             "fleet_type": "taxi"
         },
         {
@@ -87,7 +87,7 @@
                 -0.438753
             ],
             "password": "secret",
-            "name": "jjdfkk",
+            "name": "customer 3",
             "fleet_type": "taxi"
         }
     ],

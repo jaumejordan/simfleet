@@ -225,7 +225,7 @@ def save_actions(config_file, output_file_name):
     if output_file_name is None:
         try:
             extra = len(config_file.split(".")[1]) + 1
-            output_file_name = config_file[:-extra] + "-actions.json"
+            output_file_name = config_file[:-extra] + "test-actions.json"
             # print("aslufhauiohfa", output_file_name)
         except Exception as e:
             print(str(e))
@@ -233,7 +233,7 @@ def save_actions(config_file, output_file_name):
     else:
         try:
             extra = len(config_file.split(".")[1]) + 1
-            output_file_name = output_file_name[:-extra] + "-actions.json"
+            output_file_name = output_file_name[:-extra] + "test-actions.json"
         except Exception as e:
             print(str(e))
             exit()
@@ -262,7 +262,7 @@ def save_json(config_file, dictionary, output_file_name=None):
     # if output_file_name is None:
     #     try:
     #         extra = len(config_file.split(".")[1]) + 1
-    #         output_file_name = config_file[:-extra] + "-actions.json"
+    #         output_file_name = config_file[:-extra] + "test-actions.json"
     #     except Exception as e:
     #         print(str(e))
     #         exit()

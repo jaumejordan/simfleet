@@ -95,7 +95,7 @@ class BestResponse:
                 customer = action.get('attributes').get('customer_id')
                 tup = self.joint_plan.get('table_of_goals').get(customer)
                 # if no one is serving the transport
-                if tup is None:
+                if tup[0] is None:
                     benefits += STARTING_FARE + (action.get('statistics').get('dist') / 1000) * PRICE_PER_KM
                 else:
                     serving_transport = tup[0]
@@ -116,7 +116,7 @@ class BestResponse:
         # Utility (or g value) = benefits - costs
         utility = benefits - costs
         if utility < 0:
-            print("THE COSTS ARE HIGHER THANT THE BENEFITS")
+            logger.error("THE COSTS ARE HIGHER THANT THE BENEFITS")
 
         return utility
 
@@ -125,7 +125,7 @@ class BestResponse:
     def update_joint_plan(self, agent_id, new_plan):
         # Update agent's individual plan
         self.joint_plan["individual"][agent_id] = new_plan
-        self.joint_plan["no_change"][agent_id] = False
+        # self.joint_plan["no_change"][agent_id] = False
         # Extract every individual plan action to build the joint plan
         self.extract_joint_plan()
         # Update table_of_goals to match with individual plans
@@ -221,6 +221,7 @@ class BestResponse:
                 new_utility = 0
             else:
                 new_utility = self.evaluate_plan(new_plan)
+                self.joint_plan["individual"][agent_id].utility = new_utility
 
             if new_utility == 0:
                 logger.warning(
@@ -247,6 +248,10 @@ class BestResponse:
             if prev_utility != updated_utility:
                 logger.warning(f"Agent {agent_id} had its plan utility reduced "
                                f"from {prev_utility:.4f} to {updated_utility:.4f}")
+                # NEW if the utility of the plan had changed, update it in the joint plan
+                # Crec que en un dels dos deuria ser suficient pero bueno
+                prev_plan.utility = updated_utility
+                self.joint_plan["individual"][agent_id].utility = updated_utility
             else:
                 logger.info(f"The utility of agent's {agent_id} plan has not changed")
 
@@ -255,6 +260,10 @@ class BestResponse:
         planner = self.create_planner(a)
         planner.run()
         new_plan = planner.plan
+        # NEW
+        self.check_update_joint_plan(agent_id, prev_plan, new_plan)
+
+    def check_update_joint_plan(self, agent_id, prev_plan, new_plan):
         # TODO leave joint plan update for later; Why? Because if the plan found has negative utility (only costs)
         # we don't want to add it to the joint plan but instead substitute it by an empty plan (None).
         # Currently we need to update the joint plan to then evaluate the agent's new plan and determine if its
@@ -263,42 +272,51 @@ class BestResponse:
         # UPDATE: Amb les comprovacions d'autonomia i pick up time invertides, no es deurien de calcular plans amb
         # utilitat negativa tant a sovint, encara que podria passar si les autonomies inicials d'alguns vehicles son
         # molt baixes i les d'altres no, fent que els primers carreguen mentre els altres es queden tots els clients.
-        # <-- this must be relocated
+        # self.update_joint_plan(agent_id, new_plan)  # <-- this must be relocated
+
+        # If the planner could not find any plan:
+        #   1. Assign agent's individual plan to None
+        #   2. Assume utility 0 for the agent
+        #   3. If prev plan was also none, mark no change as true
+
+        # Case 1) Agent finds no plan or a plan with negative utility (only costs)
         if new_plan is None:
-            # do not update the joint plan, but add
             new_utility = 0
             # if both the previous and new plans where None, indicate that the agent did not change its proposal
             if prev_plan is None:
+                logger.warning(
+                    f"Agent {agent_id} could not find any plan"
+                )
+                self.update_joint_plan(agent_id, new_plan)
+                logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
                 self.joint_plan["no_change"][agent_id] = True
+
+        # If the planner found a plan:
+        #   1. Compare new and prev plans (utility, actions)
+        #   If the plan is new
+        #      Update joint plan
+        #   else:
+        #      Mark no change as true
         else:
             # Maybe not necessary anymore --> TODO create evaluation that does not require to update joint_plan first
             # No need to evaluate new plan, its utility comes in its plan.utility attribute (from node evaluation)
-            # TODO comprovar afirmació anterior per a tot tipus de casos
+            # TODO comprovar afirmació anterior per a tot tipus de casos; si el planner va bé, deuria ser veritat
             # new_utility = self.evaluate_plan(new_plan)
             new_utility = new_plan.utility
             # new_plan_utility = new_plan.utility
-
-        # If the utility is the same, assume plan did not change
-        # TODO compare plans action by action not just by their utility
-        # Case 1) Agent finds no plan or a plan with negative utility (only costs)
-        if new_utility <= 0:
-            logger.warning(
-                f"Agent {agent_id} could not find any plan"
-            )
-            self.update_joint_plan(agent_id, new_plan=None)
-            logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
-        # Case 2) Agent finds a new plan that improves its utility
-        elif new_utility != updated_utility:
-            # logger.error(f"The value of the plan is {new_plan_utility:.4f}")
-            logger.warning(
-                f"Agent {agent_id} found new plan with utility {new_utility:.4f}")
-            logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
-            self.update_joint_plan(agent_id, new_plan)
-        # Case 3) Agent finds the same plan it had proposed before
-        else:
-            logger.info(
-                f"Agent {agent_id} could not find a better plan (it found the same one than in the previous round)")
-            self.joint_plan["no_change"][agent_id] = True
+            # Case 2) Agent finds a new plan that improves its utility
+            if new_utility != prev_plan.utility:
+                logger.warning(
+                    f"Agent {agent_id} found new plan with utility {new_utility:.4f}")
+                logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
+                self.update_joint_plan(agent_id, new_plan)
+            # Case 3) Agent finds the same plan it had proposed before
+            # If the utility is the same, assume plan did not change
+            # TODO compare plans action by action not just by their utility
+            else:
+                logger.info(
+                    f"Agent {agent_id} could not find a better plan (it found the same one than in the previous round)")
+                self.joint_plan["no_change"][agent_id] = True
 
     def print_game_state(self):
         # joint_plan = {"no_change": {}, "joint": None, "table_of_goals": {}, "individual": {}}
@@ -366,120 +384,7 @@ class BestResponse:
 
         logger.info("END OF GAME")
 
-    # # Best Response algorithm
-    # def run_old(self):
-    #     # Read dictionary data
-    #     self.initialize()
-    #     # Create players
-    #     self.create_agents()
-    #
-    #     # Assign random order
-    #     # random.shuffle(self.agents)
-    #     logger.debug("ATTENTION, NOT RANDOMIZING ORDER")
-    #     logger.debug(f"Random order {self.agents}")
-    #
-    #     # Initialize data structure
-    #     self.init_joint_plan()
-    #
-    #     game_turn = 0
-    #
-    #     while game_turn < 2:
-    #         game_turn += 1
-    #         logger.info("*************************************************************************")
-    #         logger.info(f"\t\t\t\t\t\t\tBest Response turn {game_turn}")
-    #         logger.info("*************************************************************************")
-    #         # First turn of the game, agents propose their initial plan
-    #         if game_turn == 1:
-    #             self.create_initial_plans()
-    #             self.print_game_state()
-    #         # In the following turns, the agents may have one of this two:
-    #         # 1) A previous plan
-    #         # 2) An empty plan, because it can't do any action that increases its utility
-    #         if game_turn > 1:
-    #             continue
-    #     while not self.stop():
-    #         game_turn += 1
-    #         logger.info("*************************************************************************")
-    #         logger.info(f"\t\t\t\t\t\t\tBest Response turn {game_turn}")
-    #         logger.info("*************************************************************************")
-    #         if game_turn > 1:
-    #             logger.debug(f"Joint plan in turn {game_turn}")
-    #             logger.debug(self.joint_plan.get('joint').print_plan())
-    #         for a in self.agents:
-    #             agent_id = a.get('id')
-    #             logger.info(f"Agent \'{agent_id}\''s turn")
-    #             logger.info("-------------------------------------------------------------------------")
-    #
-    #             # If the agent had already proposed a plan before
-    #             if self.has_plan(a):
-    #                 prev_plan = self.get_individual_plan(a)
-    #                 prev_utility = prev_plan.utility
-    #                 updated_utility = self.evaluate_plan(prev_plan)
-    #                 if prev_utility != updated_utility:
-    #                     logger.warning(f"Agent {agent_id} had its plan utility reduced "
-    #                                 f"from {prev_utility:.4f} to {updated_utility:.4f}")
-    #                 else:
-    #                     logger.info(f"The utility of agent's {agent_id} plan has not changed")
-    #                 # New plan proposal
-    #                 planner = self.create_planner(a)
-    #                 planner.run()
-    #                 new_plan = planner.plan
-    #                 self.update_joint_plan(agent_id, new_plan)
-    #                 if new_plan is None:
-    #                     new_utility = 0
-    #                 else:
-    #                     new_utility = self.evaluate_plan(new_plan)
-    #                 # If the utility is the same, assume plan did not change
-    #                 # TODO compare plans action by action not just by their utility
-    #                 if new_utility == 0:
-    #                     logger.warning(
-    #                         f"Agent {agent_id} could not find any plan"
-    #                     )
-    #                 elif new_utility != updated_utility:
-    #                     logger.warning(
-    #                         f"Agent {agent_id} found new plan with utility {new_utility:.4f}")
-    #                     logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
-    #
-    #                 else:
-    #                     logger.info(f"Agent {agent_id} could not find a better plan")
-    #                     self.joint_plan["no_change"][agent_id] = True
-    #
-    #             # If the agent had no plan
-    #             else:
-    #                 logger.info(f"Creating first plan for agent {agent_id}")
-    #                 planner = self.create_planner(a)
-    #                 planner.run()
-    #                 new_plan = planner.plan
-    #                 self.update_joint_plan(agent_id, new_plan)
-    #                 if new_plan is None:
-    #                     new_utility = 0
-    #                 else:
-    #                     new_utility = self.evaluate_plan(new_plan)
-    #
-    #                 if new_utility == 0:
-    #                     logger.warning(
-    #                         f"Agent {agent_id} could not find any plan"
-    #                     )
-    #                 else:
-    #                     logger.info(f"Agent {agent_id} found a plan with utility {new_utility:.4f}")
-    #
-    #             logger.info("-------------------------------------------------------------------------")
-
 
 if __name__ == '__main__':
     br = BestResponse()
     br.run()
-# begin process
-# first player:
-#   initialize Planner
-#   get Plan and add to joint plan
-#   update agent's joint plan
-# while there is change in plan utilities
-#   select next player
-#   if player has previous plan:
-#       re-evaluate plan w.r.t new joint plan
-#       look for new proposal that improves Utility
-#       update proposal in joint plan
-#   else:
-#       propose plan w.r.t joint plan
-#       add Plan to joint plan
