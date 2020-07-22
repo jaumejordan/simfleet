@@ -1,10 +1,10 @@
 import json
-import random
+
+from constants import STARTING_FARE, PRICE_PER_kWh, PENALTY, PRICE_PER_KM, CONFIG_FILE, ACTIONS_FILE, ROUTES_FILE
+from loguru import logger
 
 from simfleet.planner.plan import JointPlan
 from simfleet.planner.planner import Planner
-from loguru import logger
-from constants import SPEED, STARTING_FARE, PRICE_PER_kWh, PENALTY, PRICE_PER_KM
 
 
 class BestResponse:
@@ -19,13 +19,13 @@ class BestResponse:
     # Load dictionary data
     def initialize(self):
         try:
-            f2 = open("3_planner_config.json", "r")
+            f2 = open(CONFIG_FILE, "r")
             self.config_dic = json.load(f2)
 
-            f2 = open("test-actions.json", "r")
+            f2 = open(ACTIONS_FILE, "r")
             self.actions_dic = json.load(f2)
 
-            f2 = open("all-routes.json", "r")
+            f2 = open(ROUTES_FILE, "r")
             self.routes_dic = json.load(f2)
 
         except Exception as e:
@@ -84,6 +84,7 @@ class BestResponse:
         return self.joint_plan.get('individual').get(agent.get('id'))
 
     # Calculates the utility of an individual plan w.r.t. the actions and goals in the Joint plan
+    # TODO extraure calcul de beneficis y costos a una funció externa
     def evaluate_plan(self, plan):
         # Benefits
         benefits = 0
@@ -109,14 +110,13 @@ class BestResponse:
             if action.get('type') != 'CHARGE':
                 costs += PENALTY * (action.get('statistics').get('dist') / 1000)
             # For actions that entail charging, pay for the charged electricity
-            # TODO
-            # price increase if congestion (implementar a futur)
+            # TODO price increase if congestion (implementar a futur)
             else:
                 costs += PRICE_PER_kWh * action.get('statistics').get('need')
         # Utility (or g value) = benefits - costs
         utility = benefits - costs
         if utility < 0:
-            logger.error("THE COSTS ARE HIGHER THANT THE BENEFITS")
+            logger.error("THE COSTS ARE HIGHER THAN THE BENEFITS")
 
         return utility
 
@@ -148,34 +148,6 @@ class BestResponse:
                     aux[customer] = []
                 # for each customer, add tuples with every transport that serves him with pick-up time
                 aux[customer].append((agent, pick_up_time))
-
-        # Then, compare all pick up times for a single customer and decide which transport arrives before
-        for customer in aux.keys():
-            earliest = min(aux.get(customer), key=lambda x: x[1])
-            # Input in the table of goals a tuple with the serving transport id and pick-up time
-            self.joint_plan['table_of_goals'][customer] = earliest
-
-    # Reads all tables of goals of individual plans and creates a global table of goals indicating, per each customer
-    # the serving transport and the pick-up time
-    def update_table_of_goals_old(self):
-        # Restart table of table_of_goals
-        for customer in self.config_dic.get("customers"):
-            customer_id = customer.get('name')
-            self.joint_plan["table_of_goals"][customer_id] = None
-
-        aux = {}
-        # Check table of goals of every individual plan
-
-        for transport in self.joint_plan.get('individual').keys():
-            p = self.joint_plan.get('individual').get(transport)
-            if p is None:
-                continue
-            tog = p.table_of_goals
-            for customer in tog.keys():
-                if aux.get(customer) is None:
-                    aux[customer] = []
-                # for each customer, add tuples with every transport that serves him with pick-up time
-                aux[customer].append((transport, tog.get(customer)))
 
         # Then, compare all pick up times for a single customer and decide which transport arrives before
         for customer in aux.keys():
@@ -217,6 +189,7 @@ class BestResponse:
             new_plan = planner.plan
             logger.info(f"Plan found: {new_plan.to_string_plan()}")
             self.update_joint_plan(agent_id, new_plan)
+            # TODO revisar
             if new_plan is None:
                 new_utility = 0
             else:
@@ -269,10 +242,6 @@ class BestResponse:
         # Currently we need to update the joint plan to then evaluate the agent's new plan and determine if its
         # final utility would be negative or not. Consequently, the joint plas has already been updated with actions_
         # that report no benefit to the agent and must be deleted.
-        # UPDATE: Amb les comprovacions d'autonomia i pick up time invertides, no es deurien de calcular plans amb
-        # utilitat negativa tant a sovint, encara que podria passar si les autonomies inicials d'alguns vehicles son
-        # molt baixes i les d'altres no, fent que els primers carreguen mentre els altres es queden tots els clients.
-        # self.update_joint_plan(agent_id, new_plan)  # <-- this must be relocated
 
         # If the planner could not find any plan:
         #   1. Assign agent's individual plan to None
@@ -290,6 +259,9 @@ class BestResponse:
                 self.update_joint_plan(agent_id, new_plan)
                 logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
                 self.joint_plan["no_change"][agent_id] = True
+
+            else: # TODO si si que hi ha pla previ i el planner accepta utilitat d'entrada a millor i torna None si no millora
+                pass
 
         # If the planner found a plan:
         #   1. Compare new and prev plans (utility, actions)
@@ -365,7 +337,7 @@ class BestResponse:
         self.init_joint_plan()
 
         game_turn = 0
-        while not self.stop():  # game_turn < 3:
+        while not self.stop():
             game_turn += 1
             logger.info("*************************************************************************")
             logger.info(f"\t\t\t\t\t\t\tBest Response turn {game_turn}")
@@ -379,7 +351,7 @@ class BestResponse:
             if game_turn > 1:
                 for a in self.agents:
                     self.propose_plan(a)
-                    # TODO when agents can't find plans, their previous plans get deleted --> correct this
+
             self.print_game_state()
 
         logger.info("END OF GAME")
