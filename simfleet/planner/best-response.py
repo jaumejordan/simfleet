@@ -1,8 +1,9 @@
 import json
 
-from constants import STARTING_FARE, PRICE_PER_kWh, PENALTY, PRICE_PER_KM, CONFIG_FILE, ACTIONS_FILE, ROUTES_FILE
 from loguru import logger
 
+from simfleet.planner.constants import CONFIG_FILE, ACTIONS_FILE, \
+    ROUTES_FILE, get_benefit, get_travel_cost, get_charge_cost
 from simfleet.planner.plan import JointPlan
 from simfleet.planner.planner import Planner
 
@@ -97,22 +98,22 @@ class BestResponse:
                 tup = self.joint_plan.get('table_of_goals').get(customer)
                 # if no one is serving the transport
                 if tup[0] is None:
-                    benefits += STARTING_FARE + (action.get('statistics').get('dist') / 1000) * PRICE_PER_KM
+                    benefits += get_benefit(action)
                 else:
                     serving_transport = tup[0]
                     if serving_transport == plan_owner:
-                        benefits += STARTING_FARE + (action.get('statistics').get('dist') / 1000) * PRICE_PER_KM
+                        benefits += get_benefit(action)
         # Costs
         costs = 0
         for entry in plan.entries:
             action = entry.action
             # For actions that entail a movement, pay a penalty per km (10%)
             if action.get('type') != 'CHARGE':
-                costs += PENALTY * (action.get('statistics').get('dist') / 1000)
+                costs += get_travel_cost(action)
             # For actions that entail charging, pay for the charged electricity
             # TODO price increase if congestion (implementar a futur)
             else:
-                costs += PRICE_PER_kWh * action.get('statistics').get('need')
+                costs += get_charge_cost(action)
         # Utility (or g value) = benefits - costs
         utility = benefits - costs
         if utility < 0:
@@ -176,7 +177,6 @@ class BestResponse:
         for transport in self.joint_plan.get('no_change').keys():
             stop = stop and self.joint_plan.get('no_change').get(transport)
         return stop
-        # return not all(self.joint_plan["no_change"])
 
     def create_initial_plans(self):
         for a in self.agents:
@@ -187,21 +187,7 @@ class BestResponse:
             planner = self.create_planner(a)
             planner.run()
             new_plan = planner.plan
-            logger.info(f"Plan found: {new_plan.to_string_plan()}")
-            self.update_joint_plan(agent_id, new_plan)
-            # TODO revisar
-            if new_plan is None:
-                new_utility = 0
-            else:
-                new_utility = self.evaluate_plan(new_plan)
-                self.joint_plan["individual"][agent_id].utility = new_utility
-
-            if new_utility == 0:
-                logger.warning(
-                    f"Agent {agent_id} could not find any plan"
-                )
-            else:
-                logger.warning(f"Agent {agent_id} found a plan with utility {new_utility:.4f}")
+            self.check_update_joint_plan(agent_id, None, new_plan)
 
     def propose_plan(self, a):
         agent_id = a.get('id')
@@ -268,8 +254,14 @@ class BestResponse:
         else:
 
             new_utility = new_plan.utility
+            # if the prev_plan was None (either 1st turn or couldn't find plan last round) accept new plan
+            if prev_plan is None:
+                logger.warning(
+                    f"Agent {agent_id} found new plan with utility {new_utility:.4f}")
+                logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
+                self.update_joint_plan(agent_id, new_plan)
             # Case 2) Agent finds a new plan that improves its utility
-            if new_utility != prev_plan.utility:
+            elif new_utility != prev_plan.utility:
                 logger.warning(
                     f"Agent {agent_id} found new plan with utility {new_utility:.4f}")
                 logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")

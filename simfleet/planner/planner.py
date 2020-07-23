@@ -5,10 +5,12 @@ import heapq
 import json
 import math
 
-from constants import SPEED, STARTING_FARE, PRICE_PER_kWh, PENALTY, PRICE_PER_KM, CONFIG_FILE, ACTIONS_FILE, ROUTES_FILE
-from generators_utils import has_enough_autonomy, calculate_km_expense
 from loguru import logger
-from plan import Plan
+
+from simfleet.planner.constants import SPEED, STARTING_FARE, PRICE_PER_kWh, PENALTY, PRICE_PER_KM, CONFIG_FILE, \
+    ACTIONS_FILE, ROUTES_FILE
+from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_expense
+from simfleet.planner.plan import Plan
 
 VERBOSE = 0  # 2, 1 or 0 according to verbosity level
 
@@ -184,8 +186,6 @@ class Planner:
 
         self.create_table_of_goals()
 
-        # TODO si hi ha pla individual anterior al joint plan, utilitzar la seua utilitat com a best solution value
-
     # Reads plan of every agent (joint plan) and fills the corresponding table of goals
     # If the joint plan is empty, creates an entry per customer and initialises its
     # pick-up time to infinity
@@ -255,7 +255,6 @@ class Planner:
 
     def reachable_goal(self, customer_id, pick_up_time):
         tup = self.table_of_goals.get(customer_id)
-        # TODO revisar
         if tup[0] == self.agent_id:
             return True
         elif pick_up_time < tup[1]:
@@ -292,23 +291,28 @@ class Planner:
         h = 0
         # If the node is a solution, its h value is 0
         if not solution:
-            for key in self.table_of_goals.keys():
-                if key not in node.already_served():
-                    if node.end_time < self.table_of_goals.get(key)[1]:
-                        # extract distance of customer trip
-                        customer_actions = self.actions_dic.get(self.agent_id).get('MOVE-TO-DEST')
-                        customer_actions = [a for a in customer_actions if
-                                            a.get('attributes').get('customer_id') == key]
-                        action = customer_actions[0]
-                        p1 = action.get('attributes').get('customer_origin')
-                        p2 = action.get('attributes').get('customer_dest')
-                        route = self.get_route(p1, p2)
-                        dist = route.get('distance')
-                        h += STARTING_FARE + (dist / 1000) * PRICE_PER_KM
+            h = self.get_h_value(node)
 
         f_value = g + h
         node.value = f_value
         return f_value
+
+    def get_h_value(self, node):
+        h = 0
+        for key in self.table_of_goals.keys():
+            if key not in node.already_served():
+                if node.end_time < self.table_of_goals.get(key)[1]:
+                    # extract distance of customer trip
+                    customer_actions = self.actions_dic.get(self.agent_id).get('MOVE-TO-DEST')
+                    customer_actions = [a for a in customer_actions if
+                                        a.get('attributes').get('customer_id') == key]
+                    action = customer_actions[0]
+                    p1 = action.get('attributes').get('customer_origin')
+                    p2 = action.get('attributes').get('customer_dest')
+                    route = self.get_route(p1, p2)
+                    dist = route.get('distance')
+                    h += STARTING_FARE + (dist / 1000) * PRICE_PER_KM
+        return h
 
     def check_prev_plan(self):
         if len(self.joint_plan) > 0:
