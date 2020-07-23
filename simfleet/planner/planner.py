@@ -8,7 +8,7 @@ import math
 from loguru import logger
 
 from simfleet.planner.constants import SPEED, STARTING_FARE, PRICE_PER_kWh, PENALTY, PRICE_PER_KM, CONFIG_FILE, \
-    ACTIONS_FILE, ROUTES_FILE
+    ACTIONS_FILE, ROUTES_FILE, get_travel_cost, get_charge_cost, get_benefit
 from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_expense
 from simfleet.planner.plan import Plan
 
@@ -272,18 +272,18 @@ class Planner:
         benefits = 0
         for action in node.actions:
             if action.get('type') == 'MOVE-TO-DEST':
-                benefits += STARTING_FARE + (action.get('statistics').get('dist') / 1000) * PRICE_PER_KM
+                benefits += get_benefit(action)
         # Costs
         costs = 0
         for action in node.actions:
             # For actions that entail a movement, pay a penalty per km (10%)
             if action.get('type') != 'CHARGE':
                 # i f action.get('type') not in ['MOVE-TO-STATION', 'CHARGE']:
-                costs += PENALTY * (action.get('statistics').get('dist') / 1000)
+                costs += get_travel_cost(action)
             # For actions that entail charging, pay for the charged electricity
             # TODO price increase if congestion (implementar a futur)
             else:
-                costs += PRICE_PER_kWh * action.get('statistics').get('need')
+                costs += get_charge_cost(action)
         # Utility (or g value) = benefits - costs
         g = benefits - costs
 
