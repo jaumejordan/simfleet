@@ -128,7 +128,8 @@
                 "agent": "Bus",
                 "type": "CHARGE",
                 "attributes": {
-                    "station_id": "station1"
+                    "station_id": "station1",
+                    "power": 5
                 },
                 "statistics": {
                     "time": null,
@@ -266,7 +267,8 @@
                 "agent": "Poli",
                 "type": "CHARGE",
                 "attributes": {
-                    "station_id": "station1"
+                    "station_id": "station1",
+                    "power": 5
                 },
                 "statistics": {
                     "time": null,
@@ -404,7 +406,8 @@
                 "agent": "Taxi",
                 "type": "CHARGE",
                 "attributes": {
-                    "station_id": "station1"
+                    "station_id": "station1",
+                    "power": 5
                 },
                 "statistics": {
                     "time": null,

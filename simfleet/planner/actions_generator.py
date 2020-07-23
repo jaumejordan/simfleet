@@ -30,13 +30,13 @@ actions : {
 }
 
 """
-import asyncio
 import json
 import sys
+
+from generators_utils import has_enough_autonomy, calculate_km_expense
+
 from simfleet.helpers import distance_in_meters
 from simfleet.utils import request_route_to_server
-from generators_utils import has_enough_autonomy, calculate_km_expense
-from plan import Action
 
 config_dic = {}
 global_actions = {}
@@ -44,6 +44,7 @@ transport_info = {}
 ordered_global_actions = {}
 
 ROUTE_HOST = "http://osrm.gti-ia.upv.es/"
+
 
 def load_config(config_file):
     config_dic = {}
@@ -58,7 +59,6 @@ def load_config(config_file):
 
 
 def generate_actions(config_dic):
-
     actions = {}
     host = config_dic.get("host")
     transports = config_dic.get("transports")
@@ -74,9 +74,9 @@ def generate_actions(config_dic):
 
         # save transport info in a dictionary
         transport_info[t_name] = {
-            "position" : t_position,
-            "max_autonomy" : t_max_autonomy,
-            "current_autonomy" : t_current_autonomy
+            "position": t_position,
+            "max_autonomy": t_max_autonomy,
+            "current_autonomy": t_current_autonomy
         }
 
         transport_actions = {}
@@ -108,22 +108,23 @@ def generate_actions(config_dic):
         station_actions = []
         charge_actions = []
         for station in stations:
-            # Get statino name and position
+            # Get station name, position and power
             # s_name = station.get("name") + "@" + host
             s_name = station.get("name")
             s_position = station.get("position")
+            s_power = station.get("power")
 
             # Create charge action
             station_action = create_move_to_station_action(t_name, s_name, s_position)
             station_actions.append(station_action)
-            charge_action = create_charge_action(t_name, s_name)
+            charge_action = create_charge_action(t_name, s_name, s_power)
             charge_actions.append(charge_action)
 
         transport_actions["MOVE-TO-STATION"] = station_actions
         transport_actions["CHARGE"] = charge_actions
 
         actions[t_name] = transport_actions
-    #print(actions)
+    # print(actions)
     return actions
 
 
@@ -156,6 +157,7 @@ def create_pick_up_action(agent, customer_id, customer_origin):
 
     return action
 
+
 def create_mode_to_dest_action(agent, customer_id, customer_origin, customer_dest):
     # Create action
     action = {}
@@ -179,16 +181,13 @@ def create_mode_to_dest_action(agent, customer_id, customer_origin, customer_des
 
     return action
 
+
 def create_move_to_station_action(agent, station_id, station_position):
     # Create action
-    action = {}
+    action = {"agent": agent, "type": "MOVE-TO-STATION"}
     # Assign agent and action type
-    action["agent"] = agent
-    action["type"] = "MOVE-TO-STATION"
     # Create attributes
-    attr = {}
-    attr["station_id"] = station_id
-    attr["station_position"] = station_position
+    attr = {"station_id": station_id, "station_position": station_position}
     # Assign attributes to action
     action["attributes"] = attr
     # Initialise action statistics
@@ -199,15 +198,13 @@ def create_move_to_station_action(agent, station_id, station_position):
 
     return action
 
-def create_charge_action(agent, station_id):
+
+def create_charge_action(agent, station_id, power):
     # Create action
-    action = {}
+    action = {"agent": agent, "type": "CHARGE"}
     # Assign agent and action type
-    action["agent"] = agent
-    action["type"] = "CHARGE"
     # Create attributes
-    attr = {}
-    attr["station_id"] = station_id
+    attr = {"station_id": station_id, "power": power}
     # Assign attributes to action
     action["attributes"] = attr
     # Initialise action statistics
@@ -217,8 +214,6 @@ def create_charge_action(agent, station_id):
     }
 
     return action
-
-
 
 
 def save_actions(config_file, output_file_name):
@@ -257,6 +252,7 @@ def save_ordered_actions(config_file, output_file_name):
             exit()
     save_json(config_file, ordered_global_actions, output_file_name)
 
+
 def save_json(config_file, dictionary, output_file_name=None):
     # # Write output file
     # if output_file_name is None:
@@ -275,12 +271,12 @@ def save_json(config_file, dictionary, output_file_name=None):
     # except Exception as e:
     #     print(str(e))
     #     exit()
-    #try:
+    # try:
     # print("asda", output_file_name)
     outfile = open(output_file_name, "w+")
     json.dump(dictionary, outfile, indent=4)
     outfile.close()
-    #except Exception as e:
+    # except Exception as e:
     #    print(str(e))
     #    exit()
 
@@ -301,38 +297,40 @@ def get_closest_customer_action(transport_actions, transport_position):
     # aux.sort(key=lambda x: x[1])
 
     closest_action = min(action_list,
-                         key=lambda x: distance_in_meters(transport_position, x.get("attributes").get("customer_origin")))
+                         key=lambda x: distance_in_meters(transport_position,
+                                                          x.get("attributes").get("customer_origin")))
     distance = distance_in_meters(transport_position, closest_action.get("attributes").get("customer_origin"))
     return (closest_action, distance)
 
-def get_closest_charge_action(transport_actions, transport_position):
 
+def get_closest_charge_action(transport_actions, transport_position):
     action_list = transport_actions.get("CHARGE")
 
     closest_action = min(action_list,
-                         key=lambda x: distance_in_meters(transport_position, x.get("attributes").get("station_position")))
+                         key=lambda x: distance_in_meters(transport_position,
+                                                          x.get("attributes").get("station_position")))
     distance = distance_in_meters(transport_position, closest_action.get("attributes").get("station_position"))
     return (closest_action, distance)
 
 
 def get_ordered_action_list(transport):
     # while there are still customer actions to do:
-        # get closest customer action
-        # if has enough autonomy
-            # calculate km expenses
-            # update autonomy
+    # get closest customer action
+    # if has enough autonomy
+    # calculate km expenses
+    # update autonomy
 
-            # append action to ordered list
+    # append action to ordered list
 
-            # update current position
+    # update current position
 
-            # delete completed customer action from to-do list
+    # delete completed customer action from to-do list
 
-        # else
-            # get closest station action
-            # append action to ordered list
-            # update autonomy
-            # update current position
+    # else
+    # get closest station action
+    # append action to ordered list
+    # update autonomy
+    # update current position
     # Initialize position and autonomy to the ones in the config file
     current_position = transport_info.get(transport).get("position")
     current_autonomy = transport_info.get(transport).get("current_autonomy")
@@ -351,7 +349,7 @@ def get_ordered_action_list(transport):
         customer_origin = next_action.get("attributes").get("customer_origin")
         customer_dest = next_action.get("attributes").get("customer_dest")
         # Check if there's enough autonomy to do the closest customer action
-        if has_enough_autonomy(current_autonomy, current_position, customer_origin, customer_dest) :
+        if has_enough_autonomy(current_autonomy, current_position, customer_origin, customer_dest):
             # Update autonomy
             km_expenses = calculate_km_expense(current_position, customer_origin, customer_dest)
             current_autonomy -= km_expenses
@@ -359,7 +357,7 @@ def get_ordered_action_list(transport):
             # Update current position
             current_position = customer_dest
             # Add action to ordered action list
-            ordered_actions[step] = {"action" : next_action, "distance" : distance}
+            ordered_actions[step] = {"action": next_action, "distance": distance}
             # Delete customer action from to-do list
             to_do_list.remove(next_action)
 
@@ -374,17 +372,20 @@ def get_ordered_action_list(transport):
             # Update current position
             current_position = station_position
             # Add action to ordered action list
-            ordered_actions[step] = {"action" : next_action, "distance" : distance}
+            ordered_actions[step] = {"action": next_action, "distance": distance}
 
     return ordered_actions
 
 
 def print_transport_actions(transport):
     dic = ordered_global_actions.get(transport)
-    print("Agent " + transport + " actions:\n====================================================================================================================================================================================")
+    print(
+        "Agent " + transport + " actions:\n====================================================================================================================================================================================")
     for step in dic:
         print(f"{step:4d}\t:\t{str(dic.get(step)):200s}")
-    print("==========================================================================================================================================================================================================")
+    print(
+        "==========================================================================================================================================================================================================")
+
 
 async def test_route_calc():
     for key in global_actions.keys():
@@ -395,6 +396,8 @@ async def test_route_calc():
             print("Path", len(path))
             print("Distance", distance)
             print("Duration", duration, "\n")
+
+
 #######################################################################################################################
 #################################################### MAIN #############################################################
 #######################################################################################################################
@@ -415,7 +418,7 @@ if __name__ == '__main__':
     config_file = str(sys.argv[1])
     if len(sys.argv) > 2:
         output_file_name = str(sys.argv[2])
-        print("Output file name will be: ",output_file_name)
+        print("Output file name will be: ", output_file_name)
 
     config_dic = load_config(config_file)
     global_actions = generate_actions(config_dic)

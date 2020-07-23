@@ -10,7 +10,7 @@ from generators_utils import has_enough_autonomy, calculate_km_expense
 from loguru import logger
 from plan import Plan
 
-VERBOSE = 1  # 2, 1 or 0 according to verbosity level
+VERBOSE = 0  # 2, 1 or 0 according to verbosity level
 
 
 # TODO tenir en compte el nombre de places de l'estació de càrrega
@@ -236,8 +236,7 @@ class Planner:
 
         elif action.get('type') == 'CHARGE':
             need = self.agent_max_autonomy - current_autonomy
-            # TODO Considerar afegir el "power" de la station com a attribute de les accions "charge"
-            total_time = need / self.get_station_power(action.get('attributes').get('station_id'))
+            total_time = need / action.get('attributes').get('power')
             # time to complete the charge
             action['statistics']['time'] = total_time
             # amount (of something) to charge
@@ -253,13 +252,6 @@ class Planner:
             logger.info("ERROR :: There is no route for key \"", key, "\" in the routes_dic")
             exit()
         return route
-
-    def get_station_power(self, station_id):
-        # station_id = station_id.split('@')[0]
-        # print("get_station_power:", station_id)
-        for s in self.config_dic.get('stations'):
-            if s.get('name') == station_id:
-                return s.get('power')
 
     def reachable_goal(self, customer_id, pick_up_time):
         tup = self.table_of_goals.get(customer_id)
@@ -318,7 +310,15 @@ class Planner:
         node.value = f_value
         return f_value
 
+    def check_prev_plan(self):
+        if len(self.joint_plan) > 0:
+            if self.joint_plan["individual"][self.agent_id] is not None:
+                if self.joint_plan["individual"][self.agent_id].utility > 0:
+                    self.best_solution_value = self.joint_plan["individual"][self.agent_id].utility
+                    logger.warning(f"Using {self.best_solution_value} as lower bound for plan utility")
+
     def run(self):
+        self.check_prev_plan()
         # CREATION OF INITIAL NODES
         if VERBOSE > 1:
             logger.info("Creating initial nodes...")
@@ -403,13 +403,14 @@ class Planner:
                 "###################################################################################################")
             logger.info("\nEnd of MAIN LOOP")
             logger.info(f'{len(self.solution_nodes):5d} solution nodes found')
-            # n = 1
+            n = 1
             # for tup in self.solution_nodes:
-            #     # logger.info("\nSolution", n)
-            #     # tup[0].print_node()
+            #     logger.info("\nSolution", n)
+            #     tup[0].print_node()
             #     n += 1
-            logger.info("Best solution node:")
-            self.best_solution.print_node()
+            if self.best_solution is not None:
+                logger.info("Best solution node:")
+                self.best_solution.print_node()
 
         # When the process finishes, extract plan from the best solution node
         # with its corresponding table of goals

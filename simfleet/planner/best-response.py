@@ -237,58 +237,46 @@ class BestResponse:
         self.check_update_joint_plan(agent_id, prev_plan, new_plan)
 
     def check_update_joint_plan(self, agent_id, prev_plan, new_plan):
-        # TODO leave joint plan update for later; Why? Because if the plan found has negative utility (only costs)
-        # we don't want to add it to the joint plan but instead substitute it by an empty plan (None).
-        # Currently we need to update the joint plan to then evaluate the agent's new plan and determine if its
-        # final utility would be negative or not. Consequently, the joint plas has already been updated with actions_
-        # that report no benefit to the agent and must be deleted.
-
-        # If the planner could not find any plan:
-        #   1. Assign agent's individual plan to None
-        #   2. Assume utility 0 for the agent
-        #   3. If prev plan was also none, mark no change as true
 
         # Case 1) Agent finds no plan or a plan with negative utility (only costs)
         if new_plan is None:
-            new_utility = 0
             # if both the previous and new plans where None, indicate that the agent did not change its proposal
             if prev_plan is None:
-                logger.warning(
+                logger.error(
                     f"Agent {agent_id} could not find any plan"
                 )
                 self.update_joint_plan(agent_id, new_plan)
                 logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
                 self.joint_plan["no_change"][agent_id] = True
 
-            else: # TODO si si que hi ha pla previ i el planner accepta utilitat d'entrada a millor i torna None si no millora
-                pass
+            else:
+                # the planner did not find any feasible plan (utility of prev plan was negative but planner returned None)
+                if prev_plan.utility < 0:
+                    logger.error(
+                        f"Agent {agent_id} could not find any plan"
+                    )
+                    self.update_joint_plan(agent_id, new_plan)
+                    logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
+                    self.joint_plan["no_change"][agent_id] = False
+                # the planner found the same plan as before (utility of prev plan was positive but planner retuned None)
+                # TODO compare plans action by action not just by their utility
+                else:
+                    logger.info(
+                        f"Agent {agent_id} could not find a better plan (it found the same one than in the previous round)")
+                    self.joint_plan["no_change"][agent_id] = True
 
-        # If the planner found a plan:
-        #   1. Compare new and prev plans (utility, actions)
-        #   If the plan is new
-        #      Update joint plan
-        #   else:
-        #      Mark no change as true
         else:
-            # Maybe not necessary anymore --> TODO create evaluation that does not require to update joint_plan first
-            # No need to evaluate new plan, its utility comes in its plan.utility attribute (from node evaluation)
-            # TODO comprovar afirmació anterior per a tot tipus de casos; si el planner va bé, deuria ser veritat
-            # new_utility = self.evaluate_plan(new_plan)
+
             new_utility = new_plan.utility
-            # new_plan_utility = new_plan.utility
             # Case 2) Agent finds a new plan that improves its utility
             if new_utility != prev_plan.utility:
                 logger.warning(
                     f"Agent {agent_id} found new plan with utility {new_utility:.4f}")
                 logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
                 self.update_joint_plan(agent_id, new_plan)
-            # Case 3) Agent finds the same plan it had proposed before
-            # If the utility is the same, assume plan did not change
-            # TODO compare plans action by action not just by their utility
+            # Case 3) Agent finds the same plan it had proposed before --> moved above
             else:
-                logger.info(
-                    f"Agent {agent_id} could not find a better plan (it found the same one than in the previous round)")
-                self.joint_plan["no_change"][agent_id] = True
+                logger.critical("NO DEURIA ENTRAR ACÍ")  # keeping this as a check
 
     def print_game_state(self):
         # joint_plan = {"no_change": {}, "joint": None, "table_of_goals": {}, "individual": {}}
