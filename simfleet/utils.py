@@ -7,6 +7,7 @@ import time
 import uuid
 from abc import ABCMeta
 from importlib import import_module
+from typing import List
 
 import aiohttp
 from loguru import logger
@@ -37,6 +38,8 @@ CUSTOMER_IN_TRANSPORT = "CUSTOMER_IN_TRANSPORT"
 CUSTOMER_IN_DEST = "CUSTOMER_IN_DEST"
 CUSTOMER_LOCATION = "CUSTOMER_LOCATION"
 CUSTOMER_ASSIGNED = "CUSTOMER_ASSIGNED"
+
+ROUTES_CACHE_PATH = "./routes/"
 
 
 def status_to_str(status_code):
@@ -102,31 +105,46 @@ class RequestRouteBehaviour(OneShotBehaviour):
         super().__init__()
 
     async def run(self):
+        filename = dump_name(self.origin, self.destination)
         try:
-            response_time = time.time()
-            path, distance, duration = await request_route_to_server(self.origin, self.destination, self.route_host)
-            response_time = time.time() - response_time
-            if path is None:
-                logger.error("There was an unknown error requesting the route from {} to {}. Response time={:.6f}"
-                             .format(self.origin, self.destination, response_time))
-                self.exit_code = {"type": "error"}
-                self.kill()
-                return
-            logger.debug("Got route in response time={:.6f}".format(response_time))
+            with open(ROUTES_CACHE_PATH + filename, 'r') as f:
+                route = json.load(f)
+            logger.debug("Got route from cache")
             reply_content = {
-                "path": path,
-                "distance": distance,
-                "duration": duration,
+                "path": route["path"],
+                "distance": route["distance"],
+                "duration": route["duration"],
                 "type": "success",
             }
             self.kill(json.loads(json.dumps(reply_content)))
-
-        except Exception as e:
-            response_time = time.time() - response_time
-            logger.error("Exception requesting route, response time={:.6f}, error: {} ".format(response_time, e))
-            self.exit_code = {"type": "error"}
-            self.kill()
-            return
+        except FileNotFoundError:
+            logger.info("Route {} not in cache, requesting to server.".format(filename))
+            try:
+                response_time = time.time()
+                path, distance, duration = await request_route_to_server(self.origin, self.destination, self.route_host)
+                response_time = time.time() - response_time
+                if path is None:
+                    logger.error(
+                        "There was an unknown error requesting the route from {} to {}. Response time={:.6f}".format(
+                            self.origin, self.destination, response_time))
+                    self.exit_code = {"type": "error"}
+                    self.kill()
+                    return
+                logger.debug("Got route in response time={:.6f}".format(response_time))
+                reply_content = {
+                    "path": path,
+                    "distance": distance,
+                    "duration": duration,
+                    "type": "success",
+                }
+                self.kill(json.loads(json.dumps(reply_content)))
+            except Exception as e:
+                response_time = time.time() - response_time
+                logger.error(
+                    "Exception requesting route, response time={:.6f}, error: {} ".format(response_time, e))
+                self.exit_code = {"type": "error"}
+                self.kill()
+                return
 
 
 async def request_path(agent, origin, destination, route_host):
@@ -279,3 +297,11 @@ async def request_route_to_server(origin, destination, route_host="http://router
     except Exception as e:
         logger.exception("Exception while getting route with call {}. Exception: {}".format(url, e))
         return None, None, None
+
+
+def dump_name(orig: List[float], dest: List[float]) -> str:
+    latO = "latO" + str(orig[0]).replace(".", "+").replace("-", "_")
+    lonO = "lonO" + str(orig[1]).replace(".", "+").replace("-", "_")
+    latD = "latD" + str(dest[0]).replace(".", "+").replace("-", "_")
+    lonD = "lonD" + str(dest[1]).replace(".", "+").replace("-", "_")
+    return f"{latO}{lonO}{latD}{lonD}.json"

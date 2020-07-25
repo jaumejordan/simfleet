@@ -1,3 +1,4 @@
+aiohttp
 Click>=6.0
 Jinja2==2.10.1
 spade>=3.1.4
