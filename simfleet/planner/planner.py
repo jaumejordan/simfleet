@@ -8,7 +8,7 @@ import math
 from loguru import logger
 
 from simfleet.planner.constants import SPEED, STARTING_FARE, PRICE_PER_kWh, PENALTY, PRICE_PER_KM, CONFIG_FILE, \
-    ACTIONS_FILE, ROUTES_FILE, get_travel_cost, get_charge_cost, get_benefit
+    ACTIONS_FILE, ROUTES_FILE, get_travel_cost, get_charge_cost, get_benefit, GOAL_PERCENTAGE
 from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_expense
 from simfleet.planner.plan import Plan
 
@@ -253,6 +253,9 @@ class Planner:
             exit()
         return route
 
+    def get_number_of_customers(self):
+        return len(self.config_dic.get('customers'))
+
     def reachable_goal(self, customer_id, pick_up_time):
         tup = self.table_of_goals.get(customer_id)
         if tup[0] == self.agent_id:
@@ -323,6 +326,7 @@ class Planner:
 
     def run(self):
         self.check_prev_plan()
+        logger.debug(f"Planning to complete a {GOAL_PERCENTAGE*100}% of the goals: {self.get_number_of_customers()*GOAL_PERCENTAGE:.0f} customers.")
         # CREATION OF INITIAL NODES
         if VERBOSE > 1:
             logger.info("Creating initial nodes...")
@@ -348,7 +352,8 @@ class Planner:
             i += 1
             if VERBOSE > 0:
                 logger.info(f'\nIteration {i:5d}.')
-                logger.info(f"Open nodes: {len(self.open_nodes)} {self.open_nodes}")
+                logger.error(f"Open nodes: {len(self.open_nodes)}")
+                #{self.open_nodes}")
 
             tup = heapq.heappop(self.open_nodes)
             value = -tup[0]
@@ -366,30 +371,36 @@ class Planner:
             if VERBOSE > 1:
                 parent.print_node()
 
-            # If the last action is a customer service, consider charging
-            # otherwise consider ONLY customer actions (avoids consecutive charging actions)
-            consider_charge = False
-            if parent.actions[-1].get('type') == 'MOVE-TO-DEST':
-                consider_charge = True
+            # if the plan in the node picks up a % of the customers, consider it complete
+            if not len(parent.completed_goals)/self.get_number_of_customers() >= GOAL_PERCENTAGE :
 
-            if VERBOSE > 0:
-                logger.info("Generating CUSTOMER children nodes...")
-            # Generate one child node per customer left to serve and return whether some customer could not be
-            # picked up because of autonomy
-            generate_charging = self.create_customer_nodes(parent)
-            customer_children = len(parent.children)
-            if VERBOSE > 0:
-                logger.info(f'{customer_children:5d} customer children have been created')
+                # If the last action is a customer service, consider charging
+                # otherwise consider ONLY customer actions (avoids consecutive charging actions)
+                consider_charge = False
+                if parent.actions[-1].get('type') == 'MOVE-TO-DEST':
+                    consider_charge = True
 
-            # if we consider charging actions AND during the creation of customer nodes there was a customer
-            # that could not be reached because of autonomy, create charge nodes.
-            if consider_charge and generate_charging:
                 if VERBOSE > 0:
-                    logger.info("Generating CHARGE children nodes...")
-                self.create_charge_nodes(parent)
-                charge_children = len(parent.children) - customer_children
+                    logger.info("Generating CUSTOMER children nodes...")
+                # Generate one child node per customer left to serve and return whether some customer could not be
+                # picked up because of autonomy
+                generate_charging = self.create_customer_nodes(parent)
+                customer_children = len(parent.children)
                 if VERBOSE > 0:
-                    logger.info(f'{charge_children:5d} charge children have been created')
+                    logger.info(f'{customer_children:5d} customer children have been created')
+
+                # if we consider charging actions AND during the creation of customer nodes there was a customer
+                # that could not be reached because of autonomy, create charge nodes.
+                if consider_charge and generate_charging:
+                    if VERBOSE > 0:
+                        logger.info("Generating CHARGE children nodes...")
+                    self.create_charge_nodes(parent)
+                    charge_children = len(parent.children) - customer_children
+                    if VERBOSE > 0:
+                        logger.info(f'{charge_children:5d} charge children have been created')
+            else:
+                if VERBOSE > 0:
+                    logger.info("The node completed a % of the total goals")
 
             # If after this process the node has no children, it is a solution Node
             if not parent.children:
@@ -584,7 +595,7 @@ if __name__ == '__main__':
 
     config_dic, global_actions, routes_dic = initialize()
 
-    agent_id = 'Poli'
+    agent_id = 'taxi1'
     agent_pos = agent_max_autonomy = None
     for transport in config_dic.get('transports'):
         if transport.get('name') == agent_id:

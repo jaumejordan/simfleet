@@ -1,0 +1,126 @@
+{
+    "fleets": [
+        {
+            "password": "secret",
+            "name": "fleet1",
+            "fleet_type": "taxi"
+        }
+    ],
+    "transports": [
+        {
+            "speed": 2000,
+            "fleet": "fleet1@localhost",
+            "fleet_type": "taxi",
+            "position": [
+                39.462618,
+                -0.364888
+            ],
+            "password": "secret",
+            "name": "Bus",
+            "autonomy": 40,
+            "current_autonomy": 1,
+            "icon": "bus"
+        },
+        {
+            "speed": 2000,
+            "fleet": "fleet1@localhost",
+            "fleet_type": "taxi",
+            "position": [
+                39.463554,
+                -0.403929
+            ],
+            "password": "secret",
+            "name": "Poli",
+            "autonomy": 30,
+            "current_autonomy": 1,
+            "icon": "police"
+        },
+        {
+            "speed": 2000,
+            "fleet": "fleet1@localhost",
+            "fleet_type": "taxi",
+            "position": [
+                39.463554,
+                -0.409929
+            ],
+            "password": "secret",
+            "name": "Taxi",
+            "autonomy": 35,
+            "current_autonomy": 1,
+            "icon": "taxi"
+        }
+    ],
+    "customers": [
+        {
+            "destination": [
+                39.466394,
+                -0.324807
+            ],
+            "position": [
+                39.501382,
+                -0.418753
+            ],
+            "password": "secret",
+            "name": "customer 1",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.466394,
+                -0.324807
+            ],
+            "position": [
+                39.501382,
+                -0.428753
+            ],
+            "password": "secret",
+            "name": "customer 2",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.466394,
+                -0.324807
+            ],
+            "position": [
+                39.501382,
+                -0.438753
+            ],
+            "password": "secret",
+            "name": "customer 3",
+            "fleet_type": "taxi"
+        }
+    ],
+    "stations": [
+        {
+            "name": "station1",
+            "password": "secret",
+            "position": [
+                39.463356,
+                -0.376463
+            ],
+            "places": 1,
+            "power": 5,
+            "icon": "wind_station"
+        }
+    ],
+    "simulation_name": "Full Config",
+    "max_time": 1000,
+    "verbose": 4,
+    "transport_strategy": "simfleet.strategies_planner.FSMTransportStrategyBehaviour",
+    "customer_strategy": "simfleet.strategies_planner.AcceptFirstRequestBehaviour",
+    "fleetmanager_strategy": "simfleet.strategies_planner.DelegateRequestBehaviour",
+    "directory_strategy": "simfleet.directory.DirectoryStrategyBehaviour",
+    "station_strategy": "simfleet.station.StationStrategyBehaviour",
+    "fleetmanager_name": "fleetmanager",
+    "fleetmanager_password": "fleetmanager_passwd",
+    "route_host": "http://osrm.gti-ia.upv.es/",
+    "route_name": "route",
+    "route_password": "route_passwd",
+    "directory_name": "directory",
+    "directory_password": "directory_passwd",
+    "host": "localhost",
+    "xmpp_port": 5222,
+    "http_port": 9000,
+    "http_ip": "127.0.0.1"
+}
