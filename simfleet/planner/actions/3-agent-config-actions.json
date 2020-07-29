@@ -1,0 +1,419 @@
+{
+    "Bus": {
+        "PICK-UP": [
+            {
+                "agent": "Bus",
+                "type": "PICK-UP",
+                "attributes": {
+                    "customer_id": "customer1",
+                    "customer_origin": [
+                        39.484324,
+                        -0.394975
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "Bus",
+                "type": "PICK-UP",
+                "attributes": {
+                    "customer_id": "customer2",
+                    "customer_origin": [
+                        39.455398,
+                        -0.397343
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "Bus",
+                "type": "PICK-UP",
+                "attributes": {
+                    "customer_id": "customer3",
+                    "customer_origin": [
+                        39.484973,
+                        -0.36313
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            }
+        ],
+        "MOVE-TO-DEST": [
+            {
+                "agent": "Bus",
+                "type": "MOVE-TO-DEST",
+                "attributes": {
+                    "customer_id": "customer1",
+                    "customer_origin": [
+                        39.484324,
+                        -0.394975
+                    ],
+                    "customer_dest": [
+                        39.470368,
+                        -0.38533
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "Bus",
+                "type": "MOVE-TO-DEST",
+                "attributes": {
+                    "customer_id": "customer2",
+                    "customer_origin": [
+                        39.455398,
+                        -0.397343
+                    ],
+                    "customer_dest": [
+                        39.463936,
+                        -0.37934
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "Bus",
+                "type": "MOVE-TO-DEST",
+                "attributes": {
+                    "customer_id": "customer3",
+                    "customer_origin": [
+                        39.484973,
+                        -0.36313
+                    ],
+                    "customer_dest": [
+                        39.464424,
+                        -0.337946
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            }
+        ],
+        "MOVE-TO-STATION": [
+            {
+                "agent": "Bus",
+                "type": "MOVE-TO-STATION",
+                "attributes": {
+                    "station_id": "station1",
+                    "station_position": [
+                        39.463356,
+                        -0.376463
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            }
+        ],
+        "CHARGE": [
+            {
+                "agent": "Bus",
+                "type": "CHARGE",
+                "attributes": {
+                    "station_id": "station1",
+                    "power": 5
+                },
+                "statistics": {
+                    "time": null,
+                    "need": null
+                }
+            }
+        ]
+    },
+    "Poli": {
+        "PICK-UP": [
+            {
+                "agent": "Poli",
+                "type": "PICK-UP",
+                "attributes": {
+                    "customer_id": "customer1",
+                    "customer_origin": [
+                        39.484324,
+                        -0.394975
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "Poli",
+                "type": "PICK-UP",
+                "attributes": {
+                    "customer_id": "customer2",
+                    "customer_origin": [
+                        39.455398,
+                        -0.397343
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "Poli",
+                "type": "PICK-UP",
+                "attributes": {
+                    "customer_id": "customer3",
+                    "customer_origin": [
+                        39.484973,
+                        -0.36313
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            }
+        ],
+        "MOVE-TO-DEST": [
+            {
+                "agent": "Poli",
+                "type": "MOVE-TO-DEST",
+                "attributes": {
+                    "customer_id": "customer1",
+                    "customer_origin": [
+                        39.484324,
+                        -0.394975
+                    ],
+                    "customer_dest": [
+                        39.470368,
+                        -0.38533
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "Poli",
+                "type": "MOVE-TO-DEST",
+                "attributes": {
+                    "customer_id": "customer2",
+                    "customer_origin": [
+                        39.455398,
+                        -0.397343
+                    ],
+                    "customer_dest": [
+                        39.463936,
+                        -0.37934
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "Poli",
+                "type": "MOVE-TO-DEST",
+                "attributes": {
+                    "customer_id": "customer3",
+                    "customer_origin": [
+                        39.484973,
+                        -0.36313
+                    ],
+                    "customer_dest": [
+                        39.464424,
+                        -0.337946
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            }
+        ],
+        "MOVE-TO-STATION": [
+            {
+                "agent": "Poli",
+                "type": "MOVE-TO-STATION",
+                "attributes": {
+                    "station_id": "station1",
+                    "station_position": [
+                        39.463356,
+                        -0.376463
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            }
+        ],
+        "CHARGE": [
+            {
+                "agent": "Poli",
+                "type": "CHARGE",
+                "attributes": {
+                    "station_id": "station1",
+                    "power": 5
+                },
+                "statistics": {
+                    "time": null,
+                    "need": null
+                }
+            }
+        ]
+    },
+    "Taxi": {
+        "PICK-UP": [
+            {
+                "agent": "Taxi",
+                "type": "PICK-UP",
+                "attributes": {
+                    "customer_id": "customer1",
+                    "customer_origin": [
+                        39.484324,
+                        -0.394975
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "Taxi",
+                "type": "PICK-UP",
+                "attributes": {
+                    "customer_id": "customer2",
+                    "customer_origin": [
+                        39.455398,
+                        -0.397343
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "Taxi",
+                "type": "PICK-UP",
+                "attributes": {
+                    "customer_id": "customer3",
+                    "customer_origin": [
+                        39.484973,
+                        -0.36313
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            }
+        ],
+        "MOVE-TO-DEST": [
+            {
+                "agent": "Taxi",
+                "type": "MOVE-TO-DEST",
+                "attributes": {
+                    "customer_id": "customer1",
+                    "customer_origin": [
+                        39.484324,
+                        -0.394975
+                    ],
+                    "customer_dest": [
+                        39.470368,
+                        -0.38533
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "Taxi",
+                "type": "MOVE-TO-DEST",
+                "attributes": {
+                    "customer_id": "customer2",
+                    "customer_origin": [
+                        39.455398,
+                        -0.397343
+                    ],
+                    "customer_dest": [
+                        39.463936,
+                        -0.37934
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            },
+            {
+                "agent": "Taxi",
+                "type": "MOVE-TO-DEST",
+                "attributes": {
+                    "customer_id": "customer3",
+                    "customer_origin": [
+                        39.484973,
+                        -0.36313
+                    ],
+                    "customer_dest": [
+                        39.464424,
+                        -0.337946
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            }
+        ],
+        "MOVE-TO-STATION": [
+            {
+                "agent": "Taxi",
+                "type": "MOVE-TO-STATION",
+                "attributes": {
+                    "station_id": "station1",
+                    "station_position": [
+                        39.463356,
+                        -0.376463
+                    ]
+                },
+                "statistics": {
+                    "time": null,
+                    "dist": null
+                }
+            }
+        ],
+        "CHARGE": [
+            {
+                "agent": "Taxi",
+                "type": "CHARGE",
+                "attributes": {
+                    "station_id": "station1",
+                    "power": 5
+                },
+                "statistics": {
+                    "time": null,
+                    "need": null
+                }
+            }
+        ]
+    }
+}

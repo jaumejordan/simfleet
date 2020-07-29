@@ -118,7 +118,7 @@ class BestResponse:
         # Initialize table_of_goals
         for customer in self.config_dic.get("customers"):
             customer_id = customer.get('name')
-            self.joint_plan["table_of_goals"][customer_id] = None
+            self.joint_plan["table_of_goals"][customer_id] = (None, math.inf)
 
     # Given a transport agent, creates its associated Planner object
     def create_planner(self, agent):
@@ -152,8 +152,8 @@ class BestResponse:
                 customer = action.get('attributes').get('customer_id')
                 tup = self.joint_plan.get('table_of_goals').get(customer)
                 # if no one is serving the transport
-                # if tup[0] is None:
-                if tup is None:
+                if tup[0] is None:
+                # if tup is None:
                     benefits += get_benefit(action)
                 else:
                     serving_transport = tup[0]
@@ -192,7 +192,7 @@ class BestResponse:
         # Restart table of table_of_goals
         for customer in self.config_dic.get("customers"):
             customer_id = customer.get('name')
-            self.joint_plan["table_of_goals"][customer_id] = None
+            self.joint_plan["table_of_goals"][customer_id] = (None, math.inf)
         aux = {}
 
         for entry in self.joint_plan.get("joint").entries:
@@ -354,6 +354,7 @@ class BestResponse:
 
             # Update joint plan
             self.check_update_joint_plan(agent.get('id'), None, initial_plan)
+            self.joint_plan["no_change"][agent.get('id')] = False
 
 
 
@@ -486,7 +487,9 @@ class BestResponse:
 
         self.feasible_joint_plan()
         self.print_game_state()
-        exit(0)
+        # exit(0)
+
+        self.create_agents()
 
         game_turn = 0
         while not self.stop():
@@ -496,6 +499,7 @@ class BestResponse:
             logger.info("*************************************************************************")
             # First turn of the game, agents propose their initial plan
             if game_turn == 1:
+                continue
                 self.create_initial_plans()
             # In the following turns, the agents may have one of this two:
             # 1) A previous plan

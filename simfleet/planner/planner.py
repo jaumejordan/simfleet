@@ -12,7 +12,7 @@ from simfleet.planner.constants import SPEED, STARTING_FARE, PRICE_PER_kWh, PENA
 from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_expense
 from simfleet.planner.plan import Plan
 
-VERBOSE = 2  # 2, 1 or 0 according to verbosity level
+VERBOSE = 0  # 2, 1 or 0 according to verbosity level
 
 
 # TODO tenir en compte el nombre de places de l'estació de càrrega
@@ -196,7 +196,7 @@ class Planner:
         else:  # extract from joint plan
             for customer in self.joint_plan.get('table_of_goals').keys():
                 tup = self.joint_plan.get('table_of_goals').get(customer)
-                if tup is None:
+                if tup[0] is None:
                     self.table_of_goals[customer] = (None, math.inf)
                 else:
                     self.table_of_goals[customer] = (tup[0], tup[1])
@@ -446,6 +446,7 @@ class Planner:
         # with its corresponding table of goals
         if self.best_solution is not None:
             self.extract_plan(self.best_solution)
+            logger.info(self.plan.to_string_plan())
 
     def create_customer_nodes(self, parent=None):
 
