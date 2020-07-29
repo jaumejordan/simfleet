@@ -10,19 +10,19 @@ STARTING_FARE = 1.45
 PRICE_PER_KM = 1.08  # 0
 PENALTY = 0.1  # 10% of the traveled km
 PRICE_PER_kWh = 0.0615
-GOAL_PERCENTAGE = 0.4 # 30%
+GOAL_PERCENTAGE = 0.3 # 30%
 
-# CONFIG_FILE = "configs/3_planner_config.json"
-# ACTIONS_FILE = "actions/3config-actions.json"
-# ROUTES_FILE = "routes/3config-routes.json"
+CONFIG_FILE = "configs/3_planner_config.json"
+ACTIONS_FILE = "actions/3config-actions.json"
+ROUTES_FILE = "routes/3config-routes.json"
 
 # CONFIG_FILE = "configs/20-taxi-fsm.json"
 # ACTIONS_FILE = "actions/20config-actions.json"
 # ROUTES_FILE = "routes/10config-routes.json"
 
-CONFIG_FILE = "configs/10taxi-config.json"
-ACTIONS_FILE = "actions/10config-actions.json"
-ROUTES_FILE = "routes/10config-routes.json"
+# CONFIG_FILE = "configs/10taxi-config.json"
+# ACTIONS_FILE = "actions/10config-actions.json"
+# ROUTES_FILE = "routes/10config-routes.json"
 
 
 def get_benefit(action):

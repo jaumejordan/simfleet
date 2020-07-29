@@ -1,11 +1,66 @@
 import json
+import math
+import random
 
 from loguru import logger
 
 from simfleet.planner.constants import CONFIG_FILE, ACTIONS_FILE, \
     ROUTES_FILE, get_benefit, get_travel_cost, get_charge_cost
-from simfleet.planner.plan import JointPlan
-from simfleet.planner.planner import Planner
+from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_expense
+from simfleet.planner.plan import JointPlan, Plan
+from simfleet.planner.planner import Planner, meters_to_seconds
+
+
+def fill_statistics(action, current_pos=None, current_autonomy=None, agent_max_autonomy=None, routes_dic=None):
+    if action.get('type') == 'PICK-UP':
+        # distance from transport position to customer origin
+        p1 = current_pos
+        p2 = action.get('attributes').get('customer_origin')
+        route = get_route(routes_dic, p1, p2)
+        dist = route.get('distance')
+        time = meters_to_seconds(dist)
+        action['statistics']['dist'] = dist
+        action['statistics']['time'] = time
+
+    elif action.get('type') == 'MOVE-TO-DEST':
+        # distance from customer_origin to customer_destination
+        p1 = action.get('attributes').get('customer_origin')
+        p2 = action.get('attributes').get('customer_dest')
+        route = get_route(routes_dic, p1, p2)
+        dist = route.get('distance')
+        time = meters_to_seconds(dist)
+        action['statistics']['dist'] = dist
+        action['statistics']['time'] = time
+
+    elif action.get('type') == 'MOVE-TO-STATION':
+        # distance from transport position to station position
+        p1 = current_pos
+        p2 = action.get('attributes').get('station_position')
+        route = get_route(routes_dic, p1, p2)
+        dist = route.get('distance')
+        time = meters_to_seconds(dist)
+        action['statistics']['dist'] = dist
+        action['statistics']['time'] = time
+
+    elif action.get('type') == 'CHARGE':
+        need = agent_max_autonomy - current_autonomy
+        total_time = need / action.get('attributes').get('power')
+        # time to complete the charge
+        action['statistics']['time'] = total_time
+        # amount (of something) to charge
+        action['statistics']['need'] = need
+
+    return action
+
+
+def get_route(routes_dic, p1, p2):
+    key = str(p1) + ":" + str(p2)
+    route = routes_dic.get(key)
+    if route is None:
+        # En el futur, demanar la ruta al OSRM
+        logger.info("ERROR :: There is no route for key \"", key, "\" in the routes_dic")
+        exit()
+    return route
 
 
 class BestResponse:
@@ -97,7 +152,8 @@ class BestResponse:
                 customer = action.get('attributes').get('customer_id')
                 tup = self.joint_plan.get('table_of_goals').get(customer)
                 # if no one is serving the transport
-                if tup[0] is None:
+                # if tup[0] is None:
+                if tup is None:
                     benefits += get_benefit(action)
                 else:
                     serving_transport = tup[0]
@@ -188,6 +244,118 @@ class BestResponse:
             planner.run()
             new_plan = planner.plan
             self.check_update_joint_plan(agent_id, None, new_plan)
+
+    def feasible_joint_plan(self):
+        # Initial list with all customers
+        customers = list(self.joint_plan.get("table_of_goals").keys())
+        # Number of customers each agent will initially pick up
+        customers_per_agent = math.ceil(len(customers)/len(self.agents))
+
+        for agent in self.agents:
+            logger.info(f"Creating initial plan for agent {agent.get('id')}")
+
+            # Get actions
+            dic_file = open(ACTIONS_FILE, "r")
+            actions_dic = json.load(dic_file)
+            agent_actions = actions_dic.get(agent.get('id'))
+
+            pick_up_actions = agent_actions.get("PICK-UP")
+            move_to_dest_actions = agent_actions.get("MOVE-TO-DEST")
+
+            move_to_station_actions = agent_actions.get("MOVE-TO-STATION")
+            charge_actions = agent_actions.get("CHARGE")
+
+            actions = []
+            goals = []
+            completed_goals = []
+            if len(customers) >= customers_per_agent:
+                # Assign their customers
+                goals = random.sample(customers, k=customers_per_agent)
+                customers = [c for c in customers if c not in goals]
+            else:
+                goals = customers.copy()
+
+            logger.info(f"Initial goals for agent {agent.get('id')}: {goals}")
+
+            while goals:
+                # Get agent attributes
+                current_position = agent.get('initial_position')
+                current_autonomy = agent.get('current_autonomy')
+                max_autonomy = agent.get('max_autonomy')
+                if not actions:
+                    current_time = 0
+                else:
+                    current_time = sum([a.get('statistics').get('time') for a in actions])
+
+                # Extract customer
+                customer = goals.pop(0)
+                # Get customer actions
+                action1 = [a for a in pick_up_actions if a.get('attributes').get('customer_id') == customer]
+                action1 = action1[0]
+                action2 = [a for a in move_to_dest_actions if a.get('attributes').get('customer_id') == customer]
+                action2 = action2[0]
+
+                # Fill statistics w.r.t. current position and autonomy
+                action1 = fill_statistics(action1, current_pos=current_position, routes_dic=self.routes_dic)
+                action2 = fill_statistics(action2, routes_dic=self.routes_dic)
+
+                # Check autonomy, go to charge in closest station if necessary
+                customer_origin = action1.get("attributes").get("customer_origin")
+                customer_dest = action2.get("attributes").get("customer_dest")
+
+                if not has_enough_autonomy(current_autonomy,current_position, customer_origin, customer_dest):
+                    # Store customer in the open goals list again
+                    goals.insert(0, customer)
+
+                    # Get closest station to transport
+                    station_actions = [fill_statistics(a, current_pos=current_position, routes_dic=self.routes_dic) for a in
+                                       move_to_station_actions]
+                    action1 = min(station_actions, key=lambda x: x.get("statistics").get("time"))
+                    station_id = action1.get('attributes').get('station_id')
+
+                    # Get actions for that station and fill statistics w.r.t. current position and autonomy
+                    action2 = [a for a in charge_actions if a.get('attributes').get('station_id') == station_id]
+                    action2 = action2[0]
+
+                    action2 = fill_statistics(action2,  current_autonomy=current_autonomy,
+                                              agent_max_autonomy=max_autonomy, routes_dic=self.routes_dic)
+
+                    # Update position and autonomy after charge
+                    agent['initial_position'] = action1.get('attributes').get('station_position')
+                    agent['current_autonomy'] = max_autonomy
+
+                    # Add actions to action list
+                    actions += [action1, action2]
+
+                else:
+                    # Add actions, update position and autonomy
+                    # Add actions to action list
+                    actions += [action1, action2]
+                    # Update position and autonomy
+                    agent['current_autonomy'] -= calculate_km_expense(current_position,
+                                                                action2.get('attributes').get('customer_origin'),
+                                                                action2.get('attributes').get('customer_dest'))
+                    agent['initial_position'] = action2.get('attributes').get('customer_dest')
+
+                    # Add served customer to completed_goals
+                    init = current_time
+                    pick_up_duration = action1.get('statistics').get('time')
+                    completed_goals.append(
+                        (action2.get('attributes').get('customer_id'), init + pick_up_duration))
+
+            # end of while loop
+            # Create plan with agent action list
+            initial_plan = Plan(actions, -1, completed_goals)
+            utility = self.evaluate_plan(initial_plan)
+            initial_plan.utility = utility
+
+            logger.info(f"Agent {agent.get('id')} initial plan:")
+            logger.info(initial_plan.to_string_plan())
+
+            # Update joint plan
+            self.check_update_joint_plan(agent.get('id'), None, initial_plan)
+
+
 
     def propose_plan(self, a):
         agent_id = a.get('id')
@@ -315,6 +483,10 @@ class BestResponse:
 
         # Initialize data structure
         self.init_joint_plan()
+
+        self.feasible_joint_plan()
+        self.print_game_state()
+        exit(0)
 
         game_turn = 0
         while not self.stop():

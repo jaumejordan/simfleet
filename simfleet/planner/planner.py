@@ -12,7 +12,7 @@ from simfleet.planner.constants import SPEED, STARTING_FARE, PRICE_PER_kWh, PENA
 from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_expense
 from simfleet.planner.plan import Plan
 
-VERBOSE = 0  # 2, 1 or 0 according to verbosity level
+VERBOSE = 2  # 2, 1 or 0 according to verbosity level
 
 
 # TODO tenir en compte el nombre de places de l'estació de càrrega
@@ -324,6 +324,21 @@ class Planner:
                     self.best_solution_value = self.joint_plan["individual"][self.agent_id].utility
                     logger.warning(f"Using {self.best_solution_value} as lower bound for plan utility")
 
+    def purge_open_nodes(self):
+        init_len = len(self.open_nodes)
+        self.open_nodes = [x for x in self.open_nodes if -x[0] > self.best_solution_value]
+        final_len = len(self.open_nodes)
+
+        if final_len < init_len:
+            heapq.heapify(self.open_nodes)
+            if VERBOSE > 1:
+                logger.debug(f"{init_len-final_len} nodes where purged from the list of open nodes")
+        elif final_len == final_len:
+            if VERBOSE > 1:
+                logger.debug(f"No node was purged")
+        else:
+            logger.critical("ERROR :: There are more nodes after the purge!!!")
+
     def run(self):
         self.check_prev_plan()
         logger.debug(f"Planning to complete a {GOAL_PERCENTAGE*100}% of the goals: {self.get_number_of_customers()*GOAL_PERCENTAGE:.0f} customers.")
@@ -353,7 +368,7 @@ class Planner:
             if VERBOSE > 0:
                 logger.info(f'\nIteration {i:5d}.')
                 logger.error(f"Open nodes: {len(self.open_nodes)}")
-                #{self.open_nodes}")
+                logger.info(f"{self.open_nodes}")
 
             tup = heapq.heappop(self.open_nodes)
             value = -tup[0]
@@ -569,6 +584,7 @@ class Planner:
                             f'{self.best_solution_value:.4f} to {node.value:.4f}')
             self.best_solution = node
             self.best_solution_value = node.value
+            self.purge_open_nodes()
 
     def extract_plan(self, node):
         self.plan = Plan(node.actions, node.value, node.completed_goals)
@@ -595,7 +611,7 @@ if __name__ == '__main__':
 
     config_dic, global_actions, routes_dic = initialize()
 
-    agent_id = 'taxi1'
+    agent_id = 'Poli'
     agent_pos = agent_max_autonomy = None
     for transport in config_dic.get('transports'):
         if transport.get('name') == agent_id:
