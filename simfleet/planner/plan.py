@@ -38,7 +38,7 @@ class Plan:
     def to_string_plan(self):
         s = "\n"
         s += f'{"init time":10s}  ||  {"action":50s}  ||  {"end time":10s}  ||  {"duration":10s}\n'
-        s +="-------------------------------------------------------------------------------------------------\n"
+        s += "-------------------------------------------------------------------------------------------------\n"
         for e in self.entries:
             s += e.to_string_simple()
         end_time = self.entries[-1].init_time + self.entries[-1].duration
@@ -53,6 +53,25 @@ class Plan:
         return equal
 
 
+def equals_actions(a1, a2):
+    agent1 = a1.get('agent')
+    agent2 = a2.get('agent')
+
+    attributes1 = a1.get('attributes')
+
+    if agent1 != agent2:
+        return False
+    else:
+        type1 = a1.get('type')
+        type2 = a2.get('type')
+
+        if type1 != type2:
+            return False
+        else:
+            attributes1 = a1.get('attributes')
+            attributes2 = a2.get('attributes')
+
+
 class PlanEntry:
     def __init__(self, init_time, action, duration):
         self.init_time = init_time
@@ -64,7 +83,7 @@ class PlanEntry:
         print(f'{self.init_time:.4f}  ::  {self.action}  ::  {self.end_time:.4f}  ||  {self.duration:.4f}')
 
     def print_simple(self):
-        action_string=""
+        action_string = ""
         if self.action.get('type') in ['PICK-UP', 'MOVE-TO-DEST']:
             action_string += str(
                 (self.action.get('agent'), self.action.get('type'), self.action.get('attributes').get('customer_id')))
@@ -75,11 +94,13 @@ class PlanEntry:
         print(f'{self.init_time:10.4f}  ::  {action_string:50s}  ::  {self.end_time:10.4f}  ||  {self.duration:10.4f}')
 
     def to_string_simple(self):
-        action_string=""
+        action_string = ""
         if self.action.get('type') in ['PICK-UP', 'MOVE-TO-DEST']:
-            action_string += str((self.action.get('agent'), self.action.get('type'), self.action.get('attributes').get('customer_id')))
+            action_string += str(
+                (self.action.get('agent'), self.action.get('type'), self.action.get('attributes').get('customer_id')))
         else:
-            action_string += str((self.action.get('agent'), self.action.get('type'), self.action.get('attributes').get('station_id')))
+            action_string += str(
+                (self.action.get('agent'), self.action.get('type'), self.action.get('attributes').get('station_id')))
 
         return f'{self.init_time:10.4f}  ::  {action_string:50s}  ::  {self.end_time:10.4f}  ||  {self.duration:10.4f}\n'
 
@@ -95,12 +116,13 @@ class JointPlan:
     def print_plan(self):
         s = "\n"
         s += f'{"init time":10s}  ||  {"action":50s}  ||  {"end time":10s}  ||  {"duration":10s}\n'
-        s +="-------------------------------------------------------------------------------------------------\n"
+        s += "-------------------------------------------------------------------------------------------------\n"
         for e in self.entries:
             s += e.to_string_simple()
         end_time = self.entries[-1].init_time + self.entries[-1].duration
         s += f'{end_time:10.4f}  ::  {"****** END-OF-PLAN *****":50s}\n'
         return s
+
 
 class Action:
     def __init__(self, agent, type, attributes, statistics):
@@ -108,4 +130,3 @@ class Action:
         self.type = type
         self.attributes = attributes
         self.statistics = statistics
-

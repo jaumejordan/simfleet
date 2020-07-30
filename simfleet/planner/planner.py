@@ -13,7 +13,8 @@ from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_
 from simfleet.planner.plan import Plan
 
 VERBOSE = 0  # 2, 1 or 0 according to verbosity level
-
+PRINT_GOALS = False
+PRINT_PLAN = False
 
 # TODO tenir en compte el nombre de places de l'estació de càrrega
 
@@ -151,6 +152,27 @@ def check_tree(leaf_node):
     logger.info("-------------------------------------------------------------------")
 
 
+def print_table_of_goals(table_of_goals):
+    logger.info("·············································")
+    logger.info("| {:<10} {:<30} |".format('Customer', 'Contents'))
+    for k, v in table_of_goals.items():
+        contents = str(v)
+        logger.info("| {:<10} {:<30} |".format(k, contents))
+    logger.info("·············································")
+
+
+def to_string_table_of_goals(table_of_goals):
+    s = "\n"
+    s += "·············································\n"
+    s += "| {:<10} {:<30} |\n".format('Customer', 'Contents')
+    for k, v in table_of_goals.items():
+        contents = str(v)
+        s += "| {:<10} {:<30} |\n".format(k, contents)
+    s += "·············································\n"
+
+    return s
+
+
 class Planner:
     def __init__(self, config_dic, actions_dic, routes_dic, agent_id, agent_pos, agent_max_autonomy, agent_autonomy,
                  previous_plan=None, joint_plan=None):
@@ -201,7 +223,10 @@ class Planner:
                 else:
                     self.table_of_goals[customer] = (tup[0], tup[1])
                     # tup[0] transport_agent, tup[1] pick_up_time
-        logger.info(f"Initial table of goals:\n{self.table_of_goals}")
+        if PRINT_GOALS:
+            logger.info(
+                f"Initial table of goals: {to_string_table_of_goals(self.table_of_goals)}")  # \n{self.table_of_goals}")
+            # print_table_of_goals(self.table_of_goals)
 
     def fill_statistics(self, action, current_pos=None, current_autonomy=None):
         if action.get('type') == 'PICK-UP':
@@ -326,13 +351,13 @@ class Planner:
 
     def purge_open_nodes(self):
         init_len = len(self.open_nodes)
-        self.open_nodes = [x for x in self.open_nodes if -x[0] > self.best_solution_value]
+        self.open_nodes = [x for x in self.open_nodes if -1 * x[0] > self.best_solution_value]
         final_len = len(self.open_nodes)
 
         if final_len < init_len:
             heapq.heapify(self.open_nodes)
             if VERBOSE > 1:
-                logger.debug(f"{init_len-final_len} nodes where purged from the list of open nodes")
+                logger.debug(f"{init_len - final_len} nodes where purged from the list of open nodes")
         elif final_len == final_len:
             if VERBOSE > 1:
                 logger.debug(f"No node was purged")
@@ -341,7 +366,8 @@ class Planner:
 
     def run(self):
         self.check_prev_plan()
-        logger.debug(f"Planning to complete a {GOAL_PERCENTAGE*100}% of the goals: {self.get_number_of_customers()*GOAL_PERCENTAGE:.0f} customers.")
+        logger.debug(
+            f"Planning to complete a {GOAL_PERCENTAGE * 100}% of the goals: {self.get_number_of_customers() * GOAL_PERCENTAGE:.0f} customers.")
         # CREATION OF INITIAL NODES
         if VERBOSE > 1:
             logger.info("Creating initial nodes...")
@@ -387,7 +413,7 @@ class Planner:
                 parent.print_node()
 
             # if the plan in the node picks up a % of the customers, consider it complete
-            if not len(parent.completed_goals)/self.get_number_of_customers() >= GOAL_PERCENTAGE :
+            if not len(parent.completed_goals) / self.get_number_of_customers() >= GOAL_PERCENTAGE:
 
                 # If the last action is a customer service, consider charging
                 # otherwise consider ONLY customer actions (avoids consecutive charging actions)
@@ -446,7 +472,8 @@ class Planner:
         # with its corresponding table of goals
         if self.best_solution is not None:
             self.extract_plan(self.best_solution)
-            logger.info(self.plan.to_string_plan())
+            if PRINT_PLAN:
+                logger.info(self.plan.to_string_plan())
 
     def create_customer_nodes(self, parent=None):
 
@@ -529,6 +556,7 @@ class Planner:
                 heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
 
             # EVALUATE NODE AS SOLUTION NODE AND SAVE IT AS SOLUTION
+            # TODO
             self.evaluate_node(node, solution=True)
             self.solution_nodes.append((node, node.value))
             self.check_update_best_solution(node)
@@ -579,13 +607,13 @@ class Planner:
                 heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
 
     def check_update_best_solution(self, node):
-        if self.best_solution_value < node.value:
+        if self.best_solution_value <= node.value:
             if VERBOSE > 1:
                 logger.info(f'The value of the best solution node increased from '
                             f'{self.best_solution_value:.4f} to {node.value:.4f}')
             self.best_solution = node
             self.best_solution_value = node.value
-            self.purge_open_nodes()
+            # self.purge_open_nodes()
 
     def extract_plan(self, node):
         self.plan = Plan(node.actions, node.value, node.completed_goals)

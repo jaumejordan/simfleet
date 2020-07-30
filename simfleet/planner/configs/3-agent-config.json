@@ -17,8 +17,8 @@
             ],
             "password": "secret",
             "name": "Bus",
-            "autonomy": 40,
-            "current_autonomy": 1,
+            "autonomy": 30,
+            "current_autonomy": 30,
             "icon": "bus"
         },
         {
@@ -32,7 +32,7 @@
             "password": "secret",
             "name": "Poli",
             "autonomy": 30,
-            "current_autonomy": 1,
+            "current_autonomy": 30,
             "icon": "police"
         },
         {
@@ -45,8 +45,8 @@
             ],
             "password": "secret",
             "name": "Taxi",
-            "autonomy": 35,
-            "current_autonomy": 1,
+            "autonomy": 30,
+            "current_autonomy": 30,
             "icon": "taxi"
         }
     ],
@@ -98,6 +98,17 @@
             "position": [
                 39.463356,
                 -0.376463
+            ],
+            "places": 1,
+            "power": 5,
+            "icon": "wind_station"
+        },
+        {
+            "name": "station2",
+            "password": "secret",
+            "position": [
+                39.463356,
+                -0.346463
             ],
             "places": 1,
             "power": 5,

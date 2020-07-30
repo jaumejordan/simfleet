@@ -161,6 +161,6 @@ if __name__ == '__main__':
     t, s, co, cd = get_points()
     routes = asyncio.run(calculate_routes(t, s, co, cd))
 
-    outfile = open("routes/3-agent-config-routes.json", "w+")
+    outfile = open("routes/20config-routes.json", "w+")
     json.dump(routes, outfile, indent=4)
     outfile.close()

@@ -153,7 +153,7 @@ class BestResponse:
                 tup = self.joint_plan.get('table_of_goals').get(customer)
                 # if no one is serving the transport
                 if tup[0] is None:
-                # if tup is None:
+                    # if tup is None:
                     benefits += get_benefit(action)
                 else:
                     serving_transport = tup[0]
@@ -249,7 +249,7 @@ class BestResponse:
         # Initial list with all customers
         customers = list(self.joint_plan.get("table_of_goals").keys())
         # Number of customers each agent will initially pick up
-        customers_per_agent = math.ceil(len(customers)/len(self.agents))
+        customers_per_agent = math.ceil(len(customers) / len(self.agents))
 
         for agent in self.agents:
             logger.info(f"Creating initial plan for agent {agent.get('id')}")
@@ -270,8 +270,11 @@ class BestResponse:
             completed_goals = []
             if len(customers) >= customers_per_agent:
                 # Assign their customers
-                goals = random.sample(customers, k=customers_per_agent)
-                customers = [c for c in customers if c not in goals]
+                # goals = random.sample(customers, k=customers_per_agent)
+                # TODO hardcoded to repartir 1 2 3
+                goals.append(customers[0])
+                customers.pop(0)
+                # customers = [c for c in customers if c not in goals]
             else:
                 goals = customers.copy()
 
@@ -288,7 +291,9 @@ class BestResponse:
                     current_time = sum([a.get('statistics').get('time') for a in actions])
 
                 # Extract customer
+
                 customer = goals.pop(0)
+                # customer = goals
                 # Get customer actions
                 action1 = [a for a in pick_up_actions if a.get('attributes').get('customer_id') == customer]
                 action1 = action1[0]
@@ -303,12 +308,13 @@ class BestResponse:
                 customer_origin = action1.get("attributes").get("customer_origin")
                 customer_dest = action2.get("attributes").get("customer_dest")
 
-                if not has_enough_autonomy(current_autonomy,current_position, customer_origin, customer_dest):
+                if not has_enough_autonomy(current_autonomy, current_position, customer_origin, customer_dest):
                     # Store customer in the open goals list again
                     goals.insert(0, customer)
 
                     # Get closest station to transport
-                    station_actions = [fill_statistics(a, current_pos=current_position, routes_dic=self.routes_dic) for a in
+                    station_actions = [fill_statistics(a, current_pos=current_position, routes_dic=self.routes_dic) for
+                                       a in
                                        move_to_station_actions]
                     action1 = min(station_actions, key=lambda x: x.get("statistics").get("time"))
                     station_id = action1.get('attributes').get('station_id')
@@ -317,7 +323,7 @@ class BestResponse:
                     action2 = [a for a in charge_actions if a.get('attributes').get('station_id') == station_id]
                     action2 = action2[0]
 
-                    action2 = fill_statistics(action2,  current_autonomy=current_autonomy,
+                    action2 = fill_statistics(action2, current_autonomy=current_autonomy,
                                               agent_max_autonomy=max_autonomy, routes_dic=self.routes_dic)
 
                     # Update position and autonomy after charge
@@ -333,8 +339,8 @@ class BestResponse:
                     actions += [action1, action2]
                     # Update position and autonomy
                     agent['current_autonomy'] -= calculate_km_expense(current_position,
-                                                                action2.get('attributes').get('customer_origin'),
-                                                                action2.get('attributes').get('customer_dest'))
+                                                                      action2.get('attributes').get('customer_origin'),
+                                                                      action2.get('attributes').get('customer_dest'))
                     agent['initial_position'] = action2.get('attributes').get('customer_dest')
 
                     # Add served customer to completed_goals
@@ -355,8 +361,6 @@ class BestResponse:
             # Update joint plan
             self.check_update_joint_plan(agent.get('id'), None, initial_plan)
             self.joint_plan["no_change"][agent.get('id')] = False
-
-
 
     def propose_plan(self, a):
         agent_id = a.get('id')
@@ -415,10 +419,18 @@ class BestResponse:
                     self.joint_plan["no_change"][agent_id] = False
                 # the planner found the same plan as before (utility of prev plan was positive but planner retuned None)
                 # TODO compare plans action by action not just by their utility
+
                 else:
-                    logger.info(
-                        f"Agent {agent_id} could not find a better plan (it found the same one than in the previous round)")
-                    self.joint_plan["no_change"][agent_id] = True
+                    logger.error(
+                        f"Agent {agent_id} could not find any plan"
+                    )
+                    self.update_joint_plan(agent_id, new_plan)
+                    logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
+                    self.joint_plan["no_change"][agent_id] = False
+                    logger.critical("NO DEURIA ENTRAR ACÍ")
+                    # logger.error(
+                    #     f"Agent {agent_id} could not find a better plan (it found the same one than in the previous round)")
+                    # self.joint_plan["no_change"][agent_id] = True
 
         else:
 
@@ -429,15 +441,20 @@ class BestResponse:
                     f"Agent {agent_id} found new plan with utility {new_utility:.4f}")
                 logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
                 self.update_joint_plan(agent_id, new_plan)
+                self.joint_plan["no_change"][agent_id] = False
             # Case 2) Agent finds a new plan that improves its utility
-            elif new_utility != prev_plan.utility:
+            elif not new_plan.equals(prev_plan): # != prev_plan.utility:
                 logger.warning(
                     f"Agent {agent_id} found new plan with utility {new_utility:.4f}")
                 logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
                 self.update_joint_plan(agent_id, new_plan)
-            # Case 3) Agent finds the same plan it had proposed before --> moved above
-            else:
-                logger.critical("NO DEURIA ENTRAR ACÍ")  # keeping this as a check
+                self.joint_plan["no_change"][agent_id] = False
+            # Case 3) Agent finds the same plan it had proposed before
+            elif new_plan.equals(prev_plan):
+                logger.info(
+                    f"Agent {agent_id} could not find a better plan (it found the same one than in the previous round)")
+                self.update_joint_plan(agent_id, new_plan)
+                self.joint_plan["no_change"][agent_id] = True
 
     def print_game_state(self):
         # joint_plan = {"no_change": {}, "joint": None, "table_of_goals": {}, "individual": {}}
@@ -492,7 +509,7 @@ class BestResponse:
         self.create_agents()
 
         game_turn = 0
-        while not self.stop():
+        while not self.stop() and game_turn < 1000:
             game_turn += 1
             logger.info("*************************************************************************")
             logger.info(f"\t\t\t\t\t\t\tBest Response turn {game_turn}")
