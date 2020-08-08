@@ -71,6 +71,7 @@ class BestResponse:
         self.routes_dic = None
         self.joint_plan = None
         self.agents = None
+        self.list_of_plans = None
 
     # Load dictionary data
     def initialize(self):
@@ -90,6 +91,7 @@ class BestResponse:
 
     # Creates Transport Agents that will act as players in the Best Response game
     def create_agents(self):
+        self.list_of_plans = {}
         agents = []
         for agent in self.config_dic.get('transports'):
             agent_id = agent.get('name')
@@ -100,6 +102,7 @@ class BestResponse:
                 'current_autonomy': agent.get('current_autonomy')
             }
             agents.append(agent_dic)
+            self.list_of_plans[agent_id] = []
         self.agents = agents
 
         logger.debug(f"Agents loaded {self.agents}")
@@ -449,12 +452,35 @@ class BestResponse:
                 logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
                 self.update_joint_plan(agent_id, new_plan)
                 self.joint_plan["no_change"][agent_id] = False
+
+                # Check for loops
+                self.check_loop(agent_id, new_plan)
+
+                # Update list of plans
+                self.update_list_of_plans(agent_id, new_plan)
+
             # Case 3) Agent finds the same plan it had proposed before
             elif new_plan.equals(prev_plan):
                 logger.info(
                     f"Agent {agent_id} could not find a better plan (it found the same one than in the previous round)")
                 self.update_joint_plan(agent_id, new_plan)
                 self.joint_plan["no_change"][agent_id] = True
+
+    # Keeps an updated list of the last 3 plans
+    def update_list_of_plans(self, agent, new_plan):
+        if len(self.list_of_plans[agent]) == 3:
+            self.list_of_plans[agent].pop(0)
+            self.list_of_plans[agent].append(new_plan)
+        else:
+            self.list_of_plans[agent].append(new_plan)
+
+    def check_loop(self, agent, new_plan):
+        detections = 0
+        for plan in self.list_of_plans[agent]:
+            if new_plan.equals(plan):
+                detections += 1
+        if detections > 0:
+            logger.error(f"Agent {agent} has {detections} equal plans in the list of previous plans")
 
     def print_game_state(self):
         # joint_plan = {"no_change": {}, "joint": None, "table_of_goals": {}, "individual": {}}
