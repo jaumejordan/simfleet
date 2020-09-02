@@ -18,7 +18,7 @@
             "password": "secret",
             "name": "Bus",
             "autonomy": 30,
-            "current_autonomy": 30,
+            "current_autonomy": 10,
             "icon": "bus"
         },
         {
@@ -98,17 +98,6 @@
             "position": [
                 39.463356,
                 -0.376463
-            ],
-            "places": 1,
-            "power": 5,
-            "icon": "wind_station"
-        },
-        {
-            "name": "station2",
-            "password": "secret",
-            "position": [
-                39.463356,
-                -0.346463
             ],
             "places": 1,
             "power": 5,

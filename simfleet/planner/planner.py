@@ -12,7 +12,7 @@ from simfleet.planner.constants import SPEED, STARTING_FARE, PRICE_PER_kWh, PENA
 from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_expense
 from simfleet.planner.plan import Plan
 
-VERBOSE = 0  # 2, 1 or 0 according to verbosity level
+VERBOSE = 2  # 2, 1 or 0 according to verbosity level
 PRINT_GOALS = False
 PRINT_PLAN = False
 
@@ -206,7 +206,17 @@ class Planner:
             self.previous_plan = None
         self.plan = None
 
+        # Variables to activate and deactivate pruning methods
+        self.save_partial_solutions = True
+        self.best_solution_prune = True
+
+        # Planner statistics
+        self.generated_nodes = 0
+        self.expanded_nodes = 0
+        self.max_queue_length = 0
+
         self.create_table_of_goals()
+
 
     # Reads plan of every agent (joint plan) and fills the corresponding table of goals
     # If the joint plan is empty, creates an entry per customer and initialises its
@@ -406,6 +416,7 @@ class Planner:
                 continue
 
             parent = tup[2]
+            self.expanded_nodes += 1
 
             if VERBOSE > 0:
                 logger.info("Node", tup, "popped from the open_nodes")
@@ -453,12 +464,19 @@ class Planner:
                 self.solution_nodes.append((parent, parent.value))
                 self.check_update_best_solution(parent)
 
+            # Update max queue length
+            if len(self.open_nodes) > self.max_queue_length:
+                self.max_queue_length = len(self.open_nodes)
+
         # END OF MAIN LOOP
         if VERBOSE > 0:
             logger.info(
                 "###################################################################################################")
             logger.info("\nEnd of MAIN LOOP")
-            logger.info(f'{len(self.solution_nodes):5d} solution nodes found')
+            if not self.save_partial_solutions:
+                logger.info(f'{len(self.solution_nodes):5d} solution nodes found')
+            else:
+                logger.info(f'{len(self.solution_nodes):5d} solution nodes found (includes partial solutions)')
             n = 1
             # for tup in self.solution_nodes:
             #     logger.info("\nSolution", n)
@@ -474,6 +492,16 @@ class Planner:
             self.extract_plan(self.best_solution)
             if PRINT_PLAN:
                 logger.info(self.plan.to_string_plan())
+
+        # Print process statistics
+        if VERBOSE > 0:
+            logger.info("Process statistics:")
+            # Amount of generated nodes
+            logger.info(f'\tGenerated nodes - {self.generated_nodes}')
+            # Amount of expanded nodes
+            logger.info(f'\tExpanded nodes - {self.expanded_nodes}')
+            # Max queue length
+            logger.info(f'\tMax. queue length - {self.max_queue_length}')
 
     def create_customer_nodes(self, parent=None):
 
@@ -514,6 +542,7 @@ class Planner:
             pick_up_time = node.init_time + node.actions[-2].get('statistics').get('time')
             customer_id = node.actions[-2].get('attributes').get('customer_id')
             # customer_id = node.actions[-2].get('attributes').get('customer_id').split('@')[0]
+            # CANVI DE PROVA
             if not self.reachable_goal(customer_id, pick_up_time):
                 # delete node object
                 del node
@@ -547,19 +576,28 @@ class Planner:
             # Evaluate node
             value = self.evaluate_node(node)
 
-            # If the value is higher than best solution value, add node to open_nodes
-            if value > self.best_solution_value:
-                # Add node to parent's children
+            if self.best_solution_prune:
+                # If the value is higher than best solution value, add node to open_nodes
+                if value > self.best_solution_value:
+                    # Add node to parent's children
+                    if parent is not None:
+                        parent.children.append(node)
+                    # Push node in the priority queue
+                    heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
+                    self.generated_nodes += 1
+            else:
                 if parent is not None:
                     parent.children.append(node)
                 # Push node in the priority queue
                 heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
+                self.generated_nodes += 1
 
             # EVALUATE NODE AS SOLUTION NODE AND SAVE IT AS SOLUTION
             # TODO
-            self.evaluate_node(node, solution=True)
-            self.solution_nodes.append((node, node.value))
-            self.check_update_best_solution(node)
+            if self.save_partial_solutions:
+                self.evaluate_node(node, solution=True)
+                self.solution_nodes.append((node, node.value))
+                self.check_update_best_solution(node)
 
         return generate_charging
 
@@ -598,13 +636,21 @@ class Planner:
             # Evaluate node
             value = self.evaluate_node(node)
 
-            # If the value is below the best solution value, add node to open_nodes
-            if value > self.best_solution_value:
-                if parent is not None:
+            if self.best_solution_prune:
+                # If the value is higher than best solution value, add node to open_nodes
+                if value > self.best_solution_value:
                     # Add node to parent's children
+                    if parent is not None:
+                        parent.children.append(node)
+                    # Push node in the priority queue
+                    heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
+                    self.generated_nodes += 1
+            else:
+                if parent is not None:
                     parent.children.append(node)
                 # Push node in the priority queue
                 heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
+                self.generated_nodes += 1
 
     def check_update_best_solution(self, node):
         if self.best_solution_value <= node.value:
@@ -640,7 +686,7 @@ if __name__ == '__main__':
 
     config_dic, global_actions, routes_dic = initialize()
 
-    agent_id = 'Poli'
+    agent_id = 'Bus'
     agent_pos = agent_max_autonomy = None
     for transport in config_dic.get('transports'):
         if transport.get('name') == agent_id:

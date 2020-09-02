@@ -121,21 +121,6 @@
                     "time": null,
                     "dist": null
                 }
-            },
-            {
-                "agent": "Bus",
-                "type": "MOVE-TO-STATION",
-                "attributes": {
-                    "station_id": "station2",
-                    "station_position": [
-                        39.463356,
-                        -0.346463
-                    ]
-                },
-                "statistics": {
-                    "time": null,
-                    "dist": null
-                }
             }
         ],
         "CHARGE": [
@@ -144,18 +129,6 @@
                 "type": "CHARGE",
                 "attributes": {
                     "station_id": "station1",
-                    "power": 5
-                },
-                "statistics": {
-                    "time": null,
-                    "need": null
-                }
-            },
-            {
-                "agent": "Bus",
-                "type": "CHARGE",
-                "attributes": {
-                    "station_id": "station2",
                     "power": 5
                 },
                 "statistics": {
@@ -287,21 +260,6 @@
                     "time": null,
                     "dist": null
                 }
-            },
-            {
-                "agent": "Poli",
-                "type": "MOVE-TO-STATION",
-                "attributes": {
-                    "station_id": "station2",
-                    "station_position": [
-                        39.463356,
-                        -0.346463
-                    ]
-                },
-                "statistics": {
-                    "time": null,
-                    "dist": null
-                }
             }
         ],
         "CHARGE": [
@@ -310,18 +268,6 @@
                 "type": "CHARGE",
                 "attributes": {
                     "station_id": "station1",
-                    "power": 5
-                },
-                "statistics": {
-                    "time": null,
-                    "need": null
-                }
-            },
-            {
-                "agent": "Poli",
-                "type": "CHARGE",
-                "attributes": {
-                    "station_id": "station2",
                     "power": 5
                 },
                 "statistics": {
@@ -453,21 +399,6 @@
                     "time": null,
                     "dist": null
                 }
-            },
-            {
-                "agent": "Taxi",
-                "type": "MOVE-TO-STATION",
-                "attributes": {
-                    "station_id": "station2",
-                    "station_position": [
-                        39.463356,
-                        -0.346463
-                    ]
-                },
-                "statistics": {
-                    "time": null,
-                    "dist": null
-                }
             }
         ],
         "CHARGE": [
@@ -476,18 +407,6 @@
                 "type": "CHARGE",
                 "attributes": {
                     "station_id": "station1",
-                    "power": 5
-                },
-                "statistics": {
-                    "time": null,
-                    "need": null
-                }
-            },
-            {
-                "agent": "Taxi",
-                "type": "CHARGE",
-                "attributes": {
-                    "station_id": "station2",
                     "power": 5
                 },
                 "statistics": {
