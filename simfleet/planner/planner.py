@@ -17,6 +17,7 @@ VERBOSE = 0  # 2, 1 or 0 according to verbosity level
 PRINT_GOALS = False
 PRINT_PLAN = False
 CHARGE_WHEN_NOT_FULL = True
+HEURISTIC = True
 
 # TODO tenir en compte el nombre de places de l'estació de càrrega
 
@@ -331,7 +332,8 @@ class Planner:
         h = 0
         # If the node is a solution, its h value is 0
         if not solution:
-            h = self.get_h_value(node)
+            if HEURISTIC:
+                h = self.get_h_value(node)
 
         f_value = g + h
         node.value = f_value
@@ -613,8 +615,6 @@ class Planner:
                 heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
                 self.generated_nodes += 1
 
-            # EVALUATE NODE AS SOLUTION NODE AND SAVE IT AS SOLUTION
-            # TODO
             if self.save_partial_solutions:
                 self.evaluate_node(node, solution=True)
                 self.solution_nodes.append((node, node.value))

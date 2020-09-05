@@ -1,0 +1,614 @@
+{
+    "fleets": [
+        {
+            "password": "secret",
+            "name": "fleet1",
+            "fleet_type": "taxi"
+        }
+    ],
+    "transports": [
+        {
+            "position": [
+                39.451409,
+                -0.387229
+            ],
+            "password": "secret",
+            "name": "taxi1",
+            "speed": 2000,
+            "fleet": "fleet1@localhost",
+            "fleet_type": "taxi",
+            "autonomy": 20,
+            "current_autonomy": 20,
+            "icon": "taxi"
+        },
+        {
+            "position": [
+                39.448493,
+                -0.396219
+            ],
+            "password": "secret",
+            "name": "taxi2",
+            "speed": 2000,
+            "fleet": "fleet1@localhost",
+            "fleet_type": "taxi",
+            "autonomy": 20,
+            "current_autonomy": 20,
+            "icon": "taxi"
+        },
+        {
+            "position": [
+                39.482512,
+                -0.401026
+            ],
+            "password": "secret",
+            "name": "taxi3",
+            "speed": 2000,
+            "fleet": "fleet1@localhost",
+            "fleet_type": "taxi",
+            "autonomy": 20,
+            "current_autonomy": 20,
+            "icon": "taxi"
+        },
+        {
+            "position": [
+                39.46295,
+                -0.354552
+            ],
+            "password": "secret",
+            "name": "taxi4",
+            "speed": 2000,
+            "fleet": "fleet1@localhost",
+            "fleet_type": "taxi",
+            "autonomy": 20,
+            "current_autonomy": 20,
+            "icon": "taxi"
+        },
+        {
+            "position": [
+                39.474327,
+                -0.39901
+            ],
+            "password": "secret",
+            "name": "taxi5",
+            "speed": 2000,
+            "fleet": "fleet1@localhost",
+            "fleet_type": "taxi",
+            "autonomy": 20,
+            "current_autonomy": 20,
+            "icon": "taxi"
+        },
+        {
+            "position": [
+                39.44539,
+                -0.364709
+            ],
+            "password": "secret",
+            "name": "taxi6",
+            "speed": 2000,
+            "fleet": "fleet1@localhost",
+            "fleet_type": "taxi",
+            "autonomy": 20,
+            "current_autonomy": 20,
+            "icon": "taxi"
+        },
+        {
+            "position": [
+                39.454206,
+                -0.351676
+            ],
+            "password": "secret",
+            "name": "taxi7",
+            "speed": 2000,
+            "fleet": "fleet1@localhost",
+            "fleet_type": "taxi",
+            "autonomy": 20,
+            "current_autonomy": 20,
+            "icon": "taxi"
+        },
+        {
+            "position": [
+                39.448493,
+                -0.396219
+            ],
+            "password": "secret",
+            "name": "taxi8",
+            "speed": 2000,
+            "fleet": "fleet1@localhost",
+            "fleet_type": "taxi",
+            "autonomy": 20,
+            "current_autonomy": 20,
+            "icon": "taxi"
+        },
+        {
+            "position": [
+                39.467986,
+                -0.365352
+            ],
+            "password": "secret",
+            "name": "taxi9",
+            "speed": 2000,
+            "fleet": "fleet1@localhost",
+            "fleet_type": "taxi",
+            "autonomy": 20,
+            "current_autonomy": 20,
+            "icon": "taxi"
+        },
+        {
+            "position": [
+                39.443878,
+                -0.325613
+            ],
+            "password": "secret",
+            "name": "taxi10",
+            "speed": 2000,
+            "fleet": "fleet1@localhost",
+            "fleet_type": "taxi",
+            "autonomy": 20,
+            "current_autonomy": 20,
+            "icon": "taxi"
+        }
+    ],
+    "customers": [
+        {
+            "destination": [
+                39.473916,
+                -0.352399
+            ],
+            "position": [
+                39.463667,
+                -0.366453
+            ],
+            "password": "secret",
+            "name": "customer1",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.431567,
+                -0.342917
+            ],
+            "position": [
+                39.451516,
+                -0.391585
+            ],
+            "password": "secret",
+            "name": "customer2",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.491911,
+                -0.366624
+            ],
+            "position": [
+                39.477392,
+                -0.382498
+            ],
+            "password": "secret",
+            "name": "customer3",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.492408,
+                -0.390871
+            ],
+            "position": [
+                39.475278,
+                -0.326543
+            ],
+            "password": "secret",
+            "name": "customer4",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.468698,
+                -0.411405
+            ],
+            "position": [
+                39.443557,
+                -0.365136
+            ],
+            "password": "secret",
+            "name": "customer5",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.438451,
+                -0.389501
+            ],
+            "position": [
+                39.474457,
+                -0.359443
+            ],
+            "password": "secret",
+            "name": "customer6",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.470397,
+                -0.340963
+            ],
+            "position": [
+                39.495362,
+                -0.380527
+            ],
+            "password": "secret",
+            "name": "customer7",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.474238,
+                -0.338532
+            ],
+            "position": [
+                39.492754,
+                -0.385391
+            ],
+            "password": "secret",
+            "name": "customer8",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.479159,
+                -0.390965
+            ],
+            "position": [
+                39.440527,
+                -0.38088
+            ],
+            "password": "secret",
+            "name": "customer9",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.436598,
+                -0.354711
+            ],
+            "position": [
+                39.442076,
+                -0.341187
+            ],
+            "password": "secret",
+            "name": "customer10",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.484747,
+                -0.345498
+            ],
+            "position": [
+                39.473076,
+                -0.396247
+            ],
+            "password": "secret",
+            "name": "customer11",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.492713,
+                -0.367952
+            ],
+            "position": [
+                39.470498,
+                -0.344466
+            ],
+            "password": "secret",
+            "name": "customer12",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.460191,
+                -0.365686
+            ],
+            "position": [
+                39.460009,
+                -0.39425
+            ],
+            "password": "secret",
+            "name": "customer13",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.442806,
+                -0.356456
+            ],
+            "position": [
+                39.480459,
+                -0.403018
+            ],
+            "password": "secret",
+            "name": "customer14",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.461217,
+                -0.378698
+            ],
+            "position": [
+                39.453643,
+                -0.399329
+            ],
+            "password": "secret",
+            "name": "customer15",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.465386,
+                -0.349424
+            ],
+            "position": [
+                39.478018,
+                -0.348462
+            ],
+            "password": "secret",
+            "name": "customer16",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.488014,
+                -0.386496
+            ],
+            "position": [
+                39.471196,
+                -0.340577
+            ],
+            "password": "secret",
+            "name": "customer17",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.497446,
+                -0.385703
+            ],
+            "position": [
+                39.44317,
+                -0.391053
+            ],
+            "password": "secret",
+            "name": "customer18",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.491956,
+                -0.407888
+            ],
+            "position": [
+                39.443557,
+                -0.365136
+            ],
+            "password": "secret",
+            "name": "customer19",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.485035,
+                -0.397689
+            ],
+            "position": [
+                39.48322,
+                -0.384962
+            ],
+            "password": "secret",
+            "name": "customer20",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.442564,
+                -0.340576
+            ],
+            "position": [
+                39.440447,
+                -0.355424
+            ],
+            "password": "secret",
+            "name": "customer21",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.470644,
+                -0.406611
+            ],
+            "position": [
+                39.476607,
+                -0.367047
+            ],
+            "password": "secret",
+            "name": "customer22",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.462888,
+                -0.378114
+            ],
+            "position": [
+                39.46313,
+                -0.358478
+            ],
+            "password": "secret",
+            "name": "customer23",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.466611,
+                -0.380156
+            ],
+            "position": [
+                39.471494,
+                -0.400364
+            ],
+            "password": "secret",
+            "name": "customer24",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.477344,
+                -0.37208
+            ],
+            "position": [
+                39.440342,
+                -0.386159
+            ],
+            "password": "secret",
+            "name": "customer25",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.453893,
+                -0.407149
+            ],
+            "position": [
+                39.490201,
+                -0.355067
+            ],
+            "password": "secret",
+            "name": "customer26",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.449751,
+                -0.348859
+            ],
+            "position": [
+                39.466501,
+                -0.38608
+            ],
+            "password": "secret",
+            "name": "customer27",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.463325,
+                -0.409267
+            ],
+            "position": [
+                39.469026,
+                -0.35712
+            ],
+            "password": "secret",
+            "name": "customer28",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.482436,
+                -0.392234
+            ],
+            "position": [
+                39.496813,
+                -0.405052
+            ],
+            "password": "secret",
+            "name": "customer29",
+            "fleet_type": "taxi"
+        },
+        {
+            "destination": [
+                39.458268,
+                -0.349862
+            ],
+            "position": [
+                39.478628,
+                -0.414555
+            ],
+            "password": "secret",
+            "name": "customer30",
+            "fleet_type": "taxi"
+        }
+    ],
+    "stations": [
+        {
+            "name": "station1",
+            "password": "secret",
+            "position": [
+                39.491386,
+                -0.396422
+            ],
+            "places": 2,
+            "power": 5,
+            "icon": "electric_station"
+        },
+        {
+            "name": "station2",
+            "password": "secret",
+            "position": [
+                39.467157,
+                -0.400143
+            ],
+            "places": 2,
+            "power": 5,
+            "icon": "electric_station"
+        },
+        {
+            "name": "station3",
+            "password": "secret",
+            "position": [
+                39.445776,
+                -0.390358
+            ],
+            "places": 2,
+            "power": 5,
+            "icon": "electric_station"
+        },
+        {
+            "name": "station4",
+            "password": "secret",
+            "position": [
+                39.486988,
+                -0.356236
+            ],
+            "places": 2,
+            "power": 5,
+            "icon": "electric_station"
+        },
+        {
+            "name": "station5",
+            "password": "secret",
+            "position": [
+                39.466028,
+                -0.350961
+            ],
+            "places": 2,
+            "power": 5,
+            "icon": "electric_station"
+        }
+    ],
+    "simulation_name": "Empty configuration",
+    "max_time": 1000,
+    "verbose": 4,
+    "fleetmanager_name": "fleetmanager",
+    "fleetmanager_password": "fleetmanager_passwd",
+    "route_name": "route",
+    "route_password": "route_passwd",
+    "directory_name": "directory",
+    "directory_password": "directory_passwd",
+    "host": "localhost",
+    "xmpp_port": 5222,
+    "http_port": 9001,
+    "http_ip": "127.0.0.1",
+    "route_host": "http://osrm.gti-ia.upv.es/"
+}

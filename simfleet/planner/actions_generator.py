@@ -417,7 +417,8 @@ if __name__ == '__main__':
 
     config_file = str(sys.argv[1])
     if len(sys.argv) > 2:
-        output_file_name = str(sys.argv[2])
+        # output_file_name = str(sys.argv[2])
+        output_file_name = "actions/problem5-actions.json"
         print("Output file name will be: ", output_file_name)
 
     config_dic = load_config(config_file)

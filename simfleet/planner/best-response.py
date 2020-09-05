@@ -275,11 +275,11 @@ class BestResponse:
             completed_goals = []
             if len(customers) >= customers_per_agent:
                 # Assign their customers
-                # goals = random.sample(customers, k=customers_per_agent)
+                goals = random.sample(customers, k=customers_per_agent)
                 # TODO hardcoded to repartir 1 2 3
-                goals.append(customers[0])
-                customers.pop(0)
-                # customers = [c for c in customers if c not in goals]
+                # goals.append(customers[0])
+                # customers.pop(0)
+                customers = [c for c in customers if c not in goals]
             else:
                 goals = customers.copy()
 
@@ -546,7 +546,6 @@ class BestResponse:
             # First turn of the game, agents propose their initial plan
             if game_turn == 1 and not INITIAL_JOINT_PLAN:
                 self.create_initial_plans()
-                continue
             # In the following turns, the agents may have one of this two:
             # 1) A previous plan
             # 2) An empty plan, because it can't do any action that increases its utility
