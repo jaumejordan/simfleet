@@ -1,6 +1,7 @@
 import json
 import math
 import random
+import time
 
 from loguru import logger
 
@@ -10,6 +11,7 @@ from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_
 from simfleet.planner.plan import JointPlan, Plan
 from simfleet.planner.planner import Planner, meters_to_seconds
 
+INITIAL_JOINT_PLAN = False
 
 def fill_statistics(action, current_pos=None, current_autonomy=None, agent_max_autonomy=None, routes_dic=None):
     if action.get('type') == 'PICK-UP':
@@ -528,22 +530,23 @@ class BestResponse:
         # Initialize data structure
         self.init_joint_plan()
 
-        self.feasible_joint_plan()
-        self.print_game_state()
+        if INITIAL_JOINT_PLAN:
+            self.feasible_joint_plan()
+            self.print_game_state()
         # exit(0)
 
         self.create_agents()
 
         game_turn = 0
-        while not self.stop() and game_turn < 1000:
+        while not self.stop() and game_turn < 3: # 1000
             game_turn += 1
             logger.info("*************************************************************************")
             logger.info(f"\t\t\t\t\t\t\tBest Response turn {game_turn}")
             logger.info("*************************************************************************")
             # First turn of the game, agents propose their initial plan
-            if game_turn == 1:
-                continue
+            if game_turn == 1 and not INITIAL_JOINT_PLAN:
                 self.create_initial_plans()
+                continue
             # In the following turns, the agents may have one of this two:
             # 1) A previous plan
             # 2) An empty plan, because it can't do any action that increases its utility
@@ -558,4 +561,7 @@ class BestResponse:
 
 if __name__ == '__main__':
     br = BestResponse()
+    start = time.time()
     br.run()
+    end = time.time()
+    logger.debug(f'\tBRPS process time: {end-start}')

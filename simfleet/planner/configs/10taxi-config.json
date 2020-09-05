@@ -342,17 +342,6 @@
             "icon": "electric_station"
         },
         {
-            "name": "station3",
-            "password": "secret",
-            "position": [
-                39.446332,
-                -0.380163
-            ],
-            "places": 2,
-            "power": 50,
-            "icon": "electric_station"
-        },
-        {
             "name": "station4",
             "password": "secret",
             "position": [

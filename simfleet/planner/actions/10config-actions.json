@@ -379,21 +379,6 @@
                 "agent": "taxi1",
                 "type": "MOVE-TO-STATION",
                 "attributes": {
-                    "station_id": "station3",
-                    "station_position": [
-                        39.446332,
-                        -0.380163
-                    ]
-                },
-                "statistics": {
-                    "time": null,
-                    "dist": null
-                }
-            },
-            {
-                "agent": "taxi1",
-                "type": "MOVE-TO-STATION",
-                "attributes": {
                     "station_id": "station4",
                     "station_position": [
                         39.471868,
@@ -739,18 +724,6 @@
                 "type": "CHARGE",
                 "attributes": {
                     "station_id": "station2",
-                    "power": 50
-                },
-                "statistics": {
-                    "time": null,
-                    "need": null
-                }
-            },
-            {
-                "agent": "taxi1",
-                "type": "CHARGE",
-                "attributes": {
-                    "station_id": "station3",
                     "power": 50
                 },
                 "statistics": {
@@ -1404,21 +1377,6 @@
                 "agent": "taxi2",
                 "type": "MOVE-TO-STATION",
                 "attributes": {
-                    "station_id": "station3",
-                    "station_position": [
-                        39.446332,
-                        -0.380163
-                    ]
-                },
-                "statistics": {
-                    "time": null,
-                    "dist": null
-                }
-            },
-            {
-                "agent": "taxi2",
-                "type": "MOVE-TO-STATION",
-                "attributes": {
                     "station_id": "station4",
                     "station_position": [
                         39.471868,
@@ -1764,18 +1722,6 @@
                 "type": "CHARGE",
                 "attributes": {
                     "station_id": "station2",
-                    "power": 50
-                },
-                "statistics": {
-                    "time": null,
-                    "need": null
-                }
-            },
-            {
-                "agent": "taxi2",
-                "type": "CHARGE",
-                "attributes": {
-                    "station_id": "station3",
                     "power": 50
                 },
                 "statistics": {
@@ -2429,21 +2375,6 @@
                 "agent": "taxi3",
                 "type": "MOVE-TO-STATION",
                 "attributes": {
-                    "station_id": "station3",
-                    "station_position": [
-                        39.446332,
-                        -0.380163
-                    ]
-                },
-                "statistics": {
-                    "time": null,
-                    "dist": null
-                }
-            },
-            {
-                "agent": "taxi3",
-                "type": "MOVE-TO-STATION",
-                "attributes": {
                     "station_id": "station4",
                     "station_position": [
                         39.471868,
@@ -2789,18 +2720,6 @@
                 "type": "CHARGE",
                 "attributes": {
                     "station_id": "station2",
-                    "power": 50
-                },
-                "statistics": {
-                    "time": null,
-                    "need": null
-                }
-            },
-            {
-                "agent": "taxi3",
-                "type": "CHARGE",
-                "attributes": {
-                    "station_id": "station3",
                     "power": 50
                 },
                 "statistics": {
@@ -3454,21 +3373,6 @@
                 "agent": "taxi4",
                 "type": "MOVE-TO-STATION",
                 "attributes": {
-                    "station_id": "station3",
-                    "station_position": [
-                        39.446332,
-                        -0.380163
-                    ]
-                },
-                "statistics": {
-                    "time": null,
-                    "dist": null
-                }
-            },
-            {
-                "agent": "taxi4",
-                "type": "MOVE-TO-STATION",
-                "attributes": {
                     "station_id": "station4",
                     "station_position": [
                         39.471868,
@@ -3814,18 +3718,6 @@
                 "type": "CHARGE",
                 "attributes": {
                     "station_id": "station2",
-                    "power": 50
-                },
-                "statistics": {
-                    "time": null,
-                    "need": null
-                }
-            },
-            {
-                "agent": "taxi4",
-                "type": "CHARGE",
-                "attributes": {
-                    "station_id": "station3",
                     "power": 50
                 },
                 "statistics": {
@@ -4479,21 +4371,6 @@
                 "agent": "taxi5",
                 "type": "MOVE-TO-STATION",
                 "attributes": {
-                    "station_id": "station3",
-                    "station_position": [
-                        39.446332,
-                        -0.380163
-                    ]
-                },
-                "statistics": {
-                    "time": null,
-                    "dist": null
-                }
-            },
-            {
-                "agent": "taxi5",
-                "type": "MOVE-TO-STATION",
-                "attributes": {
                     "station_id": "station4",
                     "station_position": [
                         39.471868,
@@ -4839,18 +4716,6 @@
                 "type": "CHARGE",
                 "attributes": {
                     "station_id": "station2",
-                    "power": 50
-                },
-                "statistics": {
-                    "time": null,
-                    "need": null
-                }
-            },
-            {
-                "agent": "taxi5",
-                "type": "CHARGE",
-                "attributes": {
-                    "station_id": "station3",
                     "power": 50
                 },
                 "statistics": {
@@ -5504,21 +5369,6 @@
                 "agent": "taxi6",
                 "type": "MOVE-TO-STATION",
                 "attributes": {
-                    "station_id": "station3",
-                    "station_position": [
-                        39.446332,
-                        -0.380163
-                    ]
-                },
-                "statistics": {
-                    "time": null,
-                    "dist": null
-                }
-            },
-            {
-                "agent": "taxi6",
-                "type": "MOVE-TO-STATION",
-                "attributes": {
                     "station_id": "station4",
                     "station_position": [
                         39.471868,
@@ -5864,18 +5714,6 @@
                 "type": "CHARGE",
                 "attributes": {
                     "station_id": "station2",
-                    "power": 50
-                },
-                "statistics": {
-                    "time": null,
-                    "need": null
-                }
-            },
-            {
-                "agent": "taxi6",
-                "type": "CHARGE",
-                "attributes": {
-                    "station_id": "station3",
                     "power": 50
                 },
                 "statistics": {
@@ -6529,21 +6367,6 @@
                 "agent": "taxi7",
                 "type": "MOVE-TO-STATION",
                 "attributes": {
-                    "station_id": "station3",
-                    "station_position": [
-                        39.446332,
-                        -0.380163
-                    ]
-                },
-                "statistics": {
-                    "time": null,
-                    "dist": null
-                }
-            },
-            {
-                "agent": "taxi7",
-                "type": "MOVE-TO-STATION",
-                "attributes": {
                     "station_id": "station4",
                     "station_position": [
                         39.471868,
@@ -6889,18 +6712,6 @@
                 "type": "CHARGE",
                 "attributes": {
                     "station_id": "station2",
-                    "power": 50
-                },
-                "statistics": {
-                    "time": null,
-                    "need": null
-                }
-            },
-            {
-                "agent": "taxi7",
-                "type": "CHARGE",
-                "attributes": {
-                    "station_id": "station3",
                     "power": 50
                 },
                 "statistics": {
@@ -7554,21 +7365,6 @@
                 "agent": "taxi8",
                 "type": "MOVE-TO-STATION",
                 "attributes": {
-                    "station_id": "station3",
-                    "station_position": [
-                        39.446332,
-                        -0.380163
-                    ]
-                },
-                "statistics": {
-                    "time": null,
-                    "dist": null
-                }
-            },
-            {
-                "agent": "taxi8",
-                "type": "MOVE-TO-STATION",
-                "attributes": {
                     "station_id": "station4",
                     "station_position": [
                         39.471868,
@@ -7914,18 +7710,6 @@
                 "type": "CHARGE",
                 "attributes": {
                     "station_id": "station2",
-                    "power": 50
-                },
-                "statistics": {
-                    "time": null,
-                    "need": null
-                }
-            },
-            {
-                "agent": "taxi8",
-                "type": "CHARGE",
-                "attributes": {
-                    "station_id": "station3",
                     "power": 50
                 },
                 "statistics": {
@@ -8579,21 +8363,6 @@
                 "agent": "taxi9",
                 "type": "MOVE-TO-STATION",
                 "attributes": {
-                    "station_id": "station3",
-                    "station_position": [
-                        39.446332,
-                        -0.380163
-                    ]
-                },
-                "statistics": {
-                    "time": null,
-                    "dist": null
-                }
-            },
-            {
-                "agent": "taxi9",
-                "type": "MOVE-TO-STATION",
-                "attributes": {
                     "station_id": "station4",
                     "station_position": [
                         39.471868,
@@ -8939,18 +8708,6 @@
                 "type": "CHARGE",
                 "attributes": {
                     "station_id": "station2",
-                    "power": 50
-                },
-                "statistics": {
-                    "time": null,
-                    "need": null
-                }
-            },
-            {
-                "agent": "taxi9",
-                "type": "CHARGE",
-                "attributes": {
-                    "station_id": "station3",
                     "power": 50
                 },
                 "statistics": {
@@ -9604,21 +9361,6 @@
                 "agent": "taxi10",
                 "type": "MOVE-TO-STATION",
                 "attributes": {
-                    "station_id": "station3",
-                    "station_position": [
-                        39.446332,
-                        -0.380163
-                    ]
-                },
-                "statistics": {
-                    "time": null,
-                    "dist": null
-                }
-            },
-            {
-                "agent": "taxi10",
-                "type": "MOVE-TO-STATION",
-                "attributes": {
                     "station_id": "station4",
                     "station_position": [
                         39.471868,
@@ -9964,18 +9706,6 @@
                 "type": "CHARGE",
                 "attributes": {
                     "station_id": "station2",
-                    "power": 50
-                },
-                "statistics": {
-                    "time": null,
-                    "need": null
-                }
-            },
-            {
-                "agent": "taxi10",
-                "type": "CHARGE",
-                "attributes": {
-                    "station_id": "station3",
                     "power": 50
                 },
                 "statistics": {

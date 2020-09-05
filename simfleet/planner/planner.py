@@ -4,6 +4,7 @@ Develops a plan for a TransportAgent
 import heapq
 import json
 import math
+import time
 
 from loguru import logger
 
@@ -12,9 +13,10 @@ from simfleet.planner.constants import SPEED, STARTING_FARE, PRICE_PER_kWh, PENA
 from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_expense
 from simfleet.planner.plan import Plan
 
-VERBOSE = 2  # 2, 1 or 0 according to verbosity level
+VERBOSE = 0  # 2, 1 or 0 according to verbosity level
 PRINT_GOALS = False
 PRINT_PLAN = False
+CHARGE_WHEN_NOT_FULL = True
 
 # TODO tenir en compte el nombre de places de l'estació de càrrega
 
@@ -284,7 +286,7 @@ class Planner:
         route = self.routes_dic.get(key)
         if route is None:
             # En el futur, demanar la ruta al OSRM
-            logger.info("ERROR :: There is no route for key \"", key, "\" in the routes_dic")
+            logger.info(f"ERROR :: There is no route for key {key} in the routes_dic")
             exit()
         return route
 
@@ -375,6 +377,9 @@ class Planner:
             logger.critical("ERROR :: There are more nodes after the purge!!!")
 
     def run(self):
+
+        start = time.time()
+
         self.check_prev_plan()
         logger.debug(
             f"Planning to complete a {GOAL_PERCENTAGE * 100}% of the goals: {self.get_number_of_customers() * GOAL_PERCENTAGE:.0f} customers.")
@@ -404,6 +409,7 @@ class Planner:
             if VERBOSE > 0:
                 logger.info(f'\nIteration {i:5d}.')
                 logger.error(f"Open nodes: {len(self.open_nodes)}")
+            if VERBOSE > 1:
                 logger.info(f"{self.open_nodes}")
 
             tup = heapq.heappop(self.open_nodes)
@@ -419,7 +425,8 @@ class Planner:
             self.expanded_nodes += 1
 
             if VERBOSE > 0:
-                logger.info("Node", tup, "popped from the open_nodes")
+                logger.info(f"Node {tup} popped from the open_nodes")
+                logger.info
             if VERBOSE > 1:
                 parent.print_node()
 
@@ -429,6 +436,7 @@ class Planner:
                 # If the last action is a customer service, consider charging
                 # otherwise consider ONLY customer actions (avoids consecutive charging actions)
                 consider_charge = False
+                not_full = False
                 if parent.actions[-1].get('type') == 'MOVE-TO-DEST':
                     consider_charge = True
 
@@ -441,9 +449,18 @@ class Planner:
                 if VERBOSE > 0:
                     logger.info(f'{customer_children:5d} customer children have been created')
 
+                # Add charging consideration when the autonomy is not full
+                if CHARGE_WHEN_NOT_FULL:
+                    if parent.agent_autonomy < self.agent_max_autonomy:
+                        if VERBOSE > 1:
+                            logger.warning(f'Node autonomy {parent.agent_autonomy} < max autonomy {self.agent_max_autonomy}')
+                        not_full = True
+
+                # logger.warning(f'{consider_charge}, {generate_charging}, {CHARGE_WHEN_NOT_FULL}, {not_full}')
+
                 # if we consider charging actions AND during the creation of customer nodes there was a customer
                 # that could not be reached because of autonomy, create charge nodes.
-                if consider_charge and generate_charging:
+                if (consider_charge and generate_charging) or (CHARGE_WHEN_NOT_FULL and not_full):
                     if VERBOSE > 0:
                         logger.info("Generating CHARGE children nodes...")
                     self.create_charge_nodes(parent)
@@ -469,6 +486,8 @@ class Planner:
                 self.max_queue_length = len(self.open_nodes)
 
         # END OF MAIN LOOP
+        end = time.time()
+
         if VERBOSE > 0:
             logger.info(
                 "###################################################################################################")
@@ -494,14 +513,16 @@ class Planner:
                 logger.info(self.plan.to_string_plan())
 
         # Print process statistics
-        if VERBOSE > 0:
-            logger.info("Process statistics:")
-            # Amount of generated nodes
-            logger.info(f'\tGenerated nodes - {self.generated_nodes}')
-            # Amount of expanded nodes
-            logger.info(f'\tExpanded nodes - {self.expanded_nodes}')
-            # Max queue length
-            logger.info(f'\tMax. queue length - {self.max_queue_length}')
+        # if VERBOSE > 0:
+        logger.info("Process statistics:")
+        # Amount of generated nodes
+        logger.info(f'\tGenerated nodes - {self.generated_nodes}')
+        # # Amount of expanded nodes
+        # logger.info(f'\tExpanded nodes - {self.expanded_nodes}')
+        # Max queue length
+        logger.info(f'\tMax. queue length - {self.max_queue_length}')
+
+        logger.debug(f'\tPlanning process time: {end - start}')
 
     def create_customer_nodes(self, parent=None):
 
@@ -686,7 +707,7 @@ if __name__ == '__main__':
 
     config_dic, global_actions, routes_dic = initialize()
 
-    agent_id = 'Bus'
+    agent_id = 'taxi1'
     agent_pos = agent_max_autonomy = None
     for transport in config_dic.get('transports'):
         if transport.get('name') == agent_id:
@@ -701,4 +722,9 @@ if __name__ == '__main__':
                       agent_pos=agent_pos,
                       agent_max_autonomy=agent_max_autonomy,
                       agent_autonomy=agent_autonomy)
+
+    # start = time.time()
     planner.run()
+    # end = time.time()
+    # logger.debug(f'\nPlanning process time: {end-start}')
+

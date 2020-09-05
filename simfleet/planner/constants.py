@@ -10,15 +10,20 @@ STARTING_FARE = 1.45
 PRICE_PER_KM = 1.08  # 0
 PENALTY = 0.1  # 10% of the traveled km
 PRICE_PER_kWh = 0.0615
-GOAL_PERCENTAGE = 1 # 30%
 
-CONFIG_FILE = "configs/3-agent-config.json"
-ACTIONS_FILE = "actions/3-agent-config-actions.json"
-ROUTES_FILE = "routes/3-agent-config-routes.json"
 
-# CONFIG_FILE = "configs/3_planner_config.json"
-# ACTIONS_FILE = "actions/3config-actions.json"
-# ROUTES_FILE = "routes/3config-routes.json"
+# Experimentation - problem 1
+# CONFIG_FILE = "configs/3-agent-config.json"
+# ACTIONS_FILE = "actions/3-agent-config-actions.json"
+# ROUTES_FILE = "routes/3-agent-config-routes.json"
+# GOAL_PERCENTAGE = 1 # 100%
+
+# Experimentation - problem 3
+CONFIG_FILE = "configs/problem3-config.json"
+ACTIONS_FILE = "actions/problem3-actions.json"
+ROUTES_FILE = "routes/problem3-routes.json"
+# 5 taxi, 10 customer, 40% is 4 customers per taxi
+GOAL_PERCENTAGE = 0.4
 
 # CONFIG_FILE = "configs/10taxi-config.json"
 # ACTIONS_FILE = "actions/10config-actions.json"
