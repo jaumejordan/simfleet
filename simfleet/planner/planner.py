@@ -20,7 +20,7 @@ DEBUG = False
 PRINT_GOALS = False
 PRINT_PLAN = False
 CHARGE_WHEN_NOT_FULL = True
-HEURISTIC = True
+HEURISTIC = False
 
 
 # TODO tenir en compte el nombre de places de l'estació de càrrega
@@ -218,6 +218,8 @@ class Planner:
         # Variables to activate and deactivate pruning methods
         self.save_partial_solutions = True
         self.best_solution_prune = True
+        if not HEURISTIC:
+            self.best_solution_prune = False
 
         # Planner statistics
         self.generated_nodes = 0
