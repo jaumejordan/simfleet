@@ -13,6 +13,7 @@ from simfleet.planner.planner import Planner, meters_to_seconds
 
 INITIAL_JOINT_PLAN = False
 
+
 def fill_statistics(action, current_pos=None, current_autonomy=None, agent_max_autonomy=None, routes_dic=None):
     if action.get('type') == 'PICK-UP':
         # distance from transport position to customer origin
@@ -145,8 +146,7 @@ class BestResponse:
         return self.joint_plan.get('individual').get(agent.get('id'))
 
     # Calculates the utility of an individual plan w.r.t. the actions and goals in the Joint plan
-    # TODO extraure calcul de beneficis y costos a una funció externa
-    def evaluate_plan(self, plan):
+    def evaluate_plan(self, plan, initial_plan = False):
         # Benefits
         benefits = 0
         for entry in plan.entries:
@@ -157,8 +157,9 @@ class BestResponse:
                 customer = action.get('attributes').get('customer_id')
                 tup = self.joint_plan.get('table_of_goals').get(customer)
                 # if no one is serving the transport
-                if tup[0] is None:
-                    # if tup is None:
+                if tup[0] is None and initial_plan:
+                    # only accept this as valid when evaluating the initial plans proposed by feasible_joint_plan()
+                    # since they have to be evaluated before updating the joint plan
                     benefits += get_benefit(action)
                 else:
                     serving_transport = tup[0]
@@ -181,6 +182,20 @@ class BestResponse:
             logger.error("THE COSTS ARE HIGHER THAN THE BENEFITS")
 
         return utility
+
+    # Joins the actions of all individual plans and orders them to create the joint plan
+    def extract_joint_plan(self):
+        all_entries = []
+        for transport in self.joint_plan.get('individual').keys():
+            plan = self.joint_plan.get('individual').get(transport)
+            if plan is None:
+                continue
+            for entry in plan.entries:
+                all_entries.append(entry)
+
+        # Order actions by init_time
+        all_entries.sort(key=lambda x: x.init_time)
+        self.joint_plan["joint"] = JointPlan(all_entries)
 
     # Given a transport agent and a plan associated to it, substitutes the agent individual plan with the new plan
     # and modifies the contents of the joint_plan accordingly
@@ -217,20 +232,6 @@ class BestResponse:
             # Input in the table of goals a tuple with the serving transport id and pick-up time
             self.joint_plan['table_of_goals'][customer] = earliest
 
-    # Joins the actions of all individual plans and orders them to create the joint plan
-    def extract_joint_plan(self):
-        all_entries = []
-        for transport in self.joint_plan.get('individual').keys():
-            plan = self.joint_plan.get('individual').get(transport)
-            if plan is None:
-                continue
-            for entry in plan.entries:
-                all_entries.append(entry)
-
-        # Order actions by init_time
-        all_entries.sort(key=lambda x: x.init_time)
-        self.joint_plan["joint"] = JointPlan(all_entries)
-
     # Checks stopping criteria of Best Response algorithm
     def stop(self):
         stop = True
@@ -251,6 +252,7 @@ class BestResponse:
             self.check_update_joint_plan(agent_id, None, new_plan)
 
     def feasible_joint_plan(self):
+        logger.debug(f"Creating an initial feasible plan")
         # Initial list with all customers
         customers = list(self.joint_plan.get("table_of_goals").keys())
         # Number of customers each agent will initially pick up
@@ -296,7 +298,6 @@ class BestResponse:
                     current_time = sum([a.get('statistics').get('time') for a in actions])
 
                 # Extract customer
-
                 customer = goals.pop(0)
                 # customer = goals
                 # Get customer actions
@@ -357,7 +358,7 @@ class BestResponse:
             # end of while loop
             # Create plan with agent action list
             initial_plan = Plan(actions, -1, completed_goals)
-            utility = self.evaluate_plan(initial_plan)
+            utility = self.evaluate_plan(initial_plan, initial_plan=True)
             initial_plan.utility = utility
 
             logger.info(f"Agent {agent.get('id')} initial plan:")
@@ -386,7 +387,6 @@ class BestResponse:
                 logger.warning(f"Agent {agent_id} had its plan utility reduced "
                                f"from {prev_utility:.4f} to {updated_utility:.4f}")
                 # NEW if the utility of the plan had changed, update it in the joint plan
-                # Crec que en un dels dos deuria ser suficient pero bueno
                 prev_plan.utility = updated_utility
                 self.joint_plan["individual"][agent_id].utility = updated_utility
             else:
@@ -422,33 +422,33 @@ class BestResponse:
                     self.update_joint_plan(agent_id, new_plan)
                     logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
                     self.joint_plan["no_change"][agent_id] = False
-                # the planner found the same plan as before (utility of prev plan was positive but planner retuned None)
+
                 # TODO compare plans action by action not just by their utility
-
+                # the planner found the same plan as before (utility of prev plan was positive but planner retuned None)
                 else:
-                    logger.error(
-                        f"Agent {agent_id} could not find any plan"
-                    )
-                    self.update_joint_plan(agent_id, new_plan)
-                    logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
-                    self.joint_plan["no_change"][agent_id] = False
-                    logger.critical("NO DEURIA ENTRAR ACÍ")
                     # logger.error(
-                    #     f"Agent {agent_id} could not find a better plan (it found the same one than in the previous round)")
-                    # self.joint_plan["no_change"][agent_id] = True
+                    #     f"Agent {agent_id} could not find any plan"
+                    # )
+                    # self.update_joint_plan(agent_id, new_plan)
+                    # logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
+                    # self.joint_plan["no_change"][agent_id] = False
+                    # logger.critical("NO DEURIA ENTRAR ACÍ")
+                    logger.error(
+                        f"Agent {agent_id} could not improve its previous plan (it found the same one than in the previous round)")
+                    self.joint_plan["no_change"][agent_id] = True
 
+        # Planner returns something that is not NONE
         else:
-
             new_utility = new_plan.utility
             # if the prev_plan was None (either 1st turn or couldn't find plan last round) accept new plan
             if prev_plan is None:
                 logger.warning(
-                    f"Agent {agent_id} found new plan with utility {new_utility:.4f}")
+                    f"Agent {agent_id} found a plan with utility {new_utility:.4f}")
                 logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
                 self.update_joint_plan(agent_id, new_plan)
                 self.joint_plan["no_change"][agent_id] = False
             # Case 2) Agent finds a new plan that improves its utility
-            elif not new_plan.equals(prev_plan): # != prev_plan.utility:
+            elif not new_plan.equals(prev_plan):  # != prev_plan.utility:
                 logger.warning(
                     f"Agent {agent_id} found new plan with utility {new_utility:.4f}")
                 logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
@@ -456,13 +456,14 @@ class BestResponse:
                 self.joint_plan["no_change"][agent_id] = False
 
                 # Check for loops
-                self.check_loop(agent_id, new_plan)
+                # self.check_loop(agent_id, new_plan)
 
                 # Update list of plans
-                self.update_list_of_plans(agent_id, new_plan)
+                # self.update_list_of_plans(agent_id, new_plan)
 
             # Case 3) Agent finds the same plan it had proposed before
             elif new_plan.equals(prev_plan):
+                logger.critical("NO DEURIA ENTRAR ACÍ")
                 logger.info(
                     f"Agent {agent_id} could not find a better plan (it found the same one than in the previous round)")
                 self.update_joint_plan(agent_id, new_plan)
@@ -525,7 +526,7 @@ class BestResponse:
         # Assign random order
         # random.shuffle(self.agents)
         logger.debug("ATTENTION, NOT RANDOMIZING ORDER")
-        logger.debug(f"Random order {self.agents}")
+        logger.debug(f"Agent order {self.agents}")
 
         # Initialize data structure
         self.init_joint_plan()
@@ -533,12 +534,11 @@ class BestResponse:
         if INITIAL_JOINT_PLAN:
             self.feasible_joint_plan()
             self.print_game_state()
-        # exit(0)
 
         self.create_agents()
 
         game_turn = 0
-        while not self.stop() and game_turn < 3: # 1000
+        while not self.stop() and game_turn < 10000:  # 1000
             game_turn += 1
             logger.info("*************************************************************************")
             logger.info(f"\t\t\t\t\t\t\tBest Response turn {game_turn}")
@@ -563,4 +563,4 @@ if __name__ == '__main__':
     start = time.time()
     br.run()
     end = time.time()
-    logger.debug(f'\tBRPS process time: {end-start}')
+    logger.debug(f'\tBRPS process time: {end - start}')

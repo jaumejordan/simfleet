@@ -14,10 +14,14 @@ from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_
 from simfleet.planner.plan import Plan
 
 VERBOSE = 0  # 2, 1 or 0 according to verbosity level
+
+DEBUG = False
+
 PRINT_GOALS = False
 PRINT_PLAN = False
 CHARGE_WHEN_NOT_FULL = True
 HEURISTIC = True
+
 
 # TODO tenir en compte el nombre de places de l'estació de càrrega
 
@@ -86,6 +90,8 @@ class Node:
     def set_end_time(self):
         self.end_time = sum(a.get('statistics').get('time') for a in self.actions)
 
+    # Given the list of completed goals, which contains tuples (customer_id, pick_up_time),
+    # compiles a list of the served customers' ids.
     def already_served(self):
         res = []
         for tup in self.completed_goals:
@@ -215,11 +221,9 @@ class Planner:
 
         # Planner statistics
         self.generated_nodes = 0
-        self.expanded_nodes = 0
         self.max_queue_length = 0
 
         self.create_table_of_goals()
-
 
     # Reads plan of every agent (joint plan) and fills the corresponding table of goals
     # If the joint plan is empty, creates an entry per customer and initialises its
@@ -295,20 +299,23 @@ class Planner:
         return len(self.config_dic.get('customers'))
 
     def reachable_goal(self, customer_id, pick_up_time):
+        if DEBUG : logger.warning(f'Checking if agent {self.agent_id} can pick-up customer {customer_id} at time { pick_up_time}')
         tup = self.table_of_goals.get(customer_id)
+        if DEBUG : logger.warning(f'Customer {customer_id} is being served by {tup[0]} at time {tup[1]}')
         if tup[0] == self.agent_id:
+            if DEBUG : logger.warning(f'Agent {self.agent_id} CAN pick-up customer {customer_id} because it was already serving it')
             return True
         elif pick_up_time < tup[1]:
+            if DEBUG : logger.warning(f'Agent {self.agent_id} CAN pick-up customer {customer_id} because serves it at time {pick_up_time}')
             return True
-        # if pick_up_time < tup[1]:
-        #     return True
+        if DEBUG : logger.warning(f'Agent {self.agent_id} CAN NOT pick-up customer {customer_id}')
         return False
 
     # Returns the f value of a node
     def evaluate_node(self, node, solution=False):
         # Calculate g value w.r.t Joint plan + node actions
         # taking into account charging congestions (implementar a futur)
-        g = 0
+
         # Benefits
         benefits = 0
         for action in node.actions:
@@ -391,7 +398,10 @@ class Planner:
 
         generate_charging = self.create_customer_nodes()
 
-        if generate_charging:
+        # Generate initial charging nodes if:
+        # 1) A customer was unreachable because of autonomy lack OR
+        # 2) The vehicle autonomy is not full
+        if generate_charging or (CHARGE_WHEN_NOT_FULL and self.agent_autonomy < self.agent_max_autonomy):
             self.create_charge_nodes()
 
         if VERBOSE > 1:
@@ -411,24 +421,25 @@ class Planner:
             if VERBOSE > 0:
                 logger.info(f'\nIteration {i:5d}.')
                 logger.error(f"Open nodes: {len(self.open_nodes)}")
-            if VERBOSE > 1:
-                logger.info(f"{self.open_nodes}")
+            # if VERBOSE > 1:
+                # logger.info(f"{self.open_nodes}")
 
             tup = heapq.heappop(self.open_nodes)
             value = -tup[0]
 
-            if value < self.best_solution_value:
-                if VERBOSE > 0:
-                    logger.info(
-                        f'The node f_value {value:.4f} is lower than the best solution value {self.best_solution_value:.4f}')
-                continue
+
+            if HEURISTIC:
+                # This voids the search without heuristic value
+                if value < self.best_solution_value:
+                    if VERBOSE > 0:
+                        logger.info(
+                            f'The node f_value {value:.4f} is lower than the best solution value {self.best_solution_value:.4f}')
+                    continue
 
             parent = tup[2]
-            self.expanded_nodes += 1
 
             if VERBOSE > 0:
                 logger.info(f"Node {tup} popped from the open_nodes")
-                logger.info
             if VERBOSE > 1:
                 parent.print_node()
 
@@ -455,7 +466,8 @@ class Planner:
                 if CHARGE_WHEN_NOT_FULL:
                     if parent.agent_autonomy < self.agent_max_autonomy:
                         if VERBOSE > 1:
-                            logger.warning(f'Node autonomy {parent.agent_autonomy} < max autonomy {self.agent_max_autonomy}')
+                            logger.warning(
+                                f'Node autonomy {parent.agent_autonomy} < max autonomy {self.agent_max_autonomy}')
                         not_full = True
 
                 # logger.warning(f'{consider_charge}, {generate_charging}, {CHARGE_WHEN_NOT_FULL}, {not_full}')
@@ -498,7 +510,7 @@ class Planner:
                 logger.info(f'{len(self.solution_nodes):5d} solution nodes found')
             else:
                 logger.info(f'{len(self.solution_nodes):5d} solution nodes found (includes partial solutions)')
-            n = 1
+            # n = 1
             # for tup in self.solution_nodes:
             #     logger.info("\nSolution", n)
             #     tup[0].print_node()
@@ -545,6 +557,8 @@ class Planner:
                                     a.get('attributes').get('customer_id') not in parent.already_served()]
 
         for tup in get_customer_couples(pick_up_actions, move_to_dest_actions):
+            customer_to_serve = tup[0].get('attributes').get('customer_id')
+            if DEBUG : logger.info(f'Planing to serve customer {customer_to_serve}')
             if parent is None:
                 node = Node()
                 node.agent_pos = self.agent_pos.copy()
@@ -568,6 +582,7 @@ class Planner:
             # CANVI DE PROVA
             if not self.reachable_goal(customer_id, pick_up_time):
                 # delete node object
+                if DEBUG : logger.info(f'Customer {customer_to_serve} is unreachable because of TIME, deleting the node')
                 del node
                 continue
 
@@ -578,8 +593,11 @@ class Planner:
                 # activate generation of station initial nodes
                 generate_charging = True
                 # delete node object
+                if DEBUG : logger.info(f'Customer {customer_to_serve} is unreachable because of CHARGE, deleting the node')
                 del node
                 continue
+
+            if DEBUG : logger.info(f'Customer {customer_to_serve} is REACHABLE')
 
             # Once the actions are set, calculate node end time
             node.set_end_time()
@@ -596,6 +614,8 @@ class Planner:
             node.completed_goals.append(
                 (node.actions[-1].get('attributes').get('customer_id'), init + pick_up_duration))
 
+            if DEBUG : logger.info(f'Customer {customer_to_serve} picked up at time {init + pick_up_duration}')
+
             # Evaluate node
             value = self.evaluate_node(node)
 
@@ -608,17 +628,28 @@ class Planner:
                     # Push node in the priority queue
                     heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
                     self.generated_nodes += 1
+                    if DEBUG : logger.info(f"Node added to open nodes with value {value}")
+
+                    if self.save_partial_solutions:
+                        self.evaluate_node(node, solution=True)
+                        if DEBUG : logger.info(f"Node saved as a partial solution with value {node.value}")
+                        self.solution_nodes.append((node, node.value))
+                        self.check_update_best_solution(node)
+                else:
+                    if DEBUG : logger.info(f"Node discarded: its value {value} is below best solution value {self.best_solution_value}")
             else:
                 if parent is not None:
                     parent.children.append(node)
                 # Push node in the priority queue
                 heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
                 self.generated_nodes += 1
+                if DEBUG : logger.info(f"Node added to open nodes with value {value}")
 
-            if self.save_partial_solutions:
-                self.evaluate_node(node, solution=True)
-                self.solution_nodes.append((node, node.value))
-                self.check_update_best_solution(node)
+                if self.save_partial_solutions:
+                    self.evaluate_node(node, solution=True)
+                    if DEBUG : logger.info(f"Node saved as a partial solution with value {node.value}")
+                    self.solution_nodes.append((node, node.value))
+                    self.check_update_best_solution(node)
 
         return generate_charging
 
@@ -626,7 +657,6 @@ class Planner:
         dic_file = open(ACTIONS_FILE, "r")
         actions_dic = json.load(dic_file)
         agent_actions = actions_dic.get(self.agent_id)
-        # agent_actions = self.actions_dic.get(self.agent_id)
         move_to_station_actions = agent_actions.get("MOVE-TO-STATION")
         charge_actions = agent_actions.get("CHARGE")
 
@@ -674,7 +704,7 @@ class Planner:
                 self.generated_nodes += 1
 
     def check_update_best_solution(self, node):
-        if self.best_solution_value <= node.value:
+        if self.best_solution_value < node.value:
             if VERBOSE > 1:
                 logger.info(f'The value of the best solution node increased from '
                             f'{self.best_solution_value:.4f} to {node.value:.4f}')
@@ -727,4 +757,3 @@ if __name__ == '__main__':
     planner.run()
     # end = time.time()
     # logger.debug(f'\nPlanning process time: {end-start}')
-
