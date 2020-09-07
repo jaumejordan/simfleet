@@ -25,11 +25,11 @@ ROUTES_FILE = "routes/problem2-routes.json"
 # 3 taxi, 6 customer, 50% is 3 customers per taxi
 GOAL_PERCENTAGE = 1
 
-# Experimentation - problem 3
+#  # Experimentation - problem 3
 # CONFIG_FILE = "configs/problem3-config.json"
 # ACTIONS_FILE = "actions/problem3-actions.json"
 # ROUTES_FILE = "routes/problem3-routes.json"
-# 5 taxi, 10 customer, 40% is 4 customers per taxi
+#  # 5 taxi, 10 customer, 40% is 4 customers per taxi
 # GOAL_PERCENTAGE = 1
 
 # Experimentation - problem 4

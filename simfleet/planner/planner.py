@@ -8,7 +8,7 @@ import time
 
 from loguru import logger
 
-from simfleet.planner.constants import SPEED, STARTING_FARE, PRICE_PER_kWh, PENALTY, PRICE_PER_KM, CONFIG_FILE, \
+from simfleet.planner.constants import SPEED, STARTING_FARE, PRICE_PER_KM, CONFIG_FILE, \
     ACTIONS_FILE, ROUTES_FILE, get_travel_cost, get_charge_cost, get_benefit, GOAL_PERCENTAGE
 from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_expense
 from simfleet.planner.plan import Plan
@@ -20,7 +20,7 @@ DEBUG = False
 PRINT_GOALS = False
 PRINT_PLAN = False
 CHARGE_WHEN_NOT_FULL = True
-HEURISTIC = False
+HEURISTIC = True
 
 
 # TODO tenir en compte el nombre de places de l'estació de càrrega
@@ -28,8 +28,8 @@ HEURISTIC = False
 def meters_to_seconds(distance_in_meters):
     # km/h to m/s
     speed = SPEED / 3.6
-    time = distance_in_meters / speed
-    return time
+    t = distance_in_meters / speed
+    return t
 
 
 # Given two lists of actions, returns the pick_up / move-to-dest tuple for the same customer

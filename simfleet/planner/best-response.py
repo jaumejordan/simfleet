@@ -1,3 +1,4 @@
+import copy
 import json
 import math
 import random
@@ -12,7 +13,7 @@ from simfleet.planner.plan import JointPlan, Plan
 from simfleet.planner.planner import Planner, meters_to_seconds
 
 INITIAL_JOINT_PLAN = False
-
+LOOP_DETECTION = True
 
 def fill_statistics(action, current_pos=None, current_autonomy=None, agent_max_autonomy=None, routes_dic=None):
     if action.get('type') == 'PICK-UP':
@@ -75,6 +76,7 @@ class BestResponse:
         self.joint_plan = None
         self.agents = None
         self.list_of_plans = None
+        self.list_of_togs = []
 
     # Load dictionary data
     def initialize(self):
@@ -146,7 +148,7 @@ class BestResponse:
         return self.joint_plan.get('individual').get(agent.get('id'))
 
     # Calculates the utility of an individual plan w.r.t. the actions and goals in the Joint plan
-    def evaluate_plan(self, plan, initial_plan = False):
+    def evaluate_plan(self, plan, initial_plan=False):
         # Benefits
         benefits = 0
         for entry in plan.entries:
@@ -234,11 +236,33 @@ class BestResponse:
 
     # Checks stopping criteria of Best Response algorithm
     def stop(self):
+
+        stop_by_loop = False
+
+        # if we are detection loops
+        if LOOP_DETECTION:
+            # list to store a boolean indicating if an agent is repeating plans
+            loops_in_agents = []
+            for agent in self.agents:
+                loops_in_agents.append(self.check_loop(agent))
+                logger.debug("\n")
+
+            # if all agents are repeating plans, stop_by_loop is True
+            stop_by_loop = all(loops_in_agents)
+
+            if stop_by_loop:
+                logger.debug("All agents have a loop in their list of plans. Stop by LOOP.")
+
         stop = True
+
         # if no agent changed their plan, stop will be True
         for transport in self.joint_plan.get('no_change').keys():
             stop = stop and self.joint_plan.get('no_change').get(transport)
-        return stop
+
+        if stop:
+            logger.debug("All agents have kept the same plan. Stop by CONVERGENCE")
+
+        return stop or stop_by_loop
 
     def create_initial_plans(self):
         for a in self.agents:
@@ -459,7 +483,8 @@ class BestResponse:
                 # self.check_loop(agent_id, new_plan)
 
                 # Update list of plans
-                # self.update_list_of_plans(agent_id, new_plan)
+                if LOOP_DETECTION:
+                    self.update_list_of_plans(agent_id, new_plan)
 
             # Case 3) Agent finds the same plan it had proposed before
             elif new_plan.equals(prev_plan):
@@ -471,19 +496,31 @@ class BestResponse:
 
     # Keeps an updated list of the last 3 plans
     def update_list_of_plans(self, agent, new_plan):
-        if len(self.list_of_plans[agent]) == 3:
-            self.list_of_plans[agent].pop(0)
-            self.list_of_plans[agent].append(new_plan)
-        else:
-            self.list_of_plans[agent].append(new_plan)
 
-    def check_loop(self, agent, new_plan):
+        self.list_of_plans[agent].append(copy.deepcopy(new_plan))
+
+        if len(self.list_of_plans[agent]) > 6:
+            self.list_of_plans[agent].pop(0)
+
+    def check_loop(self, agent):
+
         detections = 0
-        for plan in self.list_of_plans[agent]:
-            if new_plan.equals(plan):
-                detections += 1
+        agent_id = agent.get('id')
+        # Check for loops in the Table of Goals
+        for i in range(len(self.list_of_plans[agent_id])):
+            for j in range(i + 1, len(self.list_of_plans[agent_id])):
+                if self.list_of_plans[agent_id][i].equals(self.list_of_plans[agent_id][j]):
+                    logger.critical(f'Detected loop in agent {agent_id} plans in indexes {i} and {j}')
+                    detections += 1
+                    plan1 = self.list_of_plans[agent_id][i]
+                    plan2 = self.list_of_plans[agent_id][j]
+                    logger.info(f'Index {i}, plan {plan1.to_string_plan()}')
+                    logger.info(f'Index {j}, plan {plan2.to_string_plan()}')
+
         if detections > 0:
-            logger.error(f"Agent {agent} has {detections} equal plans in the list of previous plans")
+            logger.critical(f"Agent {agent_id} has {detections} pairs of equal plans in the list of previous plans")
+            return True
+        return False
 
     def print_game_state(self):
         # joint_plan = {"no_change": {}, "joint": None, "table_of_goals": {}, "individual": {}}
@@ -524,8 +561,9 @@ class BestResponse:
         self.create_agents()
 
         # Assign random order
-        # random.shuffle(self.agents)
-        logger.debug("ATTENTION, NOT RANDOMIZING ORDER")
+        random.shuffle(self.agents)
+        #logger.debug("ATTENTION, NOT RANDOMIZING ORDER")
+        logger.warning("ATTENTION, RANDOMIZING ORDER")
         logger.debug(f"Agent order {self.agents}")
 
         # Initialize data structure
@@ -534,8 +572,6 @@ class BestResponse:
         if INITIAL_JOINT_PLAN:
             self.feasible_joint_plan()
             self.print_game_state()
-
-        self.create_agents()
 
         game_turn = 0
         while not self.stop() and game_turn < 10000:  # 1000
@@ -554,6 +590,25 @@ class BestResponse:
                     self.propose_plan(a)
 
             self.print_game_state()
+            # # Add ToG to the list
+            # self.list_of_togs.append(self.joint_plan['table_of_goals'].copy())
+            #
+            # # Check for loops in the Table of Goals
+            # for i in range(len(self.list_of_togs)):
+            #     for j in range(i + 1, len(self.list_of_togs)):
+            #         if self.list_of_togs[i] == self.list_of_togs[j]:
+            #             logger.error(f'Detected loop in Table of Goals in indexes {i} and {j}')
+            #             game_turn = 9997
+            #     # if self.list_of_togs[0] == self.list_of_togs[3]:
+            #     #     logger.error(f'Detected loop in Table of Goals every 3 turns')
+            #     #     stop = True
+            #     # elif self.list_of_togs[0] == self.list_of_togs[2]:
+            #     #     logger.error(f'Detected loop in Table of Goals every 2 turns')
+            #     #     stop = True
+            #     logger.info(self.list_of_togs)
+            #
+            # if len(self.list_of_togs) > 6:
+            #     self.list_of_togs.pop(0)
 
         logger.info("END OF GAME")
 
