@@ -17,8 +17,8 @@
             "speed": 2000,
             "fleet": "fleet1@localhost",
             "fleet_type": "taxi",
-            "autonomy": 20,
-            "current_autonomy": 20,
+            "autonomy": 50,
+            "current_autonomy": 50,
             "icon": "taxi"
         },
         {
@@ -31,8 +31,8 @@
             "speed": 2000,
             "fleet": "fleet1@localhost",
             "fleet_type": "taxi",
-            "autonomy": 20,
-            "current_autonomy": 20,
+            "autonomy": 50,
+            "current_autonomy": 50,
             "icon": "taxi"
         },
         {
@@ -45,8 +45,8 @@
             "speed": 2000,
             "fleet": "fleet1@localhost",
             "fleet_type": "taxi",
-            "autonomy": 20,
-            "current_autonomy": 20,
+            "autonomy": 50,
+            "current_autonomy": 50,
             "icon": "taxi"
         },
         {
@@ -59,8 +59,8 @@
             "speed": 2000,
             "fleet": "fleet1@localhost",
             "fleet_type": "taxi",
-            "autonomy": 20,
-            "current_autonomy": 20,
+            "autonomy": 50,
+            "current_autonomy": 50,
             "icon": "taxi"
         },
         {
@@ -73,8 +73,8 @@
             "speed": 2000,
             "fleet": "fleet1@localhost",
             "fleet_type": "taxi",
-            "autonomy": 20,
-            "current_autonomy": 20,
+            "autonomy": 50,
+            "current_autonomy": 50,
             "icon": "taxi"
         }
     ],

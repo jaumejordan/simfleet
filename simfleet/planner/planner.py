@@ -19,7 +19,7 @@ DEBUG = False
 
 PRINT_GOALS = False
 PRINT_PLAN = False
-CHARGE_WHEN_NOT_FULL = True
+CHARGE_WHEN_NOT_FULL = False
 HEURISTIC = True
 
 
@@ -184,7 +184,7 @@ def to_string_table_of_goals(table_of_goals):
 
 class Planner:
     def __init__(self, config_dic, actions_dic, routes_dic, agent_id, agent_pos, agent_max_autonomy, agent_autonomy,
-                 previous_plan=None, joint_plan=None):
+                 previous_plan=None, joint_plan=None, blackboard={}, start_node = None):
 
         # Precalculated routes and actions
         self.config_dic = config_dic
@@ -224,6 +224,12 @@ class Planner:
         # Planner statistics
         self.generated_nodes = 0
         self.max_queue_length = 0
+
+        # Blackboard
+        self.blackboard = blackboard
+
+        # Plan from a specific node
+        self.start_node = start_node
 
         self.create_table_of_goals()
 
@@ -312,6 +318,26 @@ class Planner:
             return True
         if DEBUG : logger.warning(f'Agent {self.agent_id} CAN NOT pick-up customer {customer_id}')
         return False
+
+    # Checks if the current customer pick-up proposal will potentially be stolen by an agent playing in the future
+    def check_blackboard(self, customer_id, pick_up_time):
+        # Get the dictionary with pick-up entries of the customer
+        customer_times = self.blackboard.get(customer_id)
+        # Get all pick-up times of agents that are not me (current agent)
+        other_agent_times = []
+        for agent in customer_times.keys():
+            if agent != self.agent_id:
+                other_agent_times += customer_times[agent]
+
+        if len(other_agent_times) == 0:
+            return True
+
+        # If there is an agent that can reach the goal before me, return False
+        if min(other_agent_times) < pick_up_time:
+            return False
+        # If I have the earliest pick-up, return True
+        return True
+
 
     # Returns the f value of a node
     def evaluate_node(self, node, solution=False):
@@ -588,6 +614,13 @@ class Planner:
                 del node
                 continue
 
+            if len(self.blackboard) > 0 :
+                if not self.check_blackboard(customer_id, pick_up_time):
+                    # delete node object
+                    if DEBUG : logger.info(f'Customer {customer_to_serve} is unreachable because of BLACKBOARD, deleting node')
+                    del node
+                    continue
+
             # Check if there's enough autonomy to do the customer action
             customer_origin = node.actions[-2].get("attributes").get("customer_origin")
             customer_dest = node.actions[-1].get("attributes").get("customer_dest")
@@ -717,6 +750,141 @@ class Planner:
     def extract_plan(self, node):
         self.plan = Plan(node.actions, node.value, node.completed_goals)
 
+    def plan_from_node(self):
+
+        start = time.time()
+
+        logger.debug(f'Planning from node:')
+        self.start_node.print_node()
+
+        self.open_nodes.append((0, 12345, self.start_node))
+
+        if VERBOSE > 1:
+            logger.info(f'{len(self.open_nodes):5d} nodes have been created')
+            logger.info(self.open_nodes)
+
+        # MAIN LOOP
+        if VERBOSE > 1:
+            logger.info(
+                "###################################################################################################")
+            logger.info("Starting MAIN LOOP...")
+
+        i = 0
+        # TODO planifique per a recollir només a un % de customer... (simulacions molt grans)
+        while self.open_nodes:
+            i += 1
+            if VERBOSE > 0:
+                logger.info(f'\nIteration {i:5d}.')
+                logger.error(f"Open nodes: {len(self.open_nodes)}")
+
+            tup = heapq.heappop(self.open_nodes)
+            value = -tup[0]
+
+
+            if HEURISTIC:
+                # This voids the search without heuristic value
+                if value < self.best_solution_value:
+                    if VERBOSE > 0:
+                        logger.info(
+                            f'The node f_value {value:.4f} is lower than the best solution value {self.best_solution_value:.4f}')
+                    continue
+
+            parent = tup[2]
+
+            if VERBOSE > 0:
+                logger.info(f"Node {tup} popped from the open_nodes")
+            if VERBOSE > 1:
+                parent.print_node()
+
+            # if the plan in the node picks up a % of the customers, consider it complete
+            if not len(parent.completed_goals) / self.get_number_of_customers() >= GOAL_PERCENTAGE:
+
+                # If the last action is a customer service, consider charging
+                # otherwise consider ONLY customer actions (avoids consecutive charging actions)
+                consider_charge = False
+                not_full = False
+                if parent.actions[-1].get('type') == 'MOVE-TO-DEST':
+                    consider_charge = True
+
+                if VERBOSE > 0:
+                    logger.info("Generating CUSTOMER children nodes...")
+                # Generate one child node per customer left to serve and return whether some customer could not be
+                # picked up because of autonomy
+                generate_charging = self.create_customer_nodes(parent)
+                customer_children = len(parent.children)
+                if VERBOSE > 0:
+                    logger.info(f'{customer_children:5d} customer children have been created')
+
+                # Add charging consideration when the autonomy is not full
+                if CHARGE_WHEN_NOT_FULL:
+                    if parent.agent_autonomy < self.agent_max_autonomy:
+                        if VERBOSE > 1:
+                            logger.warning(
+                                f'Node autonomy {parent.agent_autonomy} < max autonomy {self.agent_max_autonomy}')
+                        not_full = True
+
+                # if we consider charging actions AND during the creation of customer nodes there was a customer
+                # that could not be reached because of autonomy, create charge nodes.
+                if (consider_charge and generate_charging) or (CHARGE_WHEN_NOT_FULL and not_full):
+                    if VERBOSE > 0:
+                        logger.info("Generating CHARGE children nodes...")
+                    self.create_charge_nodes(parent)
+                    charge_children = len(parent.children) - customer_children
+                    if VERBOSE > 0:
+                        logger.info(f'{charge_children:5d} charge children have been created')
+            else:
+                if VERBOSE > 0:
+                    logger.info("The node completed a % of the total goals")
+
+            # If after this process the node has no children, it is a solution Node
+            if not parent.children:
+                if VERBOSE > 0:
+                    logger.info("The node had no children, so it is a SOLUTION node")
+
+                # Modify node f-value to utility value (h = 0)
+                self.evaluate_node(parent, solution=True)
+                self.solution_nodes.append((parent, parent.value))
+                self.check_update_best_solution(parent)
+
+            # Update max queue length
+            if len(self.open_nodes) > self.max_queue_length:
+                self.max_queue_length = len(self.open_nodes)
+
+        # END OF MAIN LOOP
+        end = time.time()
+
+        if VERBOSE > 0:
+            logger.info(
+                "###################################################################################################")
+            logger.info("\nEnd of MAIN LOOP")
+            if not self.save_partial_solutions:
+                logger.info(f'{len(self.solution_nodes):5d} solution nodes found')
+            else:
+                logger.info(f'{len(self.solution_nodes):5d} solution nodes found (includes partial solutions)')
+
+            if self.best_solution is not None:
+                logger.info("Best solution node:")
+                self.best_solution.print_node()
+
+        # When the process finishes, extract plan from the best solution node
+        # with its corresponding table of goals
+        if self.best_solution is not None:
+            self.extract_plan(self.best_solution)
+            if PRINT_PLAN:
+                logger.info(self.plan.to_string_plan())
+
+        # Print process statistics
+        # if VERBOSE > 0:
+        logger.info("Process statistics:")
+        # Amount of generated nodes
+        logger.info(f'\tGenerated nodes - {self.generated_nodes}')
+        # # Amount of expanded nodes
+        # logger.info(f'\tExpanded nodes - {self.expanded_nodes}')
+        # Max queue length
+        logger.info(f'\tMax. queue length - {self.max_queue_length}')
+
+        logger.debug(f'\tPlanning process time: {end - start}')
+
 
 def initialize():
     try:
@@ -733,7 +901,6 @@ def initialize():
     except Exception as e:
         print(str(e))
         exit()
-
 
 if __name__ == '__main__':
 

@@ -12,8 +12,12 @@ from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_
 from simfleet.planner.plan import JointPlan, Plan
 from simfleet.planner.planner import Planner, meters_to_seconds
 
-INITIAL_JOINT_PLAN = False
+TURNS_TO_RESTART = -1
+INITIAL_JOINT_PLAN = True
 LOOP_DETECTION = True
+BLACKBOARD = True
+CONSIDER_PREV_PLAN = False
+
 
 def fill_statistics(action, current_pos=None, current_autonomy=None, agent_max_autonomy=None, routes_dic=None):
     if action.get('type') == 'PICK-UP':
@@ -77,6 +81,8 @@ class BestResponse:
         self.agents = None
         self.list_of_plans = None
         self.list_of_togs = []
+        self.blackboard = {}
+        self.best_prev_plan = {}
 
     # Load dictionary data
     def initialize(self):
@@ -108,6 +114,8 @@ class BestResponse:
             }
             agents.append(agent_dic)
             self.list_of_plans[agent_id] = []
+            self.best_prev_plan[agent_id] = (0, None)
+
         self.agents = agents
 
         logger.debug(f"Agents loaded {self.agents}")
@@ -128,6 +136,15 @@ class BestResponse:
             customer_id = customer.get('name')
             self.joint_plan["table_of_goals"][customer_id] = (None, math.inf)
 
+    def init_blackboard(self):
+        # Create one entry per customer
+        for customer in self.config_dic.get("customers"):
+            customer_id = customer.get('name')
+            self.blackboard[customer_id] = {}
+            for a in self.agents:
+                agent_id = a.get('id')
+                self.blackboard[customer_id][agent_id] = []
+
     # Given a transport agent, creates its associated Planner object
     def create_planner(self, agent):
         # prev_plan = self.joint_plan.get('individual').get(agent.get('id'))
@@ -136,7 +153,7 @@ class BestResponse:
                                 agent_pos=agent.get('initial_position'),
                                 agent_max_autonomy=agent.get('max_autonomy'),
                                 agent_autonomy=agent.get('current_autonomy'),
-                                previous_plan=None, joint_plan=self.joint_plan)
+                                previous_plan=None, joint_plan=self.joint_plan, blackboard=self.blackboard)
         return agent_planner
 
     # Returns true if the transport agent has an individual plan in the joint plan
@@ -233,6 +250,48 @@ class BestResponse:
             earliest = min(aux.get(customer), key=lambda x: x[1])
             # Input in the table of goals a tuple with the serving transport id and pick-up time
             self.joint_plan['table_of_goals'][customer] = earliest
+
+    def update_blackboard(self):
+        # Copy non-existent entries from the Table of Goals to the blackboard
+        for customer in self.joint_plan["table_of_goals"].keys():
+
+            tuple = self.joint_plan["table_of_goals"][customer]
+            agent = tuple[0]
+            pick_up_time = tuple[1]
+
+            if agent is not None:
+                # versió que manté totes les entrades per cada agent
+                if pick_up_time not in self.blackboard.get(customer).get(agent):
+                    self.blackboard[customer][agent].append(pick_up_time)
+                self.blackboard[customer][agent].sort()
+
+    def update_blackboard_limited(self, limit=3):
+        # Copy non-existent entries from the Table of Goals to the blackboard
+        for customer in self.joint_plan["table_of_goals"].keys():
+
+            tuple = self.joint_plan["table_of_goals"][customer]
+            agent = tuple[0]
+            pick_up_time = tuple[1]
+
+            if agent is not None:
+                # versió que manté totes les entrades per cada agent
+                if pick_up_time not in self.blackboard.get(customer).get(agent):
+                    self.blackboard[customer][agent].append(pick_up_time)
+
+                if len(self.blackboard[customer][agent]) > limit:
+                    self.blackboard[customer][agent].pop(0)
+
+    def update_blackboard_joint_plan(self):
+
+        for entry in self.joint_plan.get("joint").entries:
+            action = entry.action
+            if action.get('type') == 'PICK-UP':
+                agent = action.get('agent')
+                customer = action.get('attributes').get('customer_id')
+                pick_up_time = entry.end_time
+                if pick_up_time not in self.blackboard.get(customer).get(agent):
+                    self.blackboard[customer][agent].append(pick_up_time)
+                    self.blackboard[customer][agent].sort()
 
     # Checks stopping criteria of Best Response algorithm
     def stop(self):
@@ -413,14 +472,34 @@ class BestResponse:
                 # NEW if the utility of the plan had changed, update it in the joint plan
                 prev_plan.utility = updated_utility
                 self.joint_plan["individual"][agent_id].utility = updated_utility
+
             else:
                 logger.info(f"The utility of agent's {agent_id} plan has not changed")
+
+            if CONSIDER_PREV_PLAN:
+                if self.best_prev_plan[agent_id][1] is not None and prev_plan.equals(self.best_prev_plan[agent_id][1]) \
+                    and updated_utility != self.best_prev_plan[agent_id][0]:
+                    logger.critical(
+                        f"The previous best plan had its utility updated. {self.best_prev_plan[agent_id][0]} -> {updated_utility}")
+                    self.best_prev_plan[agent_id] = (updated_utility, copy.deepcopy(prev_plan))
+
+                elif updated_utility > self.best_prev_plan[agent_id][0]:
+                    logger.critical(
+                        f"The previous best plan of the agent has changed. {self.best_prev_plan[agent_id][0]} < {updated_utility}")
+                    self.best_prev_plan[agent_id] = (updated_utility, copy.deepcopy(prev_plan))
 
         # Propose new plan as best response to joint plan
         logger.info("Searching for new plan proposal...")
         planner = self.create_planner(a)
         planner.run()
         new_plan = planner.plan
+
+        # If the new plan has lower utility than the best previous plan, propose the best previous plan again
+        if CONSIDER_PREV_PLAN and new_plan is not None:
+            if new_plan.utility < self.best_prev_plan[agent_id][0]:
+                logger.critical(f"The utility of the new plan {new_plan.utility} is lower than the updated utility of "
+                                f"the best previous plan {self.best_prev_plan[agent_id][0]}. Proposing old plan instead.")
+                new_plan = copy.deepcopy(self.best_prev_plan[agent_id][1])
         # NEW
         self.check_update_joint_plan(agent_id, prev_plan, new_plan)
 
@@ -514,8 +593,8 @@ class BestResponse:
                     detections += 1
                     plan1 = self.list_of_plans[agent_id][i]
                     plan2 = self.list_of_plans[agent_id][j]
-                    logger.info(f'Index {i}, plan {plan1.to_string_plan()}')
-                    logger.info(f'Index {j}, plan {plan2.to_string_plan()}')
+                    # logger.info(f'Index {i}, plan {plan1.to_string_plan()}')
+                    # logger.info(f'Index {j}, plan {plan2.to_string_plan()}')
 
         if detections > 0:
             logger.critical(f"Agent {agent_id} has {detections} pairs of equal plans in the list of previous plans")
@@ -552,7 +631,40 @@ class BestResponse:
         for agent in self.joint_plan.get('no_change').keys():
             logger.debug(f"{agent:20s} : {self.joint_plan.get('no_change').get(agent)}")
 
+        if BLACKBOARD:
+            logger.debug("\n")
+            logger.debug("Blackboard:")
+            for customer in self.blackboard.keys():
+                logger.debug(f"{customer:20s} :")
+                for agent in self.blackboard.get(customer).keys():
+                    logger.debug(f"\t{agent:20s} : {self.blackboard.get(customer).get(agent)}")
+
         logger.debug("#########################################################################")
+
+    def obtain_best_plans(self):
+        # Read dictionary data
+        self.initialize()
+        # Create players
+        self.create_agents()
+        # Initialize data structure
+        self.init_joint_plan()
+        # Create initial plans from scratch
+        for agent in self.agents:
+            agent_id = agent.get('id')
+            logger.info(f"Agent \'{agent_id}\''s turn")
+            logger.info("-------------------------------------------------------------------------")
+            logger.info(f"Creating first plan for agent {agent_id}")
+            # prev_plan = self.joint_plan.get('individual').get(agent.get('id'))
+            agent_planner = Planner(self.config_dic, self.actions_dic, self.routes_dic,
+                                    agent_id=agent.get('id'),
+                                    agent_pos=agent.get('initial_position'),
+                                    agent_max_autonomy=agent.get('max_autonomy'),
+                                    agent_autonomy=agent.get('current_autonomy'),
+                                    previous_plan=None, joint_plan={}, blackboard={})
+            agent_planner.run()
+            new_plan = agent_planner.plan
+            logger.info(new_plan.to_string_plan())
+            # self.check_update_joint_plan(agent_id, None, new_plan)
 
     def run(self):
         # Read dictionary data
@@ -561,20 +673,25 @@ class BestResponse:
         self.create_agents()
 
         # Assign random order
-        random.shuffle(self.agents)
-        #logger.debug("ATTENTION, NOT RANDOMIZING ORDER")
+        # random.shuffle(self.agents)
+        # logger.debug("ATTENTION, NOT RANDOMIZING ORDER")
         logger.warning("ATTENTION, RANDOMIZING ORDER")
         logger.debug(f"Agent order {self.agents}")
 
         # Initialize data structure
         self.init_joint_plan()
 
+        if BLACKBOARD:
+            self.init_blackboard()
+
         if INITIAL_JOINT_PLAN:
             self.feasible_joint_plan()
             self.print_game_state()
 
         game_turn = 0
-        while not self.stop() and game_turn < 10000:  # 1000
+        i = 0
+        while not self.stop() and game_turn < 1000:  # 1000
+            i += 1
             game_turn += 1
             logger.info("*************************************************************************")
             logger.info(f"\t\t\t\t\t\t\tBest Response turn {game_turn}")
@@ -588,8 +705,14 @@ class BestResponse:
             if game_turn > 1:
                 for a in self.agents:
                     self.propose_plan(a)
-
+            if BLACKBOARD:
+                self.update_blackboard()
             self.print_game_state()
+
+            if i == TURNS_TO_RESTART:
+                i = 0
+                logger.debug("Restarting Blackboard")
+                self.init_blackboard()
             # # Add ToG to the list
             # self.list_of_togs.append(self.joint_plan['table_of_goals'].copy())
             #
@@ -617,5 +740,6 @@ if __name__ == '__main__':
     br = BestResponse()
     start = time.time()
     br.run()
+    # br.obtain_best_plans()
     end = time.time()
     logger.debug(f'\tBRPS process time: {end - start}')
