@@ -18,7 +18,7 @@
             "password": "secret",
             "name": "Bus",
             "autonomy": 30,
-            "current_autonomy": 10,
+            "current_autonomy": 1,
             "icon": "bus"
         },
         {
@@ -32,7 +32,7 @@
             "password": "secret",
             "name": "Poli",
             "autonomy": 30,
-            "current_autonomy": 30,
+            "current_autonomy": 5,
             "icon": "police"
         },
         {
@@ -46,7 +46,7 @@
             "password": "secret",
             "name": "Taxi",
             "autonomy": 30,
-            "current_autonomy": 30,
+            "current_autonomy": 2,
             "icon": "taxi"
         }
     ],

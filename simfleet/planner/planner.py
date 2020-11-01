@@ -4,12 +4,13 @@ Develops a plan for a TransportAgent
 import heapq
 import json
 import math
+import random
 import time
 
 from loguru import logger
 
 from simfleet.planner.constants import SPEED, STARTING_FARE, PRICE_PER_KM, CONFIG_FILE, \
-    ACTIONS_FILE, ROUTES_FILE, get_travel_cost, get_charge_cost, get_benefit, GOAL_PERCENTAGE
+    ACTIONS_FILE, ROUTES_FILE, get_travel_cost, get_charge_cost, get_benefit, TIME_PENALTY
 from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_expense
 from simfleet.planner.plan import Plan
 
@@ -19,8 +20,8 @@ DEBUG = False
 
 PRINT_GOALS = False
 PRINT_PLAN = False
-CHARGE_WHEN_NOT_FULL = False
-HEURISTIC = True
+CHARGE_WHEN_NOT_FULL = True
+HEURISTIC = False
 
 
 # TODO tenir en compte el nombre de places de l'estació de càrrega
@@ -33,6 +34,7 @@ def meters_to_seconds(distance_in_meters):
 
 
 # Given two lists of actions, returns the pick_up / move-to-dest tuple for the same customer
+# TODO modify for fixed goals
 def get_customer_couples(pick_up_actions, move_to_dest_actions):
     res = []
     for a in pick_up_actions[:]:
@@ -44,6 +46,7 @@ def get_customer_couples(pick_up_actions, move_to_dest_actions):
 
 
 # Given two lists of actions, returns the move-to-station / charge tuple for the same station
+# TODO modify for only n closer stations
 def get_station_couples(move_to_station_actions, charge_actions):
     res = []
     for a in move_to_station_actions:
@@ -68,8 +71,14 @@ class Node:
             # Node planner-related attributes
             self.init_time = 0.0
             self.actions = []
-            #   completed goals: list with names of already served customers
+
+            # Llista customers de l'agent + llista d'atesos
+            # New: list with names of customers assigned to the agent
+            self.agent_goals = []
+            # List with names of already served customers
             self.completed_goals = []
+
+            # Llista customers atesos + Llista de customers per atendre
 
         # If there is parent, inherit attributes
         else:
@@ -78,6 +87,8 @@ class Node:
             self.agent_autonomy = parent.agent_autonomy  # .copy()
             self.init_time = parent.end_time  # .copy()
             self.actions = parent.actions[:]  # .copy()
+            # New
+            self.agent_goals = parent.agent_goals[:]  # .copy()
             self.completed_goals = parent.completed_goals[:]  # .copy()
 
         # Independent values for every node
@@ -110,13 +121,14 @@ class Node:
             if a == self.actions[-1]:
                 action_string = action_string[:-2]
         logger.info(
-            f'(\n\tagent_position:\t{self.agent_pos}\n'
-            f'\tagent_autonomy:\t{self.agent_autonomy}\n'
+            f'(\n\tagent position:\t{self.agent_pos}\n'
+            f'\tagent autonomy:\t{self.agent_autonomy}\n'
             f'\tactions:\t[{action_string}]\n'
-            f'\tinit_time:\t{self.init_time:.4f}\n'
-            f'\tend_time:\t{self.end_time:.4f}\n'
+            f'\tinit time:\t{self.init_time:.4f}\n'
+            f'\tend time:\t{self.end_time:.4f}\n'
             f'\tvalue:\t{self.value:.4f}\n'
-            f'\tcompleted_goals:\t{self.completed_goals}\n'
+            f'\tagent goals:\t{self.agent_goals}\n'
+            f'\tcompleted goals:\t{self.completed_goals}\n'
             f'\thas parent?:\t{self.parent is not None}\n'
             f'\thas children?:\t{len(self.children)}\t)'
         )
@@ -132,6 +144,7 @@ class Node:
             f'\tinit_time:\t{self.init_time:.4f}\n'
             f'\tend_time:\t{self.end_time:.4f}\n'
             f'\tvalue:\t{self.value:.4f}\n'
+            f'\tagent goals:\t{self.agent_goals}\n'
             f'\tcompleted_goals:\t{self.completed_goals}\n'
             f'\thas parent?:\t{self.parent is not None}\n'
             f'\thas children?:\t{len(self.children)}\t)'
@@ -184,7 +197,7 @@ def to_string_table_of_goals(table_of_goals):
 
 class Planner:
     def __init__(self, config_dic, actions_dic, routes_dic, agent_id, agent_pos, agent_max_autonomy, agent_autonomy,
-                 previous_plan=None, joint_plan=None, blackboard={}, start_node = None):
+                 agent_goals, previous_plan=None, joint_plan=None, start_node=None):
 
         # Precalculated routes and actions
         self.config_dic = config_dic
@@ -196,6 +209,8 @@ class Planner:
         self.agent_pos = agent_pos
         self.agent_max_autonomy = agent_max_autonomy
         self.agent_autonomy = agent_autonomy
+        # New
+        self.agent_goals = agent_goals
 
         # Table of goals
         self.table_of_goals = {}
@@ -225,9 +240,6 @@ class Planner:
         self.generated_nodes = 0
         self.max_queue_length = 0
 
-        # Blackboard
-        self.blackboard = blackboard
-
         # Plan from a specific node
         self.start_node = start_node
 
@@ -253,7 +265,64 @@ class Planner:
                 f"Initial table of goals: {to_string_table_of_goals(self.table_of_goals)}")  # \n{self.table_of_goals}")
             # print_table_of_goals(self.table_of_goals)
 
-    def fill_statistics(self, action, current_pos=None, current_autonomy=None):
+    def get_station_places(self, station_name):
+        for station in self.config_dic.get('stations'):
+            if station.get('name') == station_name:
+                return station.get("places")
+
+    def check_available_poles(self, agent, station, at_station):
+        c = 0
+        # NO TENIR EN COMPTE AGENTS REPETITS ??
+        for usage in self.joint_plan.get('station_usage').get(station):
+            if usage.get('agent') != agent and usage.get('inv') != 'INV':
+                # A place is occupied when the agent arrives at the station (at_station time) if there are agents
+                # that have started charging before the agent arrived and will finish after the agent arrived
+                if usage.get('init_charge') < at_station < usage.get('end_charge'):
+                    c += 1
+
+        return self.get_station_places(station) - c
+
+    # Returns list of agents who are charging or will charge before the current agent does and a boolean indicating
+    # if the agents in that list is higher than the number of places in the station. If so, there is a queue.
+    def check_station_queue(self, agent, station, at_station):
+        queue = []
+        # Get agents that arrived to the station before at_station time, and will finish charging after at_station time
+        for usage in self.joint_plan.get('station_usage').get(station):
+            if usage.get('agent') != agent and usage.get('inv') != 'INV':
+                if usage.get('at_station') < at_station < usage.get('end_charge'):
+                    queue.append(usage)
+
+        queue.sort(key=lambda x: x.get('at_station'))
+
+        return queue, len(queue) > self.get_station_places(station)
+
+    # Returns a list with station usages which start before init_time and end after init_time
+    def get_usages_interval(self, agent, station, init_time, expected_end_time):
+        res = []
+        for usage in self.joint_plan.get('station_usage').get(station):
+            if usage.get('agent') is not agent:
+                # if it starts at the same time as me
+                if usage.get('init') == init_time:
+                    # if they finish before I do, consider them in front of me
+                    if usage.get('end') < expected_end_time:
+                        res.append(usage)
+                    # if they finish after I do, I go first
+                    elif usage.get('end') > expected_end_time:
+                        pass
+                    # if they finish exactly at the same time I do
+                    else:
+                        if random.random() > 0.5:
+                            # they go first
+                            res.append(usage)
+                        else:
+                            # I go first
+                            pass
+                # if they start before I do and finish after I have started
+                elif usage.get('init') < init_time < usage.get('end'):
+                    res.append(usage)
+        return res
+
+    def fill_statistics(self, action, current_pos=None, current_autonomy=None, current_time=None):
         if action.get('type') == 'PICK-UP':
             # distance from transport position to customer origin
             p1 = current_pos
@@ -285,9 +354,72 @@ class Planner:
             action['statistics']['time'] = time
 
         elif action.get('type') == 'CHARGE':
+
+            # Get variables
+            agent = action.get('agent')
+            station = action.get('attributes').get('station_id')
+
+            # 1. Compute charging time. The charge action will finish at the end of the charging time if there are
+            # free places at the station
             need = self.agent_max_autonomy - current_autonomy
-            total_time = need / action.get('attributes').get('power')
-            # time to complete the charge
+            charging_time = need / action.get('attributes').get('power')
+
+            # 2. Check if there will be a free place to charge at the arrival to the station
+            available_poles = self.check_available_poles(agent, station, current_time)
+            if VERBOSE > 0:
+                logger.info(
+                    f"Evaluating charge action of agent {agent} in station {station} at time {current_time:.4f}")
+                logger.info(f"There are {available_poles} available poles")
+            #   2.2 If there is not, compute waiting time, add it to charging time to compute total time
+            if available_poles == 0:
+                queue, check = self.check_station_queue(agent, station, current_time)
+                if VERBOSE > 0:
+                    logger.info(f"There are {len(queue)} agents in front of {agent}")
+                # Get que last X agents of the queue which are in front of you, where X is the number of stations
+                # if check, there are more agents in front of me than places in the station
+                if check:
+                    # keep only last X to arrive
+                    queue = queue[-self.get_station_places(station):]
+                # if not check, there are as many agents in front of me as places in the station
+                end_times = [x.get('end_charge') for x in queue]
+                # Get charge init time
+                init_charge = min(end_times)
+                # end_charge = init_charge + charging_time
+                # Compute waiting time
+                waiting_time = init_charge - current_time
+                if VERBOSE > 0:
+                    logger.info(
+                        f"Agent {agent} will begin charging at time {init_charge:.4f} after waiting {waiting_time:.4f} seconds")
+            elif available_poles < 0:
+                logger.critical(f"Error computing available poles: {available_poles} at time {current_time}")
+                logger.debug("\n")
+                logger.debug("Station usage:")
+                for station in self.joint_plan.get('station_usage').keys():
+                    if len(self.joint_plan.get('station_usage').get(station)) == 0:
+                        logger.debug(f"{station:20s} : []")
+                    else:
+                        logger.debug(f"{station:20s} : [")
+                        for usage in self.joint_plan.get('station_usage').get(station):
+                            logger.debug(f"\t{usage.get('agent'):10s}, {usage.get('at_station'):.4f}, "
+                                         f"{usage.get('init_charge'):.4f}, {usage.get('end_charge'):.4f}, "
+                                         f"{usage.get('inv')}")
+                        logger.debug("] \n")
+            # if there are available poles
+            else:
+                init_charge = current_time
+                waiting_time = 0
+                if VERBOSE > 0:
+                    logger.info(f"There are available places")
+                    logger.info(
+                        f"Agent {agent} will begin charging at time {init_charge:.4f} after waiting {waiting_time:.4f} seconds")
+
+            # Write times
+            #   arrival at the station
+            action['statistics']['at_station'] = current_time
+            #   begin charging
+            action['statistics']['init_charge'] = init_charge
+            #   total time
+            total_time = charging_time + waiting_time
             action['statistics']['time'] = total_time
             # amount (of something) to charge
             action['statistics']['need'] = need
@@ -307,37 +439,20 @@ class Planner:
         return len(self.config_dic.get('customers'))
 
     def reachable_goal(self, customer_id, pick_up_time):
-        if DEBUG : logger.warning(f'Checking if agent {self.agent_id} can pick-up customer {customer_id} at time { pick_up_time}')
+        if DEBUG: logger.warning(
+            f'Checking if agent {self.agent_id} can pick-up customer {customer_id} at time {pick_up_time}')
         tup = self.table_of_goals.get(customer_id)
-        if DEBUG : logger.warning(f'Customer {customer_id} is being served by {tup[0]} at time {tup[1]}')
+        if DEBUG: logger.warning(f'Customer {customer_id} is being served by {tup[0]} at time {tup[1]}')
         if tup[0] == self.agent_id:
-            if DEBUG : logger.warning(f'Agent {self.agent_id} CAN pick-up customer {customer_id} because it was already serving it')
+            if DEBUG: logger.warning(
+                f'Agent {self.agent_id} CAN pick-up customer {customer_id} because it was already serving it')
             return True
         elif pick_up_time < tup[1]:
-            if DEBUG : logger.warning(f'Agent {self.agent_id} CAN pick-up customer {customer_id} because serves it at time {pick_up_time}')
+            if DEBUG: logger.warning(
+                f'Agent {self.agent_id} CAN pick-up customer {customer_id} because serves it at time {pick_up_time}')
             return True
-        if DEBUG : logger.warning(f'Agent {self.agent_id} CAN NOT pick-up customer {customer_id}')
+        if DEBUG: logger.warning(f'Agent {self.agent_id} CAN NOT pick-up customer {customer_id}')
         return False
-
-    # Checks if the current customer pick-up proposal will potentially be stolen by an agent playing in the future
-    def check_blackboard(self, customer_id, pick_up_time):
-        # Get the dictionary with pick-up entries of the customer
-        customer_times = self.blackboard.get(customer_id)
-        # Get all pick-up times of agents that are not me (current agent)
-        other_agent_times = []
-        for agent in customer_times.keys():
-            if agent != self.agent_id:
-                other_agent_times += customer_times[agent]
-
-        if len(other_agent_times) == 0:
-            return True
-
-        # If there is an agent that can reach the goal before me, return False
-        if min(other_agent_times) < pick_up_time:
-            return False
-        # If I have the earliest pick-up, return True
-        return True
-
 
     # Returns the f value of a node
     def evaluate_node(self, node, solution=False):
@@ -356,10 +471,23 @@ class Planner:
             if action.get('type') != 'CHARGE':
                 # i f action.get('type') not in ['MOVE-TO-STATION', 'CHARGE']:
                 costs += get_travel_cost(action)
+                if action.get('inv') == 'INV':
+                    costs *= 10
             # For actions that entail charging, pay for the charged electricity
             # TODO price increase if congestion (implementar a futur)
             else:
                 costs += get_charge_cost(action)
+
+            if action.get('type') == 'PICK-UP':
+                customer = action.get('attributes').get('customer_id')
+                for tup in node.completed_goals:
+                    if tup[0] == customer:
+                        pick_up = tup
+                        break
+
+                # Add waiting time to costs
+                costs += pick_up[1] * TIME_PENALTY
+
         # Utility (or g value) = benefits - costs
         g = benefits - costs
 
@@ -374,6 +502,7 @@ class Planner:
         node.value = f_value
         return f_value
 
+    # TODO adapt for the use of fixed goals
     def get_h_value(self, node):
         h = 0
         for key in self.table_of_goals.keys():
@@ -398,6 +527,7 @@ class Planner:
                     self.best_solution_value = self.joint_plan["individual"][self.agent_id].utility
                     logger.warning(f"Using {self.best_solution_value} as lower bound for plan utility")
 
+    # TODO not in use, consider deletion
     def purge_open_nodes(self):
         init_len = len(self.open_nodes)
         self.open_nodes = [x for x in self.open_nodes if -1 * x[0] > self.best_solution_value]
@@ -418,8 +548,7 @@ class Planner:
         start = time.time()
 
         self.check_prev_plan()
-        logger.debug(
-            f"Planning to complete a {GOAL_PERCENTAGE * 100}% of the goals: {self.get_number_of_customers() * GOAL_PERCENTAGE:.0f} customers.")
+
         # CREATION OF INITIAL NODES
         if VERBOSE > 1:
             logger.info("Creating initial nodes...")
@@ -443,18 +572,16 @@ class Planner:
             logger.info("Starting MAIN LOOP...")
 
         i = 0
-        # TODO planifique per a recollir només a un % de customer... (simulacions molt grans)
         while self.open_nodes:
             i += 1
             if VERBOSE > 0:
                 logger.info(f'\nIteration {i:5d}.')
                 logger.error(f"Open nodes: {len(self.open_nodes)}")
             # if VERBOSE > 1:
-                # logger.info(f"{self.open_nodes}")
+            # logger.info(f"{self.open_nodes}")
 
             tup = heapq.heappop(self.open_nodes)
             value = -tup[0]
-
 
             if HEURISTIC:
                 # This voids the search without heuristic value
@@ -471,47 +598,41 @@ class Planner:
             if VERBOSE > 1:
                 parent.print_node()
 
-            # if the plan in the node picks up a % of the customers, consider it complete
-            if not len(parent.completed_goals) / self.get_number_of_customers() >= GOAL_PERCENTAGE:
+            # If the last action is a customer service, consider charging
+            # otherwise consider ONLY customer actions (avoids consecutive charging actions)
+            consider_charge = False
+            not_full = False
+            if parent.actions[-1].get('type') == 'MOVE-TO-DEST':
+                consider_charge = True
 
-                # If the last action is a customer service, consider charging
-                # otherwise consider ONLY customer actions (avoids consecutive charging actions)
-                consider_charge = False
-                not_full = False
-                if parent.actions[-1].get('type') == 'MOVE-TO-DEST':
-                    consider_charge = True
+            if VERBOSE > 0:
+                logger.info("Generating CUSTOMER children nodes...")
+            # Generate one child node per customer left to serve and return whether some customer could not be
+            # picked up because of autonomy
+            generate_charging = self.create_customer_nodes(parent)
+            customer_children = len(parent.children)
+            if VERBOSE > 0:
+                logger.info(f'{customer_children:5d} customer children have been created')
 
+            # Add charging consideration when the autonomy is not full
+            if CHARGE_WHEN_NOT_FULL:
+                if parent.agent_autonomy < self.agent_max_autonomy:
+                    if VERBOSE > 1:
+                        logger.warning(
+                            f'Node autonomy {parent.agent_autonomy} < max autonomy {self.agent_max_autonomy}')
+                    not_full = True
+
+            # logger.warning(f'{consider_charge}, {generate_charging}, {CHARGE_WHEN_NOT_FULL}, {not_full}')
+
+            # if we consider charging actions AND during the creation of customer nodes there was a customer
+            # that could not be reached because of autonomy, create charge nodes.
+            if (consider_charge and generate_charging) or (CHARGE_WHEN_NOT_FULL and not_full):
                 if VERBOSE > 0:
-                    logger.info("Generating CUSTOMER children nodes...")
-                # Generate one child node per customer left to serve and return whether some customer could not be
-                # picked up because of autonomy
-                generate_charging = self.create_customer_nodes(parent)
-                customer_children = len(parent.children)
+                    logger.info("Generating CHARGE children nodes...")
+                self.create_charge_nodes(parent)
+                charge_children = len(parent.children) - customer_children
                 if VERBOSE > 0:
-                    logger.info(f'{customer_children:5d} customer children have been created')
-
-                # Add charging consideration when the autonomy is not full
-                if CHARGE_WHEN_NOT_FULL:
-                    if parent.agent_autonomy < self.agent_max_autonomy:
-                        if VERBOSE > 1:
-                            logger.warning(
-                                f'Node autonomy {parent.agent_autonomy} < max autonomy {self.agent_max_autonomy}')
-                        not_full = True
-
-                # logger.warning(f'{consider_charge}, {generate_charging}, {CHARGE_WHEN_NOT_FULL}, {not_full}')
-
-                # if we consider charging actions AND during the creation of customer nodes there was a customer
-                # that could not be reached because of autonomy, create charge nodes.
-                if (consider_charge and generate_charging) or (CHARGE_WHEN_NOT_FULL and not_full):
-                    if VERBOSE > 0:
-                        logger.info("Generating CHARGE children nodes...")
-                    self.create_charge_nodes(parent)
-                    charge_children = len(parent.children) - customer_children
-                    if VERBOSE > 0:
-                        logger.info(f'{charge_children:5d} charge children have been created')
-            else:
-                if VERBOSE > 0:
-                    logger.info("The node completed a % of the total goals")
+                    logger.info(f'{charge_children:5d} charge children have been created')
 
             # If after this process the node has no children, it is a solution Node
             if not parent.children:
@@ -559,13 +680,12 @@ class Planner:
         logger.info("Process statistics:")
         # Amount of generated nodes
         logger.info(f'\tGenerated nodes - {self.generated_nodes}')
-        # # Amount of expanded nodes
-        # logger.info(f'\tExpanded nodes - {self.expanded_nodes}')
         # Max queue length
         logger.info(f'\tMax. queue length - {self.max_queue_length}')
 
         logger.debug(f'\tPlanning process time: {end - start}')
 
+    # TODO modify for fixed goals
     def create_customer_nodes(self, parent=None):
 
         dic_file = open(ACTIONS_FILE, "r")
@@ -577,6 +697,12 @@ class Planner:
         move_to_dest_actions = agent_actions.get("MOVE-TO-DEST")
         generate_charging = False
 
+        # Remove customers not assigned to the agent
+        pick_up_actions = [a for a in pick_up_actions if
+                           a.get('attributes').get('customer_id') in self.agent_goals]
+        move_to_dest_actions = [a for a in move_to_dest_actions if
+                                a.get('attributes').get('customer_id') in self.agent_goals]
+
         # Remove served customers from actions
         if parent is not None:
             pick_up_actions = [a for a in pick_up_actions if
@@ -586,11 +712,12 @@ class Planner:
 
         for tup in get_customer_couples(pick_up_actions, move_to_dest_actions):
             customer_to_serve = tup[0].get('attributes').get('customer_id')
-            if DEBUG : logger.info(f'Planing to serve customer {customer_to_serve}')
+            if DEBUG: logger.info(f'Planing to serve customer {customer_to_serve}')
             if parent is None:
                 node = Node()
                 node.agent_pos = self.agent_pos.copy()
                 node.agent_autonomy = self.agent_autonomy
+                node.agent_goals = self.agent_goals
             else:
                 node = Node(parent)
 
@@ -610,16 +737,9 @@ class Planner:
             # CANVI DE PROVA
             if not self.reachable_goal(customer_id, pick_up_time):
                 # delete node object
-                if DEBUG : logger.info(f'Customer {customer_to_serve} is unreachable because of TIME, deleting the node')
+                if DEBUG: logger.info(f'Customer {customer_to_serve} is unreachable because of TIME, deleting the node')
                 del node
                 continue
-
-            if len(self.blackboard) > 0 :
-                if not self.check_blackboard(customer_id, pick_up_time):
-                    # delete node object
-                    if DEBUG : logger.info(f'Customer {customer_to_serve} is unreachable because of BLACKBOARD, deleting node')
-                    del node
-                    continue
 
             # Check if there's enough autonomy to do the customer action
             customer_origin = node.actions[-2].get("attributes").get("customer_origin")
@@ -628,11 +748,12 @@ class Planner:
                 # activate generation of station initial nodes
                 generate_charging = True
                 # delete node object
-                if DEBUG : logger.info(f'Customer {customer_to_serve} is unreachable because of CHARGE, deleting the node')
+                if DEBUG: logger.info(
+                    f'Customer {customer_to_serve} is unreachable because of CHARGE, deleting the node')
                 del node
                 continue
 
-            if DEBUG : logger.info(f'Customer {customer_to_serve} is REACHABLE')
+            if DEBUG: logger.info(f'Customer {customer_to_serve} is REACHABLE')
 
             # Once the actions are set, calculate node end time
             node.set_end_time()
@@ -649,7 +770,7 @@ class Planner:
             node.completed_goals.append(
                 (node.actions[-1].get('attributes').get('customer_id'), init + pick_up_duration))
 
-            if DEBUG : logger.info(f'Customer {customer_to_serve} picked up at time {init + pick_up_duration}')
+            if DEBUG: logger.info(f'Customer {customer_to_serve} picked up at time {init + pick_up_duration}')
 
             # Evaluate node
             value = self.evaluate_node(node)
@@ -663,26 +784,27 @@ class Planner:
                     # Push node in the priority queue
                     heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
                     self.generated_nodes += 1
-                    if DEBUG : logger.info(f"Node added to open nodes with value {value}")
+                    if DEBUG: logger.info(f"Node added to open nodes with value {value}")
 
                     if self.save_partial_solutions:
                         self.evaluate_node(node, solution=True)
-                        if DEBUG : logger.info(f"Node saved as a partial solution with value {node.value}")
+                        if DEBUG: logger.info(f"Node saved as a partial solution with value {node.value}")
                         self.solution_nodes.append((node, node.value))
                         self.check_update_best_solution(node)
                 else:
-                    if DEBUG : logger.info(f"Node discarded: its value {value} is below best solution value {self.best_solution_value}")
+                    if DEBUG: logger.info(
+                        f"Node discarded: its value {value} is below best solution value {self.best_solution_value}")
             else:
                 if parent is not None:
                     parent.children.append(node)
                 # Push node in the priority queue
                 heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
                 self.generated_nodes += 1
-                if DEBUG : logger.info(f"Node added to open nodes with value {value}")
+                if DEBUG: logger.info(f"Node added to open nodes with value {value}")
 
                 if self.save_partial_solutions:
                     self.evaluate_node(node, solution=True)
-                    if DEBUG : logger.info(f"Node saved as a partial solution with value {node.value}")
+                    if DEBUG: logger.info(f"Node saved as a partial solution with value {node.value}")
                     self.solution_nodes.append((node, node.value))
                     self.check_update_best_solution(node)
 
@@ -700,15 +822,18 @@ class Planner:
                 node = Node()
                 node.agent_pos = self.agent_pos
                 node.agent_autonomy = self.agent_autonomy
+                current_time = 0
             else:
                 node = Node(parent)
+                current_time = parent.end_time
 
             # Fill actions statistics
             action1 = tup[0].copy()
             action2 = tup[1].copy()
             #  Calculates the time and distance according to agent's current pos/autonomy
             action1 = self.fill_statistics(action1, current_pos=node.agent_pos)
-            action2 = self.fill_statistics(action2, current_autonomy=node.agent_autonomy)
+            current_time += action1.get('statistics').get('time')
+            action2 = self.fill_statistics(action2, current_autonomy=node.agent_autonomy, current_time=current_time)
 
             node.actions += [action1, action2]
 
@@ -779,7 +904,6 @@ class Planner:
 
             tup = heapq.heappop(self.open_nodes)
             value = -tup[0]
-
 
             if HEURISTIC:
                 # This voids the search without heuristic value
@@ -902,6 +1026,7 @@ def initialize():
         print(str(e))
         exit()
 
+
 if __name__ == '__main__':
 
     config_dic, global_actions, routes_dic = initialize()
@@ -913,14 +1038,33 @@ if __name__ == '__main__':
             agent_pos = transport.get('position')
             agent_max_autonomy = transport.get('autonomy')
             agent_autonomy = transport.get('current_autonomy')
-    # actions_dic, routes_dic, agent_id, agent_pos, agent_autonomy, joint_plan=None):
+    agent_goals = ['customer1', 'customer2', 'customer3', 'customer4']
     planner = Planner(config_dic=config_dic,
                       actions_dic=global_actions,
                       routes_dic=routes_dic,
                       agent_id=agent_id,
                       agent_pos=agent_pos,
                       agent_max_autonomy=agent_max_autonomy,
-                      agent_autonomy=agent_autonomy)
+                      agent_autonomy=agent_autonomy,
+                      agent_goals=agent_goals,
+                      joint_plan={
+                          "station_usage": {
+                              'station1': [],
+                              'station2': [],
+                              'station3': [],
+                          },
+                          "no_change": {},
+                          "joint": None,
+                          "table_of_goals": {
+                              'customer1': (None, math.inf),
+                              'customer2': (None, math.inf),
+                              'customer3': (None, math.inf),
+                              'customer4': (None, math.inf),
+                          },
+                          "individual": {
+                              'taxi1': None
+                          }
+                      })
 
     # start = time.time()
     planner.run()

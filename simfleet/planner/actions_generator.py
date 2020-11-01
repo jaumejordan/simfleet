@@ -36,7 +36,7 @@ import sys
 from generators_utils import has_enough_autonomy, calculate_km_expense
 
 from simfleet.helpers import distance_in_meters
-from simfleet.utils import request_route_to_server
+#from simfleet.utils import request_route_to_server
 
 config_dic = {}
 global_actions = {}
@@ -387,15 +387,15 @@ def print_transport_actions(transport):
         "==========================================================================================================================================================================================================")
 
 
-async def test_route_calc():
-    for key in global_actions.keys():
-        for action in global_actions.get(key).get("CUSTOMER"):
-            origin = action.get("attributes").get("customer_origin")
-            destination = action.get("attributes").get("customer_dest")
-            path, distance, duration = await request_route_to_server(origin, destination, ROUTE_HOST)
-            print("Path", len(path))
-            print("Distance", distance)
-            print("Duration", duration, "\n")
+# async def test_route_calc():
+#     for key in global_actions.keys():
+#         for action in global_actions.get(key).get("CUSTOMER"):
+#             origin = action.get("attributes").get("customer_origin")
+#             destination = action.get("attributes").get("customer_dest")
+#             path, distance, duration = await request_route_to_server(origin, destination, ROUTE_HOST)
+#             print("Path", len(path))
+#             print("Distance", distance)
+#             print("Duration", duration, "\n")
 
 
 #######################################################################################################################
@@ -418,7 +418,7 @@ if __name__ == '__main__':
     config_file = str(sys.argv[1])
     if len(sys.argv) > 2:
         # output_file_name = str(sys.argv[2])
-        output_file_name = "actions/problem5-actions.json"
+        output_file_name = "actions/last-execution.json"
         print("Output file name will be: ", output_file_name)
 
     config_dic = load_config(config_file)
