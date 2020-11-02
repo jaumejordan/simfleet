@@ -270,6 +270,14 @@ class Planner:
             if station.get('name') == station_name:
                 return station.get("places")
 
+    def check_simultaneous_charge(self, agent, station, at_station):
+        for usage in self.joint_plan.get('station_usage').get(station):
+            if usage.get('agent') != agent and usage.get('inv') != 'INV':
+                if usage.get('at_station') == at_station:
+                    logger.critical(f"Found simultaneous charge among agents {usage.get('agent')} and {agent}")
+                    return True
+        return False
+
     def check_available_poles(self, agent, station, at_station):
         c = 0
         # DEFINIR QUE FER PER A QUAN DOS AGENTS ARRIBEN A LA VEGADA
@@ -364,6 +372,11 @@ class Planner:
             # free places at the station
             need = self.agent_max_autonomy - current_autonomy
             charging_time = need / action.get('attributes').get('power')
+
+            # Nou check per veure si hi ha algú que està arribant exactament a la vegada que jo; si això passara,
+            # m'incremente el meu temps d'arribada, recalcule els meus temps i torne a fer les comprovacions
+            if self.check_simultaneous_charge(agent, station, current_time):
+                current_time += 0.001
 
             # 2. Check if there will be a free place to charge at the arrival to the station
             available_poles = self.check_available_poles(agent, station, current_time)
