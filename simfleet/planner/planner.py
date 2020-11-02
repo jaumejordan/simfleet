@@ -272,7 +272,7 @@ class Planner:
 
     def check_available_poles(self, agent, station, at_station):
         c = 0
-        # NO TENIR EN COMPTE AGENTS REPETITS ??
+        # DEFINIR QUE FER PER A QUAN DOS AGENTS ARRIBEN A LA VEGADA
         for usage in self.joint_plan.get('station_usage').get(station):
             if usage.get('agent') != agent and usage.get('inv') != 'INV':
                 # A place is occupied when the agent arrives at the station (at_station time) if there are agents
@@ -285,6 +285,7 @@ class Planner:
     # Returns list of agents who are charging or will charge before the current agent does and a boolean indicating
     # if the agents in that list is higher than the number of places in the station. If so, there is a queue.
     def check_station_queue(self, agent, station, at_station):
+        # DEFINIR QUE FER PER A QUAN DOS AGENTS ARRIBEN A LA VEGADA
         queue = []
         # Get agents that arrived to the station before at_station time, and will finish charging after at_station time
         for usage in self.joint_plan.get('station_usage').get(station):

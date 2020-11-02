@@ -392,6 +392,19 @@ class BestResponse:
                         'end_charge'):
                         c += 1
                         logger.critical("increasing counter")
+                    # comencem a carregar alhora però l'altre acaba més tard que jo comence
+                    elif other_agent.get('init_charge') == current_agent.get('init_charge') < other_agent.get('end_charge'):
+                        # if the starting times are the same, current agent will only be invalid
+                        # if other agent arrived before them
+                        if other_agent.get('at_station') < current_agent.get('at_station'):
+                            c += 1
+                        elif other_agent.get('at_station') == current_agent.get('at_station'):
+                            logger.critical(f"Both agents arrive at the station at the same time and start "
+                                            f"charging at the same time, the sistem does not know which one to flag"
+                                            f"as INVALID. \n{other_agent}\n{current_agent}")
+                            c += 1
+                            # marcar com a invàlid un dels dos agents amb probabilitat del 50%
+
 
                 if c >= self.get_station_places(station):
                     # current_agent's usage is invalid
@@ -640,8 +653,8 @@ class BestResponse:
                     logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
                     self.joint_plan["no_change"][agent_id] = False
 
-                # TODO compare plans action by action not just by their utility
                 # the planner found the same plan as before (utility of prev plan was positive but planner retuned None)
+                # Case 3) Agent finds the same plan it had proposed before
                 else:
                     # logger.error(
                     #     f"Agent {agent_id} could not find any plan"
