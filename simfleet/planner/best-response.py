@@ -256,11 +256,11 @@ class BestResponse:
                 if tup[0] is None and initial_plan:
                     # only accept this as valid when evaluating the initial plans proposed by feasible_joint_plan()
                     # since they have to be evaluated before updating the joint plan
-                    benefits += get_benefit(action)
+                    benefits += get_benefit(action) + 1000
                 else:
                     serving_transport = tup[0]
                     if serving_transport == plan_owner:
-                        benefits += get_benefit(action)
+                        benefits += get_benefit(action) + 1000
         # Costs
         costs = 0
         for entry in plan.entries:
@@ -288,8 +288,9 @@ class BestResponse:
 
         # Utility (or g value) = benefits - costs
         utility = benefits - costs
-        if utility < 0:
-            logger.error("THE COSTS ARE HIGHER THAN THE BENEFITS")
+
+        # if utility < 0:
+        #    logger.error("THE COSTS ARE HIGHER THAN THE BENEFITS")
 
         return utility
 
@@ -383,32 +384,32 @@ class BestResponse:
             usage_list = self.joint_plan.get('station_usage').get(station)
             for current_agent in usage_list:
                 c = 0
-                logger.critical(f"\nagent is {current_agent}")
+                # logger.critical(f"\nagent is {current_agent}")
                 # Compare usage against all other usages which are not itself and are not invalid
                 for other_agent in [x for x in usage_list if x.get('agent') != current_agent.get('agent')
                                                              and x.get('inv') is None]:
-                    logger.critical(f"other agent is {other_agent}")
+                    # logger.critical(f"other agent is {other_agent}")
                     if other_agent.get('init_charge') < current_agent.get('init_charge') < other_agent.get(
                         'end_charge'):
                         c += 1
-                        logger.critical("increasing counter")
+                        # logger.critical("increasing counter")
                     # comencem a carregar alhora però l'altre acaba més tard que jo comence
-                    elif other_agent.get('init_charge') == current_agent.get('init_charge') < other_agent.get('end_charge'):
+                    elif other_agent.get('init_charge') == current_agent.get('init_charge') < other_agent.get(
+                        'end_charge'):
                         # if the starting times are the same, current agent will only be invalid
                         # if other agent arrived before them
                         if other_agent.get('at_station') < current_agent.get('at_station'):
                             c += 1
                         elif other_agent.get('at_station') == current_agent.get('at_station'):
-                            logger.critical(f"Both agents arrive at the station at the same time and start "
-                                            f"charging at the same time, the sistem does not know which one to flag"
-                                            f"as INVALID. \n{other_agent}\n{current_agent}")
+                            # logger.critical(f"Both agents arrive at the station at the same time and start "
+                            #               f"charging at the same time, the sistem does not know which one to flag"
+                            #                f"as INVALID. \n{other_agent}\n{current_agent}")
                             c += 1
                             # marcar com a invàlid un dels dos agents amb probabilitat del 50%
 
-
                 if c >= self.get_station_places(station):
                     # current_agent's usage is invalid
-                    logger.critical(f'INVALID {current_agent}')
+                    # logger.critical(f'INVALID {current_agent}')
                     current_agent['inv'] = 'INV'
                     # To mark it as invalid:
                     #   Go to current_agent's plan, look for the appropriate charge action and flag it
@@ -431,7 +432,7 @@ class BestResponse:
             loops_in_agents = []
             for agent in self.agents:
                 loops_in_agents.append(self.check_loop(agent))
-                logger.debug("\n")
+                # logger.debug("\n")
 
             # if all agents are repeating plans, stop_by_loop is True
             stop_by_loop = all(loops_in_agents)

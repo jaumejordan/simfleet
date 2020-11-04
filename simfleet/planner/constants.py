@@ -10,7 +10,8 @@ STARTING_FARE = 5
 PRICE_PER_KM = 1.08  # 0
 TRAVEL_PENALTY = 0.1  # 10% of the traveled km
 PRICE_PER_kWh = 0.0615
-TIME_PENALTY = 0.1
+TIME_PENALTY = 1
+MAX_STATION_DIST = 2000 # maximum distance to a station to consider it a place to charge
 
 
 # ##Experimentation - problem 1
@@ -33,18 +34,18 @@ TIME_PENALTY = 0.1
 #  # 5 taxi, 10 customer, 40% is 4 customers per taxi
 
 
-# Experimentation - problem 4
-CONFIG_FILE = "configs/problem4-config.json"
-ACTIONS_FILE = "actions/problem4-actions.json"
-ROUTES_FILE = "routes/problem4-routes.json"
-# 10 taxi, 30 customer, 30% is 9 customers per taxi, 20% is 6 per taxi
+# # Experimentation - problem 4
+# CONFIG_FILE = "configs/problem4-config.json"
+# ACTIONS_FILE = "actions/problem4-actions.json"
+# ROUTES_FILE = "routes/problem4-routes.json"
+# # 10 taxi, 30 customer, 30% is 9 customers per taxi, 20% is 6 per taxi
 
 
-#  # Experimentation - problem 5
-# CONFIG_FILE = "configs/problem5-config.json"
-# ACTIONS_FILE = "actions/problem5-actions.json"
-# ROUTES_FILE = "routes/problem5-routes.json"
-#  # 20 taxi, 60 customer, 20% is 12 customers per taxi, 10% is 6 per taxi
+ # Experimentation - problem 5
+CONFIG_FILE = "configs/problem5-config.json"
+ACTIONS_FILE = "actions/problem5-actions.json"
+ROUTES_FILE = "routes/problem5-routes.json"
+ # 20 taxi, 60 customer, 20% is 12 customers per taxi, 10% is 6 per taxi
 
 # CONFIG_FILE = "configs/10taxi-config.json"
 # ACTIONS_FILE = "actions/10config-actions.json"

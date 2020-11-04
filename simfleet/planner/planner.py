@@ -10,7 +10,7 @@ import time
 from loguru import logger
 
 from simfleet.planner.constants import SPEED, STARTING_FARE, PRICE_PER_KM, CONFIG_FILE, \
-    ACTIONS_FILE, ROUTES_FILE, get_travel_cost, get_charge_cost, get_benefit, TIME_PENALTY
+    ACTIONS_FILE, ROUTES_FILE, get_travel_cost, get_charge_cost, get_benefit, TIME_PENALTY, MAX_STATION_DIST
 from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_expense
 from simfleet.planner.plan import Plan
 
@@ -274,7 +274,7 @@ class Planner:
         for usage in self.joint_plan.get('station_usage').get(station):
             if usage.get('agent') != agent and usage.get('inv') != 'INV':
                 if usage.get('at_station') == at_station:
-                    logger.critical(f"Found simultaneous charge among agents {usage.get('agent')} and {agent}")
+                    logger.warning(f"Found simultaneous charge among agents {usage.get('agent')} and {agent}")
                     return True
         return False
 
@@ -477,7 +477,7 @@ class Planner:
         benefits = 0
         for action in node.actions:
             if action.get('type') == 'MOVE-TO-DEST':
-                benefits += get_benefit(action)
+                benefits += get_benefit(action) + 1000
         # Costs
         costs = 0
         for action in node.actions:
@@ -831,7 +831,27 @@ class Planner:
         move_to_station_actions = agent_actions.get("MOVE-TO-STATION")
         charge_actions = agent_actions.get("CHARGE")
 
-        for tup in get_station_couples(move_to_station_actions, charge_actions):
+        # Filter stations to consider only those within a distance of 2km
+        max_dist = MAX_STATION_DIST
+        if parent is None:
+            agent_pos = self.agent_pos
+        else:
+            agent_pos = parent.agent_pos
+
+        filtered_move_actions = []
+        filtered_stations = []
+        while len(filtered_move_actions) == 0:
+            for a in move_to_station_actions:
+                route = self.get_route(agent_pos, a.get('attributes').get('station_position'))
+                if route.get('distance') <= max_dist:
+                    filtered_move_actions.append(a.copy())
+                    filtered_stations.append(a.get('attributes').get('station_id'))
+            max_dist += 250
+
+        filtered_charge_actions = [a for a in charge_actions if a.get('attributes').get('station_id') in filtered_stations]
+
+        # for tup in get_station_couples(move_to_station_actions, charge_actions):
+        for tup in get_station_couples(filtered_move_actions, filtered_charge_actions):
             if parent is None:
                 node = Node()
                 node.agent_pos = self.agent_pos
