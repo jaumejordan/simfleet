@@ -7,7 +7,8 @@ import time
 from loguru import logger
 
 from simfleet.planner.constants import CONFIG_FILE, ACTIONS_FILE, \
-    ROUTES_FILE, get_benefit, get_travel_cost, get_charge_cost, TIME_PENALTY
+    ROUTES_FILE, TIME_PENALTY, INVALID_CHARGE_PENALTY
+from simfleet.planner.evaluator import evaluate_plan_2, get_benefit, get_travel_cost, get_charge_cost
 from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_expense
 from simfleet.planner.plan import JointPlan, Plan
 from simfleet.planner.planner import Planner, meters_to_seconds
@@ -273,7 +274,7 @@ class BestResponse:
             else:
                 costs += get_charge_cost(action)
                 if action.get('inv') == 'INV':
-                    costs *= 10
+                    costs *= INVALID_CHARGE_PENALTY
 
             if action.get('type') == 'PICK-UP':
                 customer = action.get('attributes').get('customer_id')
@@ -510,6 +511,9 @@ class BestResponse:
 
                 # Extract customer
                 customer = goals.pop(0)
+
+                # Extract customer smart
+
                 # customer = goals
                 # Get customer actions
                 action1 = [a for a in pick_up_actions if a.get('attributes').get('customer_id') == customer]
@@ -569,7 +573,9 @@ class BestResponse:
             # end of while loop
             # Create plan with agent action list
             initial_plan = Plan(actions, -1, completed_goals)
-            utility = self.evaluate_plan(initial_plan, initial_plan=True)
+            # CANVI
+            utility = evaluate_plan_2(initial_plan, self.joint_plan)
+            #utility = self.evaluate_plan(initial_plan, initial_plan=True)
             initial_plan.utility = utility
 
             logger.info(f"Agent {agent.get('id')} initial plan:")
@@ -593,7 +599,9 @@ class BestResponse:
             # Get previous plan utility
             prev_utility = prev_plan.utility
             # Calculate updated utility w.r.t. other agent's plans
-            updated_utility = self.evaluate_plan(prev_plan)
+            # CANVI
+            updated_utility = evaluate_plan_2(prev_plan, self.joint_plan)
+            # updated_utility = self.evaluate_plan(prev_plan)
             if prev_utility != updated_utility:
                 logger.warning(f"Agent {agent_id} had its plan utility reduced "
                                f"from {prev_utility:.4f} to {updated_utility:.4f}")
