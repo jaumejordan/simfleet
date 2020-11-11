@@ -2,8 +2,11 @@ from loguru import logger
 import numpy as np
 
 
-def get_electric_grid(station):
-    return 1
+def get_electric_grid(station, power_grids):
+    for i in power_grids.keys():
+        if station in power_grids[i]:
+            return i
+
 
 # electric_grids = {
 #     1: [station1, ...]
@@ -22,15 +25,21 @@ def get_electric_grid(station):
 #     inv: None/INV
 #     }
 
-def check_charge_congestion(u1, original_cost, station_usage):
+def check_charge_congestion(u1, station, original_cost, joint_plan):
+    station_usage = joint_plan.get('station_usage')
+    power_grids = joint_plan.get('power_grids')
     # Compare if current usage overlaps with any other usage
     congestion_time = 0
-    u1_grid = get_electric_grid(u1.get('station'))
+    current_grid = get_electric_grid(station, power_grids)
+
     # Compare against charges in stations of the same grid
-    same_grid_stations = [x for x in station_usage if get_electric_grid(x.get('station')) == u1_grid]
+    same_grid_charges = []
+    for same_grid_station in power_grids.get(current_grid):
+        same_grid_charges.append(station_usage.get(same_grid_station))
+
     # Save individual congestion percentages
     overlaps = np.ndarray([0])
-    for u2 in same_grid_stations:
+    for u2 in same_grid_charges:
         if u2.get('inv') is None and u2.get('agent') != u1.get('agent'):  # you can't overlap with yourself
             ov = overlap(u1, u2)
             if ov > 0:
@@ -47,9 +56,14 @@ def check_charge_congestion(u1, original_cost, station_usage):
                 overlaps = np.append(overlaps, [congestion_percentage])
 
     # Capacitat de la xarxa abans de congestionar-se
-    if len(overlaps) > u1_grid.capacitat:
+    if len(overlaps) + 1 > 3:  # TODO canviar per la capacitat del grid
         mean_congestion = overlaps.mean()
-        return charge_congestion_function(u1_grid, original_cost, mean_congestion)
+        logger.info(
+            f"The charge of agent {u1.get('agent')} in station {station} causes a congestion of {mean_congestion * 100:.2f}%")
+        return charge_congestion_function(current_grid, original_cost, mean_congestion)
+    else:
+        logger.info(f"No congestion, overlaps are {len(overlaps)} + 1 when limit is 3")
+        return original_cost
 
 
 # increment en percentatges
@@ -58,9 +72,9 @@ def charge_congestion_function(grid, cost, mean_congestion):
     if mean_congestion <= 0.3:
         new_cost = cost + mean_congestion * cost
     elif 0.3 < mean_congestion <= 0.7:
-        new_cost = 2*cost
+        new_cost = 2 * cost
     else:
-        new_cost = 5*cost
+        new_cost = pow(cost,3)
     return new_cost
 
 

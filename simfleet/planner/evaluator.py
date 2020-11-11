@@ -1,3 +1,4 @@
+from simfleet.planner.congestion import check_charge_congestion
 from simfleet.planner.constants import STARTING_FARE, PRICE_PER_KM, TRAVEL_PENALTY, PRICE_PER_kWh, TIME_PENALTY, \
     INVALID_CHARGE_PENALTY, HEURISTIC
 from loguru import logger
@@ -128,7 +129,7 @@ def compute_benefits(action_list):
 
 # Action_list must be node.actions or plan.entries
 # table of goals must be list of tuples or dictionary
-def compute_costs(action_list, table_of_goals):
+def compute_costs(action_list, table_of_goals, joint_plan):
     costs = 0
     for action in action_list:
         # For actions that entail a movement, pay a penalty per km (10%)
@@ -137,9 +138,33 @@ def compute_costs(action_list, table_of_goals):
 
         # For actions that entail charging, pay for the charged electricity
         else:
-            costs += get_charge_cost(action)
+            charge_cost = get_charge_cost(action)
+            # costs += get_charge_cost(action)
             if action.get('inv') == 'INV':
                 costs *= INVALID_CHARGE_PENALTY
+            else:
+                # Create station usage from action
+                agent = action.get('agent')
+                station = action.get('attributes').get('station_id')
+                at_station = action.get('statistics').get('at_station')
+                init_charge = action.get('statistics').get('init_charge')
+                end_time = at_station + action.get('statistics').get('time')
+                inv = action.get('inv')
+                usage = {
+                    'agent': agent,
+                    'at_station': at_station,
+                    'init_charge': init_charge,
+                    'end_charge': end_time,
+                    'inv': inv
+                }
+
+                congestion_cost = check_charge_congestion(usage, station, charge_cost, joint_plan)
+
+                if charge_cost != congestion_cost:
+                    logger.warning(f"Charging cost incremented by congestion from {charge_cost} to {congestion_cost}")
+                    costs += congestion_cost
+                else:
+                    costs += charge_cost
 
         # For actions that pick up a customer, add waiting time as a cost
         if action.get('type') == 'PICK-UP':
@@ -165,9 +190,9 @@ def get_h_value(node):
     return -1
 
 
-def evaluate_node_2(node, solution=False):
+def evaluate_node_2(node, joint_plan, solution=False):
     benefits = compute_benefits(node.actions)
-    costs = compute_costs(node.actions, node.completed_goals)
+    costs = compute_costs(node.actions, node.completed_goals, joint_plan)
 
     # Utility (or g value) = benefits - costs
     g = benefits - costs
@@ -188,7 +213,7 @@ def evaluate_plan_2(plan, joint_plan):
     action_list = [entry.action for entry in plan.entries]
 
     benefits = compute_benefits(action_list)
-    costs = compute_costs(action_list, joint_plan.get('table_of_goals'))
+    costs = compute_costs(action_list, joint_plan.get('table_of_goals'), joint_plan)
 
     # Utility (or g value) = benefits - costs
     utility = benefits - costs

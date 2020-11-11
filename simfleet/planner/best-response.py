@@ -133,6 +133,7 @@ class BestResponse:
         self.list_of_togs = []
         self.best_prev_plan = {}
         self.station_usage = {}
+        self.power_grids = {1:[]}
 
     # Load dictionary data
     def initialize(self):
@@ -201,6 +202,20 @@ class BestResponse:
         for station in self.config_dic.get('stations'):
             self.station_usage[station.get('name')] = []
 
+    def init_power_grids(self):
+        for station in self.config_dic.get('stations'):
+            # if the station is assigned to a grid
+            if station.get('power_grid') is not None:
+                # if the grid already exists, update its list of stations
+                if self.power_grids.get(station.get('power_grid')) is not None:
+                    self.power_grids[station.get('power_grid')].append(station.get('name'))
+                # if not, create the grid and add the station
+                else:
+                    self.power_grids[station.get('power_grid')] = [station.get('name')]
+            # if there is no grid indicated, add it to grid 1 (global grid)
+            else:
+                self.power_grids[1].append(station.get('name'))
+
     # Prepares the data structure to store the Joint plan
     def init_joint_plan(self):
         # Initialize joint plan to None
@@ -220,7 +235,9 @@ class BestResponse:
             self.joint_plan["table_of_goals"][customer_id] = (None, math.inf)
 
         self.init_station_usage()
+        self.init_power_grids()
         self.joint_plan["station_usage"] = self.station_usage
+        self.joint_plan["power_grids"] = self.power_grids
 
     # Given a transport agent, creates its associated Planner object
     def create_planner(self, agent):

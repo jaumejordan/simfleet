@@ -656,7 +656,7 @@ class Planner:
 
                 # Modify node f-value to utility value (h = 0)
                 # CANVI
-                evaluate_node_2(parent, solution=True)
+                evaluate_node_2(parent, self.joint_plan, solution=True)
                 # self.evaluate_node(parent, solution=True)
                 self.solution_nodes.append((parent, parent.value))
                 self.check_update_best_solution(parent)
@@ -791,9 +791,8 @@ class Planner:
 
             # Evaluate node
             # CANVI
-            value = evaluate_node_2(node)
+            value = evaluate_node_2(node, self.joint_plan)
             # value = self.evaluate_node(node)
-
             if self.best_solution_prune:
                 # If the value is higher than best solution value, add node to open_nodes
                 if value > self.best_solution_value:
@@ -807,7 +806,7 @@ class Planner:
 
                     if self.save_partial_solutions:
                         # CANVI
-                        evaluate_node_2(node, solution=True)
+                        evaluate_node_2(node, self.joint_plan, solution=True)
                         #self.evaluate_node(node, solution=True)
                         if DEBUG: logger.info(f"Node saved as a partial solution with value {node.value}")
                         self.solution_nodes.append((node, node.value))
@@ -825,7 +824,7 @@ class Planner:
 
                 if self.save_partial_solutions:
                     # CANVI
-                    evaluate_node_2(node, solution=True)
+                    evaluate_node_2(node, self.joint_plan, solution=True)
                     # self.evaluate_node(node, solution=True)
                     if DEBUG: logger.info(f"Node saved as a partial solution with value {node.value}")
                     self.solution_nodes.append((node, node.value))
@@ -889,7 +888,7 @@ class Planner:
 
             # Evaluate node
             # CANVI
-            value = evaluate_node_2(node)
+            value = evaluate_node_2(node, self.joint_plan)
             # value = self.evaluate_node(node)
 
             if self.best_solution_prune:
@@ -1012,7 +1011,7 @@ class Planner:
 
                 # Modify node f-value to utility value (h = 0)
                 # CANVI
-                evaluate_node_2(parent, solution=True)
+                evaluate_node_2(parent, self.joint_plan, solution=True)
                 # self.evaluate_node(parent, solution=True)
                 self.solution_nodes.append((parent, parent.value))
                 self.check_update_best_solution(parent)
