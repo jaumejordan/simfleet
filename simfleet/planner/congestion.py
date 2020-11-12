@@ -35,21 +35,30 @@ def check_charge_congestion(u1, station, original_cost, joint_plan):
     # Compare against charges in stations of the same grid
     same_grid_charges = []
     for same_grid_station in power_grids.get(current_grid):
-        same_grid_charges.append(station_usage.get(same_grid_station))
+        for usage in station_usage.get(same_grid_station):
+            same_grid_charges.append(usage)
+
+    logger.error(same_grid_charges)
+    if len(same_grid_charges) == 0:
+        return original_cost
 
     # Save individual congestion percentages
     overlaps = np.ndarray([0])
     for u2 in same_grid_charges:
+        logger.error(u2)
         if u2.get('inv') is None and u2.get('agent') != u1.get('agent'):  # you can't overlap with yourself
             ov = overlap(u1, u2)
-            if ov > 0:
-                if ov == 1:
+            if len(ov) > 0:
+                if len(ov) > 1:
+                    logger.critical(f"Usages {u1} and {u2} overlap in more than one way: {ov}")
+                    exit()
+                if ov[0] == 1:
                     congestion_time = u2.get('end_charge') - u1.get('init_charge')
-                if ov == 2:
+                if ov[0] == 2:
                     congestion_time = u1.get('end_charge') - u2.get('init_charge')
-                if ov == 3:
+                if ov[0] == 3:
                     congestion_time = u1.get('end_charge') - u1.get('init_charge')
-                if ov == 4:
+                if ov[0] == 4:
                     congestion_time = u2.get('end_charge') - u2.get('init_charge')
 
                 congestion_percentage = congestion_time / (u1.get('end_charge') - u1.get('init_charge'))
@@ -74,7 +83,7 @@ def charge_congestion_function(grid, cost, mean_congestion):
     elif 0.3 < mean_congestion <= 0.7:
         new_cost = 2 * cost
     else:
-        new_cost = pow(cost,3)
+        new_cost = pow(cost, 3)
     return new_cost
 
 

@@ -14,6 +14,7 @@ from simfleet.planner.plan import JointPlan, Plan
 from simfleet.planner.planner import Planner, meters_to_seconds
 
 INITIAL_JOINT_PLAN = False
+INITIAL_GREEDY_PLAN = True
 LOOP_DETECTION = True
 CONSIDER_PREV_PLAN = False
 VERBOSE = 0
@@ -123,10 +124,10 @@ def get_route(routes_dic, p1, p2):
 
 class BestResponse:
 
-    def __init__(self):
-        self.config_dic = None
-        self.actions_dic = None
-        self.routes_dic = None
+    def __init__(self, config_dic, actions_dic, routes_dic):
+        self.config_dic = config_dic
+        self.actions_dic = actions_dic
+        self.routes_dic = routes_dic
         self.joint_plan = None
         self.agents = None
         self.list_of_plans = None
@@ -215,6 +216,7 @@ class BestResponse:
             # if there is no grid indicated, add it to grid 1 (global grid)
             else:
                 self.power_grids[1].append(station.get('name'))
+        logger.error(self.power_grids)
 
     # Prepares the data structure to store the Joint plan
     def init_joint_plan(self):
@@ -480,6 +482,17 @@ class BestResponse:
             new_plan = planner.plan
             self.check_update_joint_plan(agent_id, None, new_plan)
 
+    def create_initial_greedy_plans(self):
+        for a in self.agents:
+            agent_id = a.get('id')
+            logger.info(f"Agent \'{agent_id}\''s turn")
+            logger.info("-------------------------------------------------------------------------")
+            logger.info(f"Creating GREEDY initial plan for agent {agent_id}")
+            planner = self.create_planner(a)
+            planner.greedy_initial_plan()
+            new_plan = planner.plan
+            self.check_update_joint_plan(agent_id, None, new_plan)
+
     def feasible_joint_plan(self):
         logger.debug(f"Creating an initial feasible plan")
         # Initial list with all customers
@@ -602,6 +615,131 @@ class BestResponse:
             self.check_update_joint_plan(agent.get('id'), None, initial_plan)
             self.joint_plan["no_change"][agent.get('id')] = False
 
+    def greedy_initial_plan(self):
+        # agent goals are in self.agents.get(agent).get('goals')
+        for agent in self.agents():
+            logger.info(f"Creating greedy initial plan for agent {agent.get('id')}")
+
+            # Get actions
+            dic_file = open(ACTIONS_FILE, "r")
+            actions_dic = json.load(dic_file)
+            agent_actions = actions_dic.get(agent.get('id'))
+
+            pick_up_actions = agent_actions.get("PICK-UP")
+            move_to_dest_actions = agent_actions.get("MOVE-TO-DEST")
+
+            move_to_station_actions = agent_actions.get("MOVE-TO-STATION")
+            charge_actions = agent_actions.get("CHARGE")
+
+            actions = []
+            goals = agent.get('goals')
+            completed_goals = []
+
+            while goals:
+                # Get agent attributes
+                current_position = agent.get('initial_position')
+                current_autonomy = agent.get('current_autonomy')
+                max_autonomy = agent.get('max_autonomy')
+                if not actions:
+                    current_time = 0
+                else:
+                    current_time = sum([a.get('statistics').get('time') for a in actions])
+
+                # -------------------- Closest customer selection phase --------------------
+
+                #   Get move_to_dest actions of customers in goals
+                customer_actions = [a for a in move_to_dest_actions if a.get('attributes').get('customer_id') in goals]
+                customer_distances = []
+                #   For every customer save a tuple with its name and the distance of the route from the agent's current position to its origin position
+                for action in customer_actions:
+                    customer_distances.append(
+                        (action.get('attributes').get('agent'),
+                         self.get_route(current_position, action.get('attributes').get('customer_origin')).get('dist'))
+                    )
+                #   Get tuple with closest customer
+                closest_goal = min(customer_distances, key=lambda x: x[1])
+                #   Extract closest customer and delete it from goals
+                customer = closest_goal[0]
+                goals = [c for c in goals if c != customer]
+
+                # -------------------- Plan building phase --------------------
+
+                # Get customer actions
+                action1 = [a for a in pick_up_actions if a.get('attributes').get('customer_id') == customer]
+                action1 = action1[0]
+                action2 = [a for a in move_to_dest_actions if a.get('attributes').get('customer_id') == customer]
+                action2 = action2[0]
+
+                # Fill statistics w.r.t. current position and autonomy
+                action1 = fill_statistics(action1, current_pos=current_position, routes_dic=self.routes_dic)
+                action2 = fill_statistics(action2, routes_dic=self.routes_dic)
+
+                # Check autonomy, go to charge in closest station if necessary
+                customer_origin = action1.get("attributes").get("customer_origin")
+                customer_dest = action2.get("attributes").get("customer_dest")
+
+                # Need to charge
+                if not has_enough_autonomy(current_autonomy, current_position, customer_origin, customer_dest):
+                    # Store customer in the open goals list again
+                    goals.insert(0, customer)
+
+                    # Get closest station to transport
+                    station_actions = [fill_statistics(a, current_pos=current_position, routes_dic=self.routes_dic) for
+                                       a in
+                                       move_to_station_actions]
+                    action1 = min(station_actions, key=lambda x: x.get("statistics").get("time"))
+                    station_id = action1.get('attributes').get('station_id')
+
+                    # Get actions for that station and fill statistics w.r.t. current position and autonomy
+                    action2 = [a for a in charge_actions if a.get('attributes').get('station_id') == station_id]
+                    action2 = action2[0]
+
+                    action2 = fill_statistics(action2, current_autonomy=current_autonomy,
+                                              agent_max_autonomy=max_autonomy, routes_dic=self.routes_dic)
+
+                    # Update position and autonomy after charge
+                    agent['initial_position'] = action1.get('attributes').get('station_position')
+                    agent['current_autonomy'] = max_autonomy
+
+                    # Add actions to action list
+                    actions += [action1, action2]
+
+                # No need to charge
+                else:
+                    # Add actions, update position and autonomy
+                    # Add actions to action list
+                    actions += [action1, action2]
+                    # Update position and autonomy
+                    agent['current_autonomy'] -= calculate_km_expense(current_position,
+                                                                      action2.get('attributes').get('customer_origin'),
+                                                                      action2.get('attributes').get('customer_dest'))
+                    agent['initial_position'] = action2.get('attributes').get('customer_dest')
+
+                    # Add served customer to completed_goals
+                    init = current_time
+                    pick_up_duration = action1.get('statistics').get('time')
+                    completed_goals.append(
+                        (action2.get('attributes').get('customer_id'), init + pick_up_duration))
+
+            # end of while loop
+
+            # -------------------- Joint Plan update phase --------------------
+
+            # Create plan with agent action list
+            initial_plan = Plan(actions, -1, completed_goals)
+            # CANVI
+            utility = evaluate_plan_2(initial_plan, self.joint_plan)
+            # utility = self.evaluate_plan(initial_plan, initial_plan=True)
+            initial_plan.utility = utility
+
+            logger.info(f"Agent {agent.get('id')} initial plan:")
+            logger.info(initial_plan.to_string_plan())
+
+            # Update joint plan
+            self.check_update_joint_plan(agent.get('id'), None, initial_plan)
+            self.joint_plan["no_change"][agent.get('id')] = False
+
+
     def propose_plan(self, a):
         agent_id = a.get('id')
         logger.info("\n")
@@ -629,30 +767,11 @@ class BestResponse:
             else:
                 logger.info(f"The utility of agent's {agent_id} plan has not changed")
 
-            # if CONSIDER_PREV_PLAN:
-            #     if self.best_prev_plan[agent_id][1] is not None and prev_plan.equals(self.best_prev_plan[agent_id][1]) \
-            #         and updated_utility != self.best_prev_plan[agent_id][0]:
-            #         logger.critical(
-            #             f"The previous best plan had its utility updated. {self.best_prev_plan[agent_id][0]} -> {updated_utility}")
-            #         self.best_prev_plan[agent_id] = (updated_utility, copy.deepcopy(prev_plan))
-            #
-            #     elif updated_utility > self.best_prev_plan[agent_id][0]:
-            #         logger.critical(
-            #             f"The previous best plan of the agent has changed. {self.best_prev_plan[agent_id][0]} < {updated_utility}")
-            #         self.best_prev_plan[agent_id] = (updated_utility, copy.deepcopy(prev_plan))
-
         # Propose new plan as best response to joint plan
         logger.info("Searching for new plan proposal...")
         planner = self.create_planner(a)
         planner.run()
         new_plan = planner.plan
-
-        # # If the new plan has lower utility than the best previous plan, propose the best previous plan again
-        # if CONSIDER_PREV_PLAN and new_plan is not None:
-        #     if new_plan.utility < self.best_prev_plan[agent_id][0]:
-        #         logger.critical(f"The utility of the new plan {new_plan.utility} is lower than the updated utility of "
-        #                         f"the best previous plan {self.best_prev_plan[agent_id][0]}. Proposing old plan instead.")
-        #         new_plan = copy.deepcopy(self.best_prev_plan[agent_id][1])
 
         self.check_update_joint_plan(agent_id, prev_plan, new_plan)
 
@@ -831,7 +950,9 @@ class BestResponse:
             logger.info(f"\t\t\t\t\t\t\tBest Response turn {game_turn}")
             logger.info("*************************************************************************")
             # First turn of the game, agents propose their initial plan
-            if game_turn == 1 and not INITIAL_JOINT_PLAN:
+            if game_turn == 1 and INITIAL_GREEDY_PLAN:
+                self.create_initial_greedy_plans()
+            elif game_turn == 1 and not INITIAL_JOINT_PLAN :
                 self.create_initial_plans()
             # In the following turns, the agents may have one of this two:
             # 1) A previous plan
@@ -845,7 +966,7 @@ class BestResponse:
 
 
 if __name__ == '__main__':
-    br = BestResponse()
+    br = BestResponse(None, None, None)
     start = time.time()
     br.run()
     # br.obtain_best_plans()

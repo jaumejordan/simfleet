@@ -11,7 +11,7 @@ from loguru import logger
 
 from simfleet.planner.constants import SPEED, STARTING_FARE, PRICE_PER_KM, CONFIG_FILE, \
     ACTIONS_FILE, ROUTES_FILE, TIME_PENALTY, MAX_STATION_DIST
-from simfleet.planner.evaluator import evaluate_node_2, get_benefit, get_travel_cost, get_charge_cost
+from simfleet.planner.evaluator import evaluate_node_2, get_benefit, get_travel_cost, get_charge_cost, evaluate_plan_2
 from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_expense
 from simfleet.planner.plan import Plan
 
@@ -791,7 +791,7 @@ class Planner:
 
             # Evaluate node
             # CANVI
-            value = evaluate_node_2(node, self.joint_plan)
+            value = evaluate_node_2(node, self.joint_plan, self.actions_dic)
             # value = self.evaluate_node(node)
             if self.best_solution_prune:
                 # If the value is higher than best solution value, add node to open_nodes
@@ -807,7 +807,7 @@ class Planner:
                     if self.save_partial_solutions:
                         # CANVI
                         evaluate_node_2(node, self.joint_plan, solution=True)
-                        #self.evaluate_node(node, solution=True)
+                        # self.evaluate_node(node, solution=True)
                         if DEBUG: logger.info(f"Node saved as a partial solution with value {node.value}")
                         self.solution_nodes.append((node, node.value))
                         self.check_update_best_solution(node)
@@ -856,7 +856,8 @@ class Planner:
                     filtered_stations.append(a.get('attributes').get('station_id'))
             max_dist += 250
 
-        filtered_charge_actions = [a for a in charge_actions if a.get('attributes').get('station_id') in filtered_stations]
+        filtered_charge_actions = [a for a in charge_actions if
+                                   a.get('attributes').get('station_id') in filtered_stations]
 
         # for tup in get_station_couples(move_to_station_actions, charge_actions):
         for tup in get_station_couples(filtered_move_actions, filtered_charge_actions):
@@ -888,7 +889,7 @@ class Planner:
 
             # Evaluate node
             # CANVI
-            value = evaluate_node_2(node, self.joint_plan)
+            value = evaluate_node_2(node, self.joint_plan, self.actions_dic)
             # value = self.evaluate_node(node)
 
             if self.best_solution_prune:
@@ -918,6 +919,132 @@ class Planner:
 
     def extract_plan(self, node):
         self.plan = Plan(node.actions, node.value, node.completed_goals)
+
+    def greedy_initial_plan(self):
+
+        logger.info(f"Creating greedy initial plan for agent {self.agent_id}")
+
+        # Get actions
+        dic_file = open(ACTIONS_FILE, "r")
+        actions_dic = json.load(dic_file)
+        agent_actions = actions_dic.get(self.agent_id)
+
+        pick_up_actions = agent_actions.get("PICK-UP")
+        move_to_dest_actions = agent_actions.get("MOVE-TO-DEST")
+
+        move_to_station_actions = agent_actions.get("MOVE-TO-STATION")
+        charge_actions = agent_actions.get("CHARGE")
+
+        actions = []
+        goals = self.agent_goals
+        completed_goals = []
+
+        while goals:
+
+            # Get agent attributes
+            current_position = self.agent_pos
+            current_autonomy = self.agent_autonomy
+            max_autonomy = self.agent_max_autonomy
+            if not actions:
+                current_time = 0
+            else:
+                current_time = sum([a.get('statistics').get('time') for a in actions])
+
+            # -------------------- Closest customer selection phase --------------------
+
+            #   Get move_to_dest actions of customers in goals
+            customer_actions = [a for a in move_to_dest_actions if a.get('attributes').get('customer_id') in goals]
+            customer_distances = []
+            # For every customer save a tuple with its name and the distance of the route from the agent's current
+            # position to its origin position
+            for action in customer_actions:
+                customer_distances.append(
+                    (action.get('attributes').get('customer_id'),
+                     self.get_route(current_position, action.get('attributes').get('customer_origin')).get('distance'))
+                )
+            #   Get tuple with closest customer
+            logger.info(customer_distances)
+            closest_goal = min(customer_distances, key=lambda x: x[1])
+            #   Extract closest customer and delete it from goals
+            customer = closest_goal[0]
+            goals = [c for c in goals if c != customer]
+
+            # -------------------- Plan building phase --------------------
+
+            # Get customer actions
+            action1 = [a for a in pick_up_actions if a.get('attributes').get('customer_id') == customer]
+            action1 = action1[0]
+            action2 = [a for a in move_to_dest_actions if a.get('attributes').get('customer_id') == customer]
+            action2 = action2[0]
+
+            # Fill statistics w.r.t. current position and autonomy
+            action1 = self.fill_statistics(action1, current_pos=current_position)
+            action2 = self.fill_statistics(action2)
+
+            # Check autonomy, go to charge in closest station if necessary
+            customer_origin = action1.get("attributes").get("customer_origin")
+            customer_dest = action2.get("attributes").get("customer_dest")
+
+            # Need to charge
+            if not has_enough_autonomy(current_autonomy, current_position, customer_origin, customer_dest):
+                # Store customer in the open goals list again
+                goals.insert(0, customer)
+
+                # Get closest station to transport
+                station_actions = [self.fill_statistics(a, current_pos=current_position) for
+                                   a in
+                                   move_to_station_actions]
+                action1 = min(station_actions, key=lambda x: x.get("statistics").get("time"))
+                station_id = action1.get('attributes').get('station_id')
+                current_time += action1.get('statistics').get('time')
+
+                # Get actions for that station and fill statistics w.r.t. current position and autonomy
+                action2 = [a for a in charge_actions if a.get('attributes').get('station_id') == station_id]
+                action2 = action2[0]
+
+                action2 = self.fill_statistics(action2, current_autonomy=current_autonomy, current_time=current_time)
+
+                # Update position and autonomy after charge
+                self.agent_pos = action1.get('attributes').get('station_position')
+                self.agent_autonomy = max_autonomy
+
+                # Add actions to action list
+                actions += [action1, action2]
+
+            # No need to charge
+            else:
+                # Add actions, update position and autonomy
+                # Add actions to action list
+                actions += [action1, action2]
+                # Update position and autonomy
+                self.agent_autonomy -= calculate_km_expense(current_position,
+                                                            action2.get('attributes').get('customer_origin'),
+                                                            action2.get('attributes').get('customer_dest'))
+                self.agent_pos = action2.get('attributes').get('customer_dest')
+
+                # Add served customer to completed_goals
+                init = current_time
+                pick_up_duration = action1.get('statistics').get('time')
+                completed_goals.append(
+                    (action2.get('attributes').get('customer_id'), init + pick_up_duration))
+
+        # end of while loop
+
+        # -------------------- Joint Plan update phase --------------------
+
+        # Create plan with agent action list
+        self.plan = Plan(actions, -1, completed_goals)
+        # CANVI
+        utility = evaluate_plan_2(self.plan, self.joint_plan)
+        # utility = self.evaluate_plan(initial_plan, initial_plan=True)
+        self.plan.utility = utility
+
+        logger.info(f"Agent {self.agent_id} initial plan:")
+        logger.info(self.plan.to_string_plan())
+
+        # # Update joint plan
+        # self.check_update_joint_plan(agent.get('id'), None, initial_plan)
+        # self.joint_plan["no_change"][agent.get('id')] = False
 
     def plan_from_node(self):
 
@@ -964,45 +1091,39 @@ class Planner:
             if VERBOSE > 1:
                 parent.print_node()
 
-            # if the plan in the node picks up a % of the customers, consider it complete
-            if not len(parent.completed_goals) / self.get_number_of_customers() >= GOAL_PERCENTAGE:
+            # If the last action is a customer service, consider charging
+            # otherwise consider ONLY customer actions (avoids consecutive charging actions)
+            consider_charge = False
+            not_full = False
+            if parent.actions[-1].get('type') == 'MOVE-TO-DEST':
+                consider_charge = True
 
-                # If the last action is a customer service, consider charging
-                # otherwise consider ONLY customer actions (avoids consecutive charging actions)
-                consider_charge = False
-                not_full = False
-                if parent.actions[-1].get('type') == 'MOVE-TO-DEST':
-                    consider_charge = True
+            if VERBOSE > 0:
+                logger.info("Generating CUSTOMER children nodes...")
+            # Generate one child node per customer left to serve and return whether some customer could not be
+            # picked up because of autonomy
+            generate_charging = self.create_customer_nodes(parent)
+            customer_children = len(parent.children)
+            if VERBOSE > 0:
+                logger.info(f'{customer_children:5d} customer children have been created')
 
+            # Add charging consideration when the autonomy is not full
+            if CHARGE_WHEN_NOT_FULL:
+                if parent.agent_autonomy < self.agent_max_autonomy:
+                    if VERBOSE > 1:
+                        logger.warning(
+                            f'Node autonomy {parent.agent_autonomy} < max autonomy {self.agent_max_autonomy}')
+                    not_full = True
+
+            # if we consider charging actions AND during the creation of customer nodes there was a customer
+            # that could not be reached because of autonomy, create charge nodes.
+            if (consider_charge and generate_charging) or (CHARGE_WHEN_NOT_FULL and not_full):
                 if VERBOSE > 0:
-                    logger.info("Generating CUSTOMER children nodes...")
-                # Generate one child node per customer left to serve and return whether some customer could not be
-                # picked up because of autonomy
-                generate_charging = self.create_customer_nodes(parent)
-                customer_children = len(parent.children)
+                    logger.info("Generating CHARGE children nodes...")
+                self.create_charge_nodes(parent)
+                charge_children = len(parent.children) - customer_children
                 if VERBOSE > 0:
-                    logger.info(f'{customer_children:5d} customer children have been created')
-
-                # Add charging consideration when the autonomy is not full
-                if CHARGE_WHEN_NOT_FULL:
-                    if parent.agent_autonomy < self.agent_max_autonomy:
-                        if VERBOSE > 1:
-                            logger.warning(
-                                f'Node autonomy {parent.agent_autonomy} < max autonomy {self.agent_max_autonomy}')
-                        not_full = True
-
-                # if we consider charging actions AND during the creation of customer nodes there was a customer
-                # that could not be reached because of autonomy, create charge nodes.
-                if (consider_charge and generate_charging) or (CHARGE_WHEN_NOT_FULL and not_full):
-                    if VERBOSE > 0:
-                        logger.info("Generating CHARGE children nodes...")
-                    self.create_charge_nodes(parent)
-                    charge_children = len(parent.children) - customer_children
-                    if VERBOSE > 0:
-                        logger.info(f'{charge_children:5d} charge children have been created')
-            else:
-                if VERBOSE > 0:
-                    logger.info("The node completed a % of the total goals")
+                    logger.info(f'{charge_children:5d} charge children have been created')
 
             # If after this process the node has no children, it is a solution Node
             if not parent.children:
