@@ -1,4 +1,5 @@
 import json
+import math
 
 from simfleet.planner.congestion import check_charge_congestion
 from simfleet.planner.constants import STARTING_FARE, PRICE_PER_KM, TRAVEL_PENALTY, PRICE_PER_kWh, TIME_PENALTY, \
@@ -80,7 +81,10 @@ def compute_costs(action_list, table_of_goals, joint_plan):
                 pick_up = table_of_goals.get(customer)
 
             # Add waiting time to costs
-            costs += pick_up[1] * TIME_PENALTY
+            if isinstance(pick_up, tuple):
+                costs += pick_up[1] * TIME_PENALTY
+            else:
+                costs += pick_up * TIME_PENALTY
     return costs
 
 
@@ -146,7 +150,8 @@ def evaluate_plan_2(plan, joint_plan):
     action_list = [entry.action for entry in plan.entries]
 
     benefits = compute_benefits(action_list)
-    costs = compute_costs(action_list, joint_plan.get('table_of_goals'), joint_plan)
+    #costs = compute_costs(action_list, joint_plan.get('table_of_goals'), joint_plan)
+    costs = compute_costs(action_list, plan.table_of_goals, joint_plan)
 
     # Utility (or g value) = benefits - costs
     utility = benefits - costs

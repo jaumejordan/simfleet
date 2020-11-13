@@ -38,14 +38,12 @@ def check_charge_congestion(u1, station, original_cost, joint_plan):
         for usage in station_usage.get(same_grid_station):
             same_grid_charges.append(usage)
 
-    logger.error(same_grid_charges)
     if len(same_grid_charges) == 0:
         return original_cost
 
     # Save individual congestion percentages
     overlaps = np.ndarray([0])
     for u2 in same_grid_charges:
-        logger.error(u2)
         if u2.get('inv') is None and u2.get('agent') != u1.get('agent'):  # you can't overlap with yourself
             ov = overlap(u1, u2)
             if len(ov) > 0:
@@ -69,9 +67,10 @@ def check_charge_congestion(u1, station, original_cost, joint_plan):
         mean_congestion = overlaps.mean()
         logger.info(
             f"The charge of agent {u1.get('agent')} in station {station} causes a congestion of {mean_congestion * 100:.2f}%")
+        logger.info(f"Overlaps: {overlaps}")
         return charge_congestion_function(current_grid, original_cost, mean_congestion)
     else:
-        logger.info(f"No congestion, overlaps are {len(overlaps)} + 1 when limit is 3")
+        # logger.info(f"No congestion, overlaps are {len(overlaps)} + 1 when limit is 3")
         return original_cost
 
 

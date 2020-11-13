@@ -987,6 +987,15 @@ class Planner:
 
             # Need to charge
             if not has_enough_autonomy(current_autonomy, current_position, customer_origin, customer_dest):
+
+                # Before a charge, reload actions
+                dic_file = open(ACTIONS_FILE, "r")
+                actions_dic = json.load(dic_file)
+                agent_actions = actions_dic.get(self.agent_id)
+
+                move_to_station_actions = agent_actions.get("MOVE-TO-STATION")
+                charge_actions = agent_actions.get("CHARGE")
+
                 # Store customer in the open goals list again
                 goals.insert(0, customer)
 
