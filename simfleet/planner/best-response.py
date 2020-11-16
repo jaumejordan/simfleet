@@ -966,6 +966,8 @@ class BestResponse:
 
 
 if __name__ == '__main__':
+    f2 = open(CONFIG_FILE, "r")
+    config_dic = json.load(f2)
     br = BestResponse(None, None, None)
     start = time.time()
     br.run()

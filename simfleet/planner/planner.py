@@ -10,7 +10,7 @@ import time
 from loguru import logger
 
 from simfleet.planner.constants import SPEED, STARTING_FARE, PRICE_PER_KM, CONFIG_FILE, \
-    ACTIONS_FILE, ROUTES_FILE, TIME_PENALTY, MAX_STATION_DIST
+    ACTIONS_FILE, ROUTES_FILE, TIME_PENALTY, MAX_STATION_DIST, HEURISTIC
 from simfleet.planner.evaluator import evaluate_node_2, get_benefit, get_travel_cost, get_charge_cost, evaluate_plan_2
 from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_expense
 from simfleet.planner.plan import Plan
@@ -22,7 +22,6 @@ DEBUG = False
 PRINT_GOALS = False
 PRINT_PLAN = False
 CHARGE_WHEN_NOT_FULL = True
-HEURISTIC = False
 
 
 # TODO tenir en compte el nombre de places de l'estació de càrrega
@@ -232,7 +231,7 @@ class Planner:
         self.plan = None
 
         # Variables to activate and deactivate pruning methods
-        self.save_partial_solutions = True
+        self.save_partial_solutions = False
         self.best_solution_prune = True
         if not HEURISTIC:
             self.best_solution_prune = False
@@ -245,6 +244,22 @@ class Planner:
         self.start_node = start_node
 
         self.create_table_of_goals()
+
+    # Load dictionary data
+    def initialize(self):
+        try:
+            f2 = open(CONFIG_FILE, "r")
+            self.config_dic = json.load(f2)
+
+            f2 = open(ACTIONS_FILE, "r")
+            self.actions_dic = json.load(f2)
+
+            f2 = open(ROUTES_FILE, "r")
+            self.routes_dic = json.load(f2)
+
+        except Exception as e:
+            print(str(e))
+            exit()
 
     # Reads plan of every agent (joint plan) and fills the corresponding table of goals
     # If the joint plan is empty, creates an entry per customer and initialises its
@@ -542,25 +557,11 @@ class Planner:
                     self.best_solution_value = self.joint_plan["individual"][self.agent_id].utility
                     logger.warning(f"Using {self.best_solution_value} as lower bound for plan utility")
 
-    # TODO not in use, consider deletion
-    def purge_open_nodes(self):
-        init_len = len(self.open_nodes)
-        self.open_nodes = [x for x in self.open_nodes if -1 * x[0] > self.best_solution_value]
-        final_len = len(self.open_nodes)
-
-        if final_len < init_len:
-            heapq.heapify(self.open_nodes)
-            if VERBOSE > 1:
-                logger.debug(f"{init_len - final_len} nodes where purged from the list of open nodes")
-        elif final_len == final_len:
-            if VERBOSE > 1:
-                logger.debug(f"No node was purged")
-        else:
-            logger.critical("ERROR :: There are more nodes after the purge!!!")
-
     def run(self):
 
         start = time.time()
+
+        # self.initialize()
 
         self.check_prev_plan()
 
@@ -656,7 +657,7 @@ class Planner:
 
                 # Modify node f-value to utility value (h = 0)
                 # CANVI
-                evaluate_node_2(parent, self.joint_plan, solution=True)
+                evaluate_node_2(parent, self.joint_plan, self.routes_dic, solution=True)
                 # self.evaluate_node(parent, solution=True)
                 self.solution_nodes.append((parent, parent.value))
                 self.check_update_best_solution(parent)
@@ -734,7 +735,7 @@ class Planner:
                 node = Node()
                 node.agent_pos = self.agent_pos.copy()
                 node.agent_autonomy = self.agent_autonomy
-                node.agent_goals = self.agent_goals
+                node.agent_goals = self.agent_goals.copy()
             else:
                 node = Node(parent)
 
@@ -791,7 +792,7 @@ class Planner:
 
             # Evaluate node
             # CANVI
-            value = evaluate_node_2(node, self.joint_plan, self.actions_dic)
+            value = evaluate_node_2(node, self.joint_plan, self.actions_dic, self.routes_dic)
             # value = self.evaluate_node(node)
             if self.best_solution_prune:
                 # If the value is higher than best solution value, add node to open_nodes
@@ -843,6 +844,7 @@ class Planner:
         max_dist = MAX_STATION_DIST
         if parent is None:
             agent_pos = self.agent_pos
+
         else:
             agent_pos = parent.agent_pos
 
@@ -865,6 +867,7 @@ class Planner:
                 node = Node()
                 node.agent_pos = self.agent_pos
                 node.agent_autonomy = self.agent_autonomy
+                node.agent_goals = self.agent_goals
                 current_time = 0
             else:
                 node = Node(parent)
@@ -889,7 +892,7 @@ class Planner:
 
             # Evaluate node
             # CANVI
-            value = evaluate_node_2(node, self.joint_plan, self.actions_dic)
+            value = evaluate_node_2(node, self.joint_plan, self.actions_dic, self.routes_dic)
             # value = self.evaluate_node(node)
 
             if self.best_solution_prune:
@@ -1229,6 +1232,7 @@ if __name__ == '__main__':
                               'station2': [],
                               'station3': [],
                           },
+                          "power_grids": {1: ['station5']},
                           "no_change": {},
                           "joint": None,
                           "table_of_goals": {

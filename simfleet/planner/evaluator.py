@@ -3,7 +3,7 @@ import math
 
 from simfleet.planner.congestion import check_charge_congestion
 from simfleet.planner.constants import STARTING_FARE, PRICE_PER_KM, TRAVEL_PENALTY, PRICE_PER_kWh, TIME_PENALTY, \
-    INVALID_CHARGE_PENALTY, HEURISTIC, ROUTES_FILE
+    INVALID_CHARGE_PENALTY, HEURISTIC, ROUTES_FILE, STATION_CONGESTION
 from loguru import logger
 
 
@@ -41,7 +41,7 @@ def compute_costs(action_list, table_of_goals, joint_plan):
             charge_cost = get_charge_cost(action)
             # costs += get_charge_cost(action)
             if action.get('inv') == 'INV':
-                costs *= INVALID_CHARGE_PENALTY
+                costs += INVALID_CHARGE_PENALTY
             else:
                 # Create station usage from action
                 agent = action.get('agent')
@@ -58,11 +58,13 @@ def compute_costs(action_list, table_of_goals, joint_plan):
                     'inv': inv
                 }
 
-                congestion_cost = check_charge_congestion(usage, station, charge_cost, joint_plan)
+                if STATION_CONGESTION:
+                    congestion_cost = check_charge_congestion(usage, station, charge_cost, joint_plan)
 
-                if charge_cost != congestion_cost:
-                    logger.warning(f"Charging cost incremented by congestion from {charge_cost} to {congestion_cost}")
-                    costs += congestion_cost
+                    if charge_cost != congestion_cost:
+                        logger.warning(
+                            f"Charging cost incremented by congestion from {charge_cost} to {congestion_cost}")
+                        costs += congestion_cost
                 else:
                     costs += charge_cost
 
@@ -88,10 +90,8 @@ def compute_costs(action_list, table_of_goals, joint_plan):
     return costs
 
 
-def get_route(p1, p2):
+def get_route(p1, p2, routes_dic):
     key = str(p1) + ":" + str(p2)
-    file = open(ROUTES_FILE, "r")
-    routes_dic = json.load(file)
     route = routes_dic.get(key)
     if route is None:
         # En el futur, demanar la ruta al OSRM
@@ -100,14 +100,22 @@ def get_route(p1, p2):
     return route
 
 
-# Assume the agent can pick up every remaining agent without charging costs
-def get_h_value(node, actions_dic):
+def already_served(node):
+    res = []
+    for tup in node.completed_goals:
+        res.append(tup[0])
+    return res
+
+
+def get_h_value(node, actions_dic, routes_dic):
     h = 0
     benefits = 0
     costs = 0
     agent_id = node.actions[0].get('agent')
+
     # Get a list with the non-served customers
-    non_served_customers = [x for x in node.agent_goals if x not in node.alredy_served()]
+    non_served_customers = [x for x in node.agent_goals if x not in already_served(node)]
+
     for customer in non_served_customers:
         # extract distance of customer trip
         customer_actions = actions_dic.get(agent_id).get('MOVE-TO-DEST')
@@ -116,7 +124,7 @@ def get_h_value(node, actions_dic):
         action = customer_actions[0]
         p1 = action.get('attributes').get('customer_origin')
         p2 = action.get('attributes').get('customer_dest')
-        route = get_route(p1, p2)
+        route = get_route(p1, p2, routes_dic)
         dist = route.get('distance')
         action['statistics']['dist'] = dist
         # Consider service benefits + move-to-dest costs
@@ -127,7 +135,7 @@ def get_h_value(node, actions_dic):
     return h
 
 
-def evaluate_node_2(node, joint_plan, actions_dic=None, solution=False):
+def evaluate_node_2(node, joint_plan, actions_dic=None, routes_dic=None, solution=False):
     benefits = compute_benefits(node.actions)
     costs = compute_costs(node.actions, node.completed_goals, joint_plan)
 
@@ -139,7 +147,7 @@ def evaluate_node_2(node, joint_plan, actions_dic=None, solution=False):
     # If the node is a solution, its h value is 0
     if not solution:
         if HEURISTIC:
-            h = get_h_value(node, actions_dic)
+            h = get_h_value(node, actions_dic, routes_dic)
 
     f_value = g + h
     node.value = f_value
@@ -150,7 +158,7 @@ def evaluate_plan_2(plan, joint_plan):
     action_list = [entry.action for entry in plan.entries]
 
     benefits = compute_benefits(action_list)
-    #costs = compute_costs(action_list, joint_plan.get('table_of_goals'), joint_plan)
+    # costs = compute_costs(action_list, joint_plan.get('table_of_goals'), joint_plan)
     costs = compute_costs(action_list, plan.table_of_goals, joint_plan)
 
     # Utility (or g value) = benefits - costs
