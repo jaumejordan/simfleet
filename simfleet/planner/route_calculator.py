@@ -1,9 +1,10 @@
 import asyncio
 import json
 import sys
-from simfleet.helpers import distance_in_meters
-from simfleet.utils import request_route_to_server
-from generators_utils import has_enough_autonomy, calculate_km_expense
+
+import aiohttp
+
+# from simfleet.utils import request_route_to_server
 
 config_dic = {}
 global_actions = {}
@@ -12,6 +13,38 @@ ordered_global_actions = {}
 
 ROUTE_HOST = "http://osrm.gti-ia.upv.es/"
 
+
+async def request_route_to_server(origin, destination, route_host="http://router.project-osrm.org/"):
+    """
+    Queries the OSRM for a path.
+
+    Args:
+        origin (list): origin coordinate (longitude, latitude)
+        destination (list): target coordinate (longitude, latitude)
+        route_host (string): route to host server of OSRM service
+
+    Returns:
+        list, float, float = the path, the distance of the path and the estimated duration
+    """
+    try:
+
+        url = route_host + "route/v1/car/{src1},{src2};{dest1},{dest2}?geometries=geojson&overview=full"
+        src1, src2, dest1, dest2 = origin[1], origin[0], destination[1], destination[0]
+        url = url.format(src1=src1, src2=src2, dest1=dest1, dest2=dest2)
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                result = await response.json()
+
+        path = result["routes"][0]["geometry"]["coordinates"]
+        path = [[point[1], point[0]] for point in path]
+        duration = result["routes"][0]["duration"]
+        distance = result["routes"][0]["distance"]
+        if path[-1] != destination:
+            path.append(destination)
+        return path, distance, duration
+    except Exception as e:
+        return None, None, None
 
 def load_config(config_file):
     config_dic = {}
@@ -161,6 +194,6 @@ if __name__ == '__main__':
     t, s, co, cd = get_points()
     routes = asyncio.run(calculate_routes(t, s, co, cd))
 
-    outfile = open("routes/problem5-routes.json", "w+")
+    outfile = open("routes/congestion-routes.json", "w+")
     json.dump(routes, outfile, indent=4)
     outfile.close()

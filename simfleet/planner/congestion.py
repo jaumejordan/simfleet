@@ -1,5 +1,5 @@
-from loguru import logger
 import numpy as np
+from loguru import logger
 
 
 def get_electric_grid(station, power_grids):
@@ -63,7 +63,7 @@ def check_charge_congestion(u1, station, original_cost, joint_plan):
                 overlaps = np.append(overlaps, [congestion_percentage])
 
     # Capacitat de la xarxa abans de congestionar-se
-    if len(overlaps) + 1 > 3:  # TODO canviar per la capacitat del grid
+    if len(overlaps) + 1 > 2:  # TODO canviar per la capacitat del grid (en nombre o potència consumida)
         mean_congestion = overlaps.mean()
         logger.info(
             f"The charge of agent {u1.get('agent')} in station {station} causes a congestion of {mean_congestion * 100:.2f}%")
@@ -77,6 +77,7 @@ def check_charge_congestion(u1, station, original_cost, joint_plan):
 # increment en percentatges
 def charge_congestion_function(grid, cost, mean_congestion):
     # TODO use different values according to different grids
+    # afegir nombre d'agents en congestió
     if mean_congestion <= 0.3:
         new_cost = cost + mean_congestion * cost
     elif 0.3 < mean_congestion <= 0.7:

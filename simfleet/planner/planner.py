@@ -9,9 +9,9 @@ import time
 
 from loguru import logger
 
-from simfleet.planner.constants import SPEED, STARTING_FARE, PRICE_PER_KM, CONFIG_FILE, \
-    ACTIONS_FILE, ROUTES_FILE, TIME_PENALTY, MAX_STATION_DIST, HEURISTIC
-from simfleet.planner.evaluator import evaluate_node_2, get_benefit, get_travel_cost, get_charge_cost, evaluate_plan_2
+from simfleet.planner.constants import SPEED, CONFIG_FILE, \
+    ACTIONS_FILE, ROUTES_FILE, HEURISTIC
+from simfleet.planner.evaluator import evaluate_node_2, evaluate_plan_2
 from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_expense
 from simfleet.planner.plan import Plan
 
@@ -22,39 +22,6 @@ DEBUG = False
 PRINT_GOALS = False
 PRINT_PLAN = False
 CHARGE_WHEN_NOT_FULL = True
-
-
-# TODO tenir en compte el nombre de places de l'estació de càrrega
-
-def meters_to_seconds(distance_in_meters):
-    # km/h to m/s
-    speed = SPEED / 3.6
-    t = distance_in_meters / speed
-    return t
-
-
-# Given two lists of actions, returns the pick_up / move-to-dest tuple for the same customer
-# TODO modify for fixed goals
-def get_customer_couples(pick_up_actions, move_to_dest_actions):
-    res = []
-    for a in pick_up_actions[:]:
-        customer_id = a.get('attributes').get('customer_id')
-        for b in move_to_dest_actions[:]:
-            if b.get('attributes').get('customer_id') == customer_id:
-                res.append((a, b))
-    return res
-
-
-# Given two lists of actions, returns the move-to-station / charge tuple for the same station
-# TODO modify for only n closer stations
-def get_station_couples(move_to_station_actions, charge_actions):
-    res = []
-    for a in move_to_station_actions:
-        station_id = a.get('attributes').get('station_id')
-        for b in charge_actions:
-            if b.get('attributes').get('station_id') == station_id:
-                res.append((a, b))
-    return res
 
 
 class Node:
@@ -196,13 +163,14 @@ def to_string_table_of_goals(table_of_goals):
 
 
 class Planner:
-    def __init__(self, config_dic, actions_dic, routes_dic, agent_id, agent_pos, agent_max_autonomy, agent_autonomy,
-                 agent_goals, previous_plan=None, joint_plan=None, start_node=None):
+    def __init__(self, database, agent_id, agent_pos, agent_max_autonomy, agent_autonomy,
+                 agent_goals, previous_plan=None, start_node=None):
 
         # Precalculated routes and actions
-        self.config_dic = config_dic
-        self.actions_dic = actions_dic
-        self.routes_dic = routes_dic
+        # self.config_dic = config_dic
+        # self.actions_dic = actions_dic
+        # self.routes_dic = routes_dic
+        self.db = database
 
         # Transport agent attributes
         self.agent_id = agent_id
@@ -216,10 +184,13 @@ class Planner:
         self.table_of_goals = {}
         # Node heap
         self.open_nodes = []
+
         # Joint plan
-        if joint_plan is None:
-            joint_plan = {}
-        self.joint_plan = joint_plan
+        self.joint_plan = self.db.joint_plan
+        # if joint_plan is None:
+        #     joint_plan = {}
+        # self.joint_plan = joint_plan
+
         # Best solution to prune tree
         self.best_solution = None
         self.best_solution_value = -math.inf
@@ -245,28 +216,12 @@ class Planner:
 
         self.create_table_of_goals()
 
-    # Load dictionary data
-    def initialize(self):
-        try:
-            f2 = open(CONFIG_FILE, "r")
-            self.config_dic = json.load(f2)
-
-            f2 = open(ACTIONS_FILE, "r")
-            self.actions_dic = json.load(f2)
-
-            f2 = open(ROUTES_FILE, "r")
-            self.routes_dic = json.load(f2)
-
-        except Exception as e:
-            print(str(e))
-            exit()
-
     # Reads plan of every agent (joint plan) and fills the corresponding table of goals
     # If the joint plan is empty, creates an entry per customer and initialises its
     # pick-up time to infinity
     def create_table_of_goals(self):
         if len(self.joint_plan) == 0:
-            for customer in self.config_dic.get("customers"):
+            for customer in self.db.config_dic.get("customers"):
                 self.table_of_goals[customer.get("name")] = (None, math.inf)
         else:  # extract from joint plan
             for customer in self.joint_plan.get('table_of_goals').keys():
@@ -282,7 +237,7 @@ class Planner:
             # print_table_of_goals(self.table_of_goals)
 
     def get_station_places(self, station_name):
-        for station in self.config_dic.get('stations'):
+        for station in self.db.config_dic.get('stations'):
             if station.get('name') == station_name:
                 return station.get("places")
 
@@ -304,7 +259,7 @@ class Planner:
                 if usage.get('init_charge') < at_station < usage.get('end_charge'):
                     c += 1
 
-        return self.get_station_places(station) - c
+        return self.db.get_station_places(station) - c
 
     # Returns list of agents who are charging or will charge before the current agent does and a boolean indicating
     # if the agents in that list is higher than the number of places in the station. If so, there is a queue.
@@ -319,7 +274,7 @@ class Planner:
 
         queue.sort(key=lambda x: x.get('at_station'))
 
-        return queue, len(queue) > self.get_station_places(station)
+        return queue, len(queue) > self.db.get_station_places(station)
 
     # Returns a list with station usages which start before init_time and end after init_time
     def get_usages_interval(self, agent, station, init_time, expected_end_time):
@@ -347,126 +302,114 @@ class Planner:
                     res.append(usage)
         return res
 
-    def fill_statistics(self, action, current_pos=None, current_autonomy=None, current_time=None):
-        if action.get('type') == 'PICK-UP':
-            # distance from transport position to customer origin
-            p1 = current_pos
-            p2 = action.get('attributes').get('customer_origin')
-            route = self.get_route(p1, p2)
-            dist = route.get('distance')
-            time = meters_to_seconds(dist)
-            action['statistics']['dist'] = dist
-            action['statistics']['time'] = time
-
-        elif action.get('type') == 'MOVE-TO-DEST':
-            # distance from customer_origin to customer_destination
-            p1 = action.get('attributes').get('customer_origin')
-            p2 = action.get('attributes').get('customer_dest')
-            route = self.get_route(p1, p2)
-            dist = route.get('distance')
-            time = meters_to_seconds(dist)
-            action['statistics']['dist'] = dist
-            action['statistics']['time'] = time
-
-        elif action.get('type') == 'MOVE-TO-STATION':
-            # distance from transport position to station position
-            p1 = current_pos
-            p2 = action.get('attributes').get('station_position')
-            route = self.get_route(p1, p2)
-            dist = route.get('distance')
-            time = meters_to_seconds(dist)
-            action['statistics']['dist'] = dist
-            action['statistics']['time'] = time
-
-        elif action.get('type') == 'CHARGE':
-
-            # Get variables
-            agent = action.get('agent')
-            station = action.get('attributes').get('station_id')
-
-            # 1. Compute charging time. The charge action will finish at the end of the charging time if there are
-            # free places at the station
-            need = self.agent_max_autonomy - current_autonomy
-            charging_time = need / action.get('attributes').get('power')
-
-            # Nou check per veure si hi ha algú que està arribant exactament a la vegada que jo; si això passara,
-            # m'incremente el meu temps d'arribada, recalcule els meus temps i torne a fer les comprovacions
-            if self.check_simultaneous_charge(agent, station, current_time):
-                current_time += 0.001
-
-            # 2. Check if there will be a free place to charge at the arrival to the station
-            available_poles = self.check_available_poles(agent, station, current_time)
-            if VERBOSE > 0:
-                logger.info(
-                    f"Evaluating charge action of agent {agent} in station {station} at time {current_time:.4f}")
-                logger.info(f"There are {available_poles} available poles")
-            #   2.2 If there is not, compute waiting time, add it to charging time to compute total time
-            if available_poles == 0:
-                queue, check = self.check_station_queue(agent, station, current_time)
-                if VERBOSE > 0:
-                    logger.info(f"There are {len(queue)} agents in front of {agent}")
-                # Get que last X agents of the queue which are in front of you, where X is the number of stations
-                # if check, there are more agents in front of me than places in the station
-                if check:
-                    # keep only last X to arrive
-                    queue = queue[-self.get_station_places(station):]
-                # if not check, there are as many agents in front of me as places in the station
-                end_times = [x.get('end_charge') for x in queue]
-                # Get charge init time
-                init_charge = min(end_times)
-                # end_charge = init_charge + charging_time
-                # Compute waiting time
-                waiting_time = init_charge - current_time
-                if VERBOSE > 0:
-                    logger.info(
-                        f"Agent {agent} will begin charging at time {init_charge:.4f} after waiting {waiting_time:.4f} seconds")
-            elif available_poles < 0:
-                logger.critical(f"Error computing available poles: {available_poles} at time {current_time}")
-                logger.debug("\n")
-                logger.debug("Station usage:")
-                for station in self.joint_plan.get('station_usage').keys():
-                    if len(self.joint_plan.get('station_usage').get(station)) == 0:
-                        logger.debug(f"{station:20s} : []")
-                    else:
-                        logger.debug(f"{station:20s} : [")
-                        for usage in self.joint_plan.get('station_usage').get(station):
-                            logger.debug(f"\t{usage.get('agent'):10s}, {usage.get('at_station'):.4f}, "
-                                         f"{usage.get('init_charge'):.4f}, {usage.get('end_charge'):.4f}, "
-                                         f"{usage.get('inv')}")
-                        logger.debug("] \n")
-            # if there are available poles
-            else:
-                init_charge = current_time
-                waiting_time = 0
-                if VERBOSE > 0:
-                    logger.info(f"There are available places")
-                    logger.info(
-                        f"Agent {agent} will begin charging at time {init_charge:.4f} after waiting {waiting_time:.4f} seconds")
-
-            # Write times
-            #   arrival at the station
-            action['statistics']['at_station'] = current_time
-            #   begin charging
-            action['statistics']['init_charge'] = init_charge
-            #   total time
-            total_time = charging_time + waiting_time
-            action['statistics']['time'] = total_time
-            # amount (of something) to charge
-            action['statistics']['need'] = need
-
-        return action
-
-    def get_route(self, p1, p2):
-        key = str(p1) + ":" + str(p2)
-        route = self.routes_dic.get(key)
-        if route is None:
-            # En el futur, demanar la ruta al OSRM
-            logger.info(f"ERROR :: There is no route for key {key} in the routes_dic")
-            exit()
-        return route
-
-    def get_number_of_customers(self):
-        return len(self.config_dic.get('customers'))
+    # def fill_statistics(self, action, current_pos=None, current_autonomy=None, current_time=None):
+    #     if action.get('type') == 'PICK-UP':
+    #         # distance from transport position to customer origin
+    #         p1 = current_pos
+    #         p2 = action.get('attributes').get('customer_origin')
+    #         route = self.get_route(p1, p2)
+    #         dist = route.get('distance')
+    #         time = meters_to_seconds(dist)
+    #         action['statistics']['dist'] = dist
+    #         action['statistics']['time'] = time
+    #
+    #     elif action.get('type') == 'MOVE-TO-DEST':
+    #         # distance from customer_origin to customer_destination
+    #         p1 = action.get('attributes').get('customer_origin')
+    #         p2 = action.get('attributes').get('customer_dest')
+    #         route = self.get_route(p1, p2)
+    #         dist = route.get('distance')
+    #         time = meters_to_seconds(dist)
+    #         action['statistics']['dist'] = dist
+    #         action['statistics']['time'] = time
+    #
+    #     elif action.get('type') == 'MOVE-TO-STATION':
+    #         # distance from transport position to station position
+    #         p1 = current_pos
+    #         p2 = action.get('attributes').get('station_position')
+    #         route = self.get_route(p1, p2)
+    #         dist = route.get('distance')
+    #         time = meters_to_seconds(dist)
+    #         action['statistics']['dist'] = dist
+    #         action['statistics']['time'] = time
+    #
+    #     elif action.get('type') == 'CHARGE':
+    #
+    #         # Get variables
+    #         agent = action.get('agent')
+    #         station = action.get('attributes').get('station_id')
+    #
+    #         # 1. Compute charging time. The charge action will finish at the end of the charging time if there are
+    #         # free places at the station
+    #         need = self.agent_max_autonomy - current_autonomy
+    #         charging_time = need / action.get('attributes').get('power')
+    #
+    #         # Nou check per veure si hi ha algú que està arribant exactament a la vegada que jo; si això passara,
+    #         # m'incremente el meu temps d'arribada, recalcule els meus temps i torne a fer les comprovacions
+    #         if self.db.check_simultaneous_charge(agent, station, current_time):
+    #             current_time += 0.001
+    #
+    #         # 2. Check if there will be a free place to charge at the arrival to the station
+    #         available_poles = self.db.check_available_poles(agent, station, current_time)
+    #         if VERBOSE > 0:
+    #             logger.info(
+    #                 f"Evaluating charge action of agent {agent} in station {station} at time {current_time:.4f}")
+    #             logger.info(f"There are {available_poles} available poles")
+    #         #   2.2 If there is not, compute waiting time, add it to charging time to compute total time
+    #         if available_poles == 0:
+    #             queue, check = self.check_station_queue(agent, station, current_time)
+    #             if VERBOSE > 0:
+    #                 logger.info(f"There are {len(queue)} agents in front of {agent}")
+    #             # Get que last X agents of the queue which are in front of you, where X is the number of stations
+    #             # if check, there are more agents in front of me than places in the station
+    #             if check:
+    #                 # keep only last X to arrive
+    #                 queue = queue[-self.db.get_station_places(station):]
+    #             # if not check, there are as many agents in front of me as places in the station
+    #             end_times = [x.get('end_charge') for x in queue]
+    #             # Get charge init time
+    #             init_charge = min(end_times)
+    #             # end_charge = init_charge + charging_time
+    #             # Compute waiting time
+    #             waiting_time = init_charge - current_time
+    #             if VERBOSE > 0:
+    #                 logger.info(
+    #                     f"Agent {agent} will begin charging at time {init_charge:.4f} after waiting {waiting_time:.4f} seconds")
+    #         elif available_poles < 0:
+    #             logger.critical(f"Error computing available poles: {available_poles} at time {current_time}")
+    #             logger.debug("\n")
+    #             logger.debug("Station usage:")
+    #             for station in self.joint_plan.get('station_usage').keys():
+    #                 if len(self.joint_plan.get('station_usage').get(station)) == 0:
+    #                     logger.debug(f"{station:20s} : []")
+    #                 else:
+    #                     logger.debug(f"{station:20s} : [")
+    #                     for usage in self.joint_plan.get('station_usage').get(station):
+    #                         logger.debug(f"\t{usage.get('agent'):10s}, {usage.get('at_station'):.4f}, "
+    #                                      f"{usage.get('init_charge'):.4f}, {usage.get('end_charge'):.4f}, "
+    #                                      f"{usage.get('inv')}")
+    #                     logger.debug("] \n")
+    #         # if there are available poles
+    #         else:
+    #             init_charge = current_time
+    #             waiting_time = 0
+    #             if VERBOSE > 0:
+    #                 logger.info(f"There are available places")
+    #                 logger.info(
+    #                     f"Agent {agent} will begin charging at time {init_charge:.4f} after waiting {waiting_time:.4f} seconds")
+    #
+    #         # Write times
+    #         #   arrival at the station
+    #         action['statistics']['at_station'] = current_time
+    #         #   begin charging
+    #         action['statistics']['init_charge'] = init_charge
+    #         #   total time
+    #         total_time = charging_time + waiting_time
+    #         action['statistics']['time'] = total_time
+    #         # amount (of something) to charge
+    #         action['statistics']['need'] = need
+    #
+    #     return action
 
     def reachable_goal(self, customer_id, pick_up_time):
         if DEBUG: logger.warning(
@@ -483,72 +426,6 @@ class Planner:
             return True
         if DEBUG: logger.warning(f'Agent {self.agent_id} CAN NOT pick-up customer {customer_id}')
         return False
-
-    # Returns the f value of a node
-    def evaluate_node(self, node, solution=False):
-        # Calculate g value w.r.t Joint plan + node actions
-        # taking into account charging congestions (implementar a futur)
-
-        # Benefits
-        benefits = 0
-        for action in node.actions:
-            if action.get('type') == 'MOVE-TO-DEST':
-                benefits += get_benefit(action) + 1000
-        # Costs
-        costs = 0
-        for action in node.actions:
-            # For actions that entail a movement, pay a penalty per km (10%)
-            if action.get('type') != 'CHARGE':
-                # i f action.get('type') not in ['MOVE-TO-STATION', 'CHARGE']:
-                costs += get_travel_cost(action)
-                if action.get('inv') == 'INV':
-                    costs *= 10
-            # For actions that entail charging, pay for the charged electricity
-            # TODO price increase if congestion (implementar a futur)
-            else:
-                costs += get_charge_cost(action)
-
-            if action.get('type') == 'PICK-UP':
-                customer = action.get('attributes').get('customer_id')
-                for tup in node.completed_goals:
-                    if tup[0] == customer:
-                        pick_up = tup
-                        break
-
-                # Add waiting time to costs
-                costs += pick_up[1] * TIME_PENALTY
-
-        # Utility (or g value) = benefits - costs
-        g = benefits - costs
-
-        # Calculate h value w.r.t Table of Goals + node end time
-        h = 0
-        # If the node is a solution, its h value is 0
-        if not solution:
-            if HEURISTIC:
-                h = self.get_h_value(node)
-
-        f_value = g + h
-        node.value = f_value
-        return f_value
-
-    # TODO adapt for the use of fixed goals
-    def get_h_value_open_goals(self, node):
-        h = 0
-        for key in self.table_of_goals.keys():
-            if key not in node.already_served():
-                if node.end_time < self.table_of_goals.get(key)[1]:
-                    # extract distance of customer trip
-                    customer_actions = self.actions_dic.get(self.agent_id).get('MOVE-TO-DEST')
-                    customer_actions = [a for a in customer_actions if
-                                        a.get('attributes').get('customer_id') == key]
-                    action = customer_actions[0]
-                    p1 = action.get('attributes').get('customer_origin')
-                    p2 = action.get('attributes').get('customer_dest')
-                    route = self.get_route(p1, p2)
-                    dist = route.get('distance')
-                    h += STARTING_FARE + (dist / 1000) * PRICE_PER_KM
-        return h
 
     def check_prev_plan(self):
         if len(self.joint_plan) > 0:
@@ -657,7 +534,7 @@ class Planner:
 
                 # Modify node f-value to utility value (h = 0)
                 # CANVI
-                evaluate_node_2(parent, self.joint_plan, self.routes_dic, solution=True)
+                evaluate_node_2(parent, self.joint_plan, self.db.routes_dic, solution=True)
                 # self.evaluate_node(parent, solution=True)
                 self.solution_nodes.append((parent, parent.value))
                 self.check_update_best_solution(parent)
@@ -706,9 +583,9 @@ class Planner:
     # TODO modify for fixed goals
     def create_customer_nodes(self, parent=None):
 
-        dic_file = open(ACTIONS_FILE, "r")
-        actions_dic = json.load(dic_file)
-        agent_actions = actions_dic.get(self.agent_id)
+
+        self.db.reload_actions()
+        agent_actions = self.db.actions_dic.get(self.agent_id)
         # agent_actions = self.actions_dic.get(self.agent_id)
 
         pick_up_actions = agent_actions.get("PICK-UP")
@@ -728,7 +605,7 @@ class Planner:
             move_to_dest_actions = [a for a in move_to_dest_actions if
                                     a.get('attributes').get('customer_id') not in parent.already_served()]
 
-        for tup in get_customer_couples(pick_up_actions, move_to_dest_actions):
+        for tup in self.db.get_customer_couples(pick_up_actions, move_to_dest_actions):
             customer_to_serve = tup[0].get('attributes').get('customer_id')
             if DEBUG: logger.info(f'Planing to serve customer {customer_to_serve}')
             if parent is None:
@@ -743,8 +620,8 @@ class Planner:
             action1 = tup[0].copy()
             action2 = tup[1].copy()
             #  Calculates the time and distance according to agent's current pos/autonomy
-            action1 = self.fill_statistics(action1, current_pos=node.agent_pos)
-            action2 = self.fill_statistics(action2)
+            action1 = self.db.fill_statistics(action1, current_pos=node.agent_pos)
+            action2 = self.db.fill_statistics(action2)
 
             node.actions += [action1, action2]
 
@@ -792,7 +669,7 @@ class Planner:
 
             # Evaluate node
             # CANVI
-            value = evaluate_node_2(node, self.joint_plan, self.actions_dic, self.routes_dic)
+            value = evaluate_node_2(node, self.joint_plan, self.db.actions_dic, self.db.routes_dic)
             # value = self.evaluate_node(node)
             if self.best_solution_prune:
                 # If the value is higher than best solution value, add node to open_nodes
@@ -834,35 +711,27 @@ class Planner:
         return generate_charging
 
     def create_charge_nodes(self, parent=None):
-        dic_file = open(ACTIONS_FILE, "r")
-        actions_dic = json.load(dic_file)
-        agent_actions = actions_dic.get(self.agent_id)
-        move_to_station_actions = agent_actions.get("MOVE-TO-STATION")
-        charge_actions = agent_actions.get("CHARGE")
+        # # dic_file = open(ACTIONS_FILE, "r")
+        # # actions_dic = json.load(dic_file)
+        # # agent_actions = actions_dic.get(self.agent_id)
+        #
+        # self.db.reload_actions()
+        # agent_actions = self.db.actions_dic.get(self.agent_id)
+        #
+        # move_to_station_actions = agent_actions.get("MOVE-TO-STATION")
+        # charge_actions = agent_actions.get("CHARGE")
 
         # Filter stations to consider only those within a distance of 2km
-        max_dist = MAX_STATION_DIST
         if parent is None:
             agent_pos = self.agent_pos
 
         else:
             agent_pos = parent.agent_pos
 
-        filtered_move_actions = []
-        filtered_stations = []
-        while len(filtered_move_actions) == 0:
-            for a in move_to_station_actions:
-                route = self.get_route(agent_pos, a.get('attributes').get('station_position'))
-                if route.get('distance') <= max_dist:
-                    filtered_move_actions.append(a.copy())
-                    filtered_stations.append(a.get('attributes').get('station_id'))
-            max_dist += 250
-
-        filtered_charge_actions = [a for a in charge_actions if
-                                   a.get('attributes').get('station_id') in filtered_stations]
+        filtered_move_actions, filtered_charge_actions = self.db.filter_station_actions(self.agent_id, agent_pos)
 
         # for tup in get_station_couples(move_to_station_actions, charge_actions):
-        for tup in get_station_couples(filtered_move_actions, filtered_charge_actions):
+        for tup in self.db.get_station_couples(filtered_move_actions, filtered_charge_actions):
             if parent is None:
                 node = Node()
                 node.agent_pos = self.agent_pos
@@ -877,9 +746,10 @@ class Planner:
             action1 = tup[0].copy()
             action2 = tup[1].copy()
             #  Calculates the time and distance according to agent's current pos/autonomy
-            action1 = self.fill_statistics(action1, current_pos=node.agent_pos)
+            action1 = self.db.fill_statistics(action1, current_pos=node.agent_pos)
             current_time += action1.get('statistics').get('time')
-            action2 = self.fill_statistics(action2, current_autonomy=node.agent_autonomy, current_time=current_time)
+            action2 = self.db.fill_statistics(action2, current_autonomy=node.agent_autonomy,
+                                              agent_max_autonomy=self.agent_max_autonomy, current_time=current_time)
 
             node.actions += [action1, action2]
 
@@ -892,7 +762,7 @@ class Planner:
 
             # Evaluate node
             # CANVI
-            value = evaluate_node_2(node, self.joint_plan, self.actions_dic, self.routes_dic)
+            value = evaluate_node_2(node, self.joint_plan, self.db.actions_dic, self.db.routes_dic)
             # value = self.evaluate_node(node)
 
             if self.best_solution_prune:
@@ -918,7 +788,6 @@ class Planner:
                             f'{self.best_solution_value:.4f} to {node.value:.4f}')
             self.best_solution = node
             self.best_solution_value = node.value
-            # self.purge_open_nodes()
 
     def extract_plan(self, node):
         self.plan = Plan(node.actions, node.value, node.completed_goals)
@@ -963,7 +832,7 @@ class Planner:
             for action in customer_actions:
                 customer_distances.append(
                     (action.get('attributes').get('customer_id'),
-                     self.get_route(current_position, action.get('attributes').get('customer_origin')).get('distance'))
+                     self.db.get_route(current_position, action.get('attributes').get('customer_origin')).get('distance'))
                 )
             #   Get tuple with closest customer
             logger.info(customer_distances)
@@ -981,8 +850,8 @@ class Planner:
             action2 = action2[0]
 
             # Fill statistics w.r.t. current position and autonomy
-            action1 = self.fill_statistics(action1, current_pos=current_position)
-            action2 = self.fill_statistics(action2)
+            action1 = self.db.fill_statistics(action1, current_pos=current_position)
+            action2 = self.db.fill_statistics(action2)
 
             # Check autonomy, go to charge in closest station if necessary
             customer_origin = action1.get("attributes").get("customer_origin")
@@ -1048,15 +917,10 @@ class Planner:
         self.plan = Plan(actions, -1, completed_goals)
         # CANVI
         utility = evaluate_plan_2(self.plan, self.joint_plan)
-        # utility = self.evaluate_plan(initial_plan, initial_plan=True)
         self.plan.utility = utility
 
         logger.info(f"Agent {self.agent_id} initial plan:")
         logger.info(self.plan.to_string_plan())
-
-        # # Update joint plan
-        # self.check_update_joint_plan(agent.get('id'), None, initial_plan)
-        # self.joint_plan["no_change"][agent.get('id')] = False
 
     def plan_from_node(self):
 
@@ -1189,64 +1053,5 @@ class Planner:
         logger.debug(f'\tPlanning process time: {end - start}')
 
 
-def initialize():
-    try:
-        f2 = open(CONFIG_FILE, "r")
-        config_dic = json.load(f2)
-
-        f2 = open(ACTIONS_FILE, "r")
-        global_actions = json.load(f2)
-
-        f2 = open(ROUTES_FILE, "r")
-        routes_dic = json.load(f2)
-
-        return config_dic, global_actions, routes_dic
-    except Exception as e:
-        print(str(e))
-        exit()
-
-
 if __name__ == '__main__':
-
-    config_dic, global_actions, routes_dic = initialize()
-
-    agent_id = 'taxi1'
-    agent_pos = agent_max_autonomy = None
-    for transport in config_dic.get('transports'):
-        if transport.get('name') == agent_id:
-            agent_pos = transport.get('position')
-            agent_max_autonomy = transport.get('autonomy')
-            agent_autonomy = transport.get('current_autonomy')
-    agent_goals = ['customer1', 'customer2', 'customer3', 'customer4']
-    planner = Planner(config_dic=config_dic,
-                      actions_dic=global_actions,
-                      routes_dic=routes_dic,
-                      agent_id=agent_id,
-                      agent_pos=agent_pos,
-                      agent_max_autonomy=agent_max_autonomy,
-                      agent_autonomy=agent_autonomy,
-                      agent_goals=agent_goals,
-                      joint_plan={
-                          "station_usage": {
-                              'station1': [],
-                              'station2': [],
-                              'station3': [],
-                          },
-                          "power_grids": {1: ['station5']},
-                          "no_change": {},
-                          "joint": None,
-                          "table_of_goals": {
-                              'customer1': (None, math.inf),
-                              'customer2': (None, math.inf),
-                              'customer3': (None, math.inf),
-                              'customer4': (None, math.inf),
-                          },
-                          "individual": {
-                              'taxi1': None
-                          }
-                      })
-
-    # start = time.time()
-    planner.run()
-    # end = time.time()
-    # logger.debug(f'\nPlanning process time: {end-start}')
+    logger.error("To test the Planner by itself please use the test_planner() function in launcher.py")

@@ -1,10 +1,8 @@
-import json
-import math
+from loguru import logger
 
 from simfleet.planner.congestion import check_charge_congestion
 from simfleet.planner.constants import STARTING_FARE, PRICE_PER_KM, TRAVEL_PENALTY, PRICE_PER_kWh, TIME_PENALTY, \
-    INVALID_CHARGE_PENALTY, HEURISTIC, ROUTES_FILE, STATION_CONGESTION
-from loguru import logger
+    INVALID_CHARGE_PENALTY, HEURISTIC, STATION_CONGESTION
 
 
 def get_benefit(action):
@@ -49,12 +47,14 @@ def compute_costs(action_list, table_of_goals, joint_plan):
                 at_station = action.get('statistics').get('at_station')
                 init_charge = action.get('statistics').get('init_charge')
                 end_time = at_station + action.get('statistics').get('time')
+                power = action.get('statistics').get('need')
                 inv = action.get('inv')
                 usage = {
                     'agent': agent,
                     'at_station': at_station,
                     'init_charge': init_charge,
                     'end_charge': end_time,
+                    'power': power,
                     'inv': inv
                 }
 
@@ -127,11 +127,31 @@ def get_h_value(node, actions_dic, routes_dic):
         route = get_route(p1, p2, routes_dic)
         dist = route.get('distance')
         action['statistics']['dist'] = dist
+
         # Consider service benefits + move-to-dest costs
         benefits += get_benefit(action) + 1000
         costs += get_travel_cost(action)
 
     h = benefits - costs
+    return h
+
+
+# TODO adapt for the use of fixed goals
+def get_h_value_open_goals(self, node):
+    h = 0
+    for key in self.table_of_goals.keys():
+        if key not in node.already_served():
+            if node.end_time < self.table_of_goals.get(key)[1]:
+                # extract distance of customer trip
+                customer_actions = self.db.actions_dic.get(self.agent_id).get('MOVE-TO-DEST')
+                customer_actions = [a for a in customer_actions if
+                                    a.get('attributes').get('customer_id') == key]
+                action = customer_actions[0]
+                p1 = action.get('attributes').get('customer_origin')
+                p2 = action.get('attributes').get('customer_dest')
+                route = self.get_route(p1, p2)
+                dist = route.get('distance')
+                h += STARTING_FARE + (dist / 1000) * PRICE_PER_KM
     return h
 
 
