@@ -37,7 +37,6 @@ def compute_costs(action_list, table_of_goals, db):
         # For actions that entail charging, pay for the charged electricity
         else:
             charge_cost = get_charge_cost(action)
-            # costs += get_charge_cost(action)
             if action.get('inv') == 'INV':
                 costs += INVALID_CHARGE_PENALTY
             else:
@@ -163,12 +162,11 @@ def evaluate_node(node, db, solution=False):
     return f_value
 
 
-def evaluate_plan(plan, joint_plan):
+def evaluate_plan(plan, db):
     action_list = [entry.action for entry in plan.entries]
 
     benefits = compute_benefits(action_list)
-    # costs = compute_costs(action_list, joint_plan.get('table_of_goals'), joint_plan)
-    costs = compute_costs(action_list, plan.table_of_goals, joint_plan)
+    costs = compute_costs(action_list, plan.table_of_goals, db)
 
     # Utility (or g value) = benefits - costs
     utility = benefits - costs

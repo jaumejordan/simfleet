@@ -32,7 +32,7 @@ class BestResponse:
         self.list_of_togs = []
         self.best_prev_plan = {}
         self.station_usage = {}
-        self.power_grids = {1:[]}
+        self.power_grids = {1: {'stations': [], 'limit_power': 0}}
 
     # Load dictionary data
     def initialize(self):
@@ -105,19 +105,26 @@ class BestResponse:
             self.station_usage[station.get('name')] = []
 
     def init_power_grids(self):
-        for station in self.db.config_dic.get('stations'):
+        for station in self.config_dic.get('stations'):
             # if the station is assigned to a grid
             if station.get('power_grid') is not None:
-                # if the grid already exists, update its list of stations
+                # if the grid already exists
                 if self.power_grids.get(station.get('power_grid')) is not None:
-                    self.power_grids[station.get('power_grid')].append(station.get('name'))
-                # if not, create the grid and add the station
+                    # add station to stations list
+                    self.power_grids[station.get('power_grid')]['stations'].append(station.get('name'))
+                    # add station power to maximum grid power
+                    self.power_grids[station.get('power_grid')]['limit_power'] += station.get('power')
+                # if not
                 else:
-                    self.power_grids[station.get('power_grid')] = [station.get('name')]
+                    self.power_grids[station.get('power_grid')]['stations'] = [station.get('name')]
+                    self.power_grids[station.get('power_grid')]['limit_power'] = station.get('power')
             # if there is no grid indicated, add it to grid 1 (global grid)
             else:
-                self.power_grids[1].append(station.get('name'))
-        logger.error(self.power_grids)
+                self.power_grids[1]['stations'].append(station.get('name'))
+                self.power_grids[1]['limit_power'] += station.get('power')
+        # TODO delete later
+        for grid in self.power_grids.keys():
+            logger.error(self.power_grids[grid])
 
     # Prepares the data structure to store the Joint plan
     def init_joint_plan(self):
@@ -362,7 +369,7 @@ class BestResponse:
             prev_utility = prev_plan.utility
             # Calculate updated utility w.r.t. other agent's plans
             # CANVI
-            updated_utility = evaluate_plan(prev_plan, self.joint_plan)
+            updated_utility = evaluate_plan(prev_plan, self.db)
             # updated_utility = self.evaluate_plan(prev_plan)
             if prev_utility != updated_utility:
                 logger.warning(f"Agent {agent_id} had its plan utility reduced "
