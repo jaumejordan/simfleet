@@ -11,7 +11,7 @@ from loguru import logger
 
 from simfleet.planner.constants import SPEED, CONFIG_FILE, \
     ACTIONS_FILE, ROUTES_FILE, HEURISTIC
-from simfleet.planner.evaluator import evaluate_node_2, evaluate_plan_2
+from simfleet.planner.evaluator import evaluate_node, evaluate_plan
 from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_expense
 from simfleet.planner.plan import Plan
 
@@ -533,9 +533,7 @@ class Planner:
                     logger.info("The node had no children, so it is a SOLUTION node")
 
                 # Modify node f-value to utility value (h = 0)
-                # CANVI
-                evaluate_node_2(parent, self.joint_plan, self.db.routes_dic, solution=True)
-                # self.evaluate_node(parent, solution=True)
+                evaluate_node(parent, self.db, solution=True)
                 self.solution_nodes.append((parent, parent.value))
                 self.check_update_best_solution(parent)
 
@@ -668,9 +666,7 @@ class Planner:
             if DEBUG: logger.info(f'Customer {customer_to_serve} picked up at time {init + pick_up_duration}')
 
             # Evaluate node
-            # CANVI
-            value = evaluate_node_2(node, self.joint_plan, self.db.actions_dic, self.db.routes_dic)
-            # value = self.evaluate_node(node)
+            value = evaluate_node(node, self.db)
             if self.best_solution_prune:
                 # If the value is higher than best solution value, add node to open_nodes
                 if value > self.best_solution_value:
@@ -683,9 +679,7 @@ class Planner:
                     if DEBUG: logger.info(f"Node added to open nodes with value {value}")
 
                     if self.save_partial_solutions:
-                        # CANVI
-                        evaluate_node_2(node, self.joint_plan, solution=True)
-                        # self.evaluate_node(node, solution=True)
+                        evaluate_node(node, self.db, solution=True)
                         if DEBUG: logger.info(f"Node saved as a partial solution with value {node.value}")
                         self.solution_nodes.append((node, node.value))
                         self.check_update_best_solution(node)
@@ -701,9 +695,7 @@ class Planner:
                 if DEBUG: logger.info(f"Node added to open nodes with value {value}")
 
                 if self.save_partial_solutions:
-                    # CANVI
-                    evaluate_node_2(node, self.joint_plan, solution=True)
-                    # self.evaluate_node(node, solution=True)
+                    evaluate_node(node, self.db, solution=True)
                     if DEBUG: logger.info(f"Node saved as a partial solution with value {node.value}")
                     self.solution_nodes.append((node, node.value))
                     self.check_update_best_solution(node)
@@ -761,9 +753,7 @@ class Planner:
             node.agent_pos = node.actions[-2].get('attributes').get('station_position')
 
             # Evaluate node
-            # CANVI
-            value = evaluate_node_2(node, self.joint_plan, self.db.actions_dic, self.db.routes_dic)
-            # value = self.evaluate_node(node)
+            value = evaluate_node(node, self.db)
 
             if self.best_solution_prune:
                 # If the value is higher than best solution value, add node to open_nodes
@@ -872,7 +862,7 @@ class Planner:
                 goals.insert(0, customer)
 
                 # Get closest station to transport
-                station_actions = [self.fill_statistics(a, current_pos=current_position) for
+                station_actions = [self.db.fill_statistics(a, current_pos=current_position) for
                                    a in
                                    move_to_station_actions]
                 action1 = min(station_actions, key=lambda x: x.get("statistics").get("time"))
@@ -883,7 +873,8 @@ class Planner:
                 action2 = [a for a in charge_actions if a.get('attributes').get('station_id') == station_id]
                 action2 = action2[0]
 
-                action2 = self.fill_statistics(action2, current_autonomy=current_autonomy, current_time=current_time)
+                action2 = self.db.fill_statistics(action2, current_autonomy=current_autonomy,
+                                                  agent_max_autonomy=self.agent_max_autonomy, current_time=current_time)
 
                 # Update position and autonomy after charge
                 self.agent_pos = action1.get('attributes').get('station_position')
@@ -915,8 +906,7 @@ class Planner:
 
         # Create plan with agent action list
         self.plan = Plan(actions, -1, completed_goals)
-        # CANVI
-        utility = evaluate_plan_2(self.plan, self.joint_plan)
+        utility = evaluate_plan(self.plan, self.db.joint_plan)
         self.plan.utility = utility
 
         logger.info(f"Agent {self.agent_id} initial plan:")
@@ -1007,9 +997,7 @@ class Planner:
                     logger.info("The node had no children, so it is a SOLUTION node")
 
                 # Modify node f-value to utility value (h = 0)
-                # CANVI
-                evaluate_node_2(parent, self.joint_plan, solution=True)
-                # self.evaluate_node(parent, solution=True)
+                evaluate_node(parent, self.db, solution=True)
                 self.solution_nodes.append((parent, parent.value))
                 self.check_update_best_solution(parent)
 

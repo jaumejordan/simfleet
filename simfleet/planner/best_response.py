@@ -8,12 +8,12 @@ from loguru import logger
 
 from simfleet.planner.constants import CONFIG_FILE, ACTIONS_FILE, \
     ROUTES_FILE
-from simfleet.planner.evaluator import evaluate_plan_2
+from simfleet.planner.evaluator import evaluate_plan
 from simfleet.planner.plan import JointPlan
 from simfleet.planner.planner import Planner
 
 INITIAL_JOINT_PLAN = False
-INITIAL_GREEDY_PLAN = False
+INITIAL_GREEDY_PLAN = True
 LOOP_DETECTION = True
 CONSIDER_PREV_PLAN = False
 VERBOSE = 0
@@ -362,7 +362,7 @@ class BestResponse:
             prev_utility = prev_plan.utility
             # Calculate updated utility w.r.t. other agent's plans
             # CANVI
-            updated_utility = evaluate_plan_2(prev_plan, self.joint_plan)
+            updated_utility = evaluate_plan(prev_plan, self.joint_plan)
             # updated_utility = self.evaluate_plan(prev_plan)
             if prev_utility != updated_utility:
                 logger.warning(f"Agent {agent_id} had its plan utility reduced "

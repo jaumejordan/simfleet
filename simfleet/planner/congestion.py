@@ -25,9 +25,9 @@ def get_electric_grid(station, power_grids):
 #     inv: None/INV
 #     }
 
-def check_charge_congestion(u1, station, original_cost, joint_plan):
-    station_usage = joint_plan.get('station_usage')
-    power_grids = joint_plan.get('power_grids')
+def check_charge_congestion(u1, station, original_cost, db):
+    station_usage = db.joint_plan.get('station_usage')
+    power_grids = db.joint_plan.get('power_grids')
     # Compare if current usage overlaps with any other usage
     congestion_time = 0
     current_grid = get_electric_grid(station, power_grids)

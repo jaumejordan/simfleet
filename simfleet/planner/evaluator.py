@@ -27,7 +27,7 @@ def compute_benefits(action_list):
 
 # Action_list must be node.actions or plan.entries
 # table of goals must be list of tuples or dictionary
-def compute_costs(action_list, table_of_goals, joint_plan):
+def compute_costs(action_list, table_of_goals, db):
     costs = 0
     for action in action_list:
         # For actions that entail a movement, pay a penalty per km (10%)
@@ -59,7 +59,7 @@ def compute_costs(action_list, table_of_goals, joint_plan):
                 }
 
                 if STATION_CONGESTION:
-                    congestion_cost = check_charge_congestion(usage, station, charge_cost, joint_plan)
+                    congestion_cost = check_charge_congestion(usage, station, charge_cost, db)
 
                     if charge_cost != congestion_cost:
                         logger.warning(
@@ -90,16 +90,6 @@ def compute_costs(action_list, table_of_goals, joint_plan):
     return costs
 
 
-def get_route(p1, p2, routes_dic):
-    key = str(p1) + ":" + str(p2)
-    route = routes_dic.get(key)
-    if route is None:
-        # En el futur, demanar la ruta al OSRM
-        logger.info(f"ERROR :: There is no route for key {key} in the routes_dic")
-        exit()
-    return route
-
-
 def already_served(node):
     res = []
     for tup in node.completed_goals:
@@ -107,8 +97,8 @@ def already_served(node):
     return res
 
 
-def get_h_value(node, actions_dic, routes_dic):
-    h = 0
+def get_h_value(node, db):
+
     benefits = 0
     costs = 0
     agent_id = node.actions[0].get('agent')
@@ -118,13 +108,13 @@ def get_h_value(node, actions_dic, routes_dic):
 
     for customer in non_served_customers:
         # extract distance of customer trip
-        customer_actions = actions_dic.get(agent_id).get('MOVE-TO-DEST')
+        customer_actions = db.actions_dic.get(agent_id).get('MOVE-TO-DEST')
         customer_actions = [a for a in customer_actions if
                             a.get('attributes').get('customer_id') == customer]
         action = customer_actions[0]
         p1 = action.get('attributes').get('customer_origin')
         p2 = action.get('attributes').get('customer_dest')
-        route = get_route(p1, p2, routes_dic)
+        route = db.get_route(p1, p2)
         dist = route.get('distance')
         action['statistics']['dist'] = dist
 
@@ -136,8 +126,7 @@ def get_h_value(node, actions_dic, routes_dic):
     return h
 
 
-# TODO adapt for the use of fixed goals
-def get_h_value_open_goals(self, node):
+def get_h_value_open_goals(self, node, db):
     h = 0
     for key in self.table_of_goals.keys():
         if key not in node.already_served():
@@ -149,15 +138,15 @@ def get_h_value_open_goals(self, node):
                 action = customer_actions[0]
                 p1 = action.get('attributes').get('customer_origin')
                 p2 = action.get('attributes').get('customer_dest')
-                route = self.get_route(p1, p2)
+                route = db.get_route(p1, p2)
                 dist = route.get('distance')
                 h += STARTING_FARE + (dist / 1000) * PRICE_PER_KM
     return h
 
 
-def evaluate_node_2(node, joint_plan, actions_dic=None, routes_dic=None, solution=False):
+def evaluate_node(node, db, solution=False):
     benefits = compute_benefits(node.actions)
-    costs = compute_costs(node.actions, node.completed_goals, joint_plan)
+    costs = compute_costs(node.actions, node.completed_goals, db)
 
     # Utility (or g value) = benefits - costs
     g = benefits - costs
@@ -167,14 +156,14 @@ def evaluate_node_2(node, joint_plan, actions_dic=None, routes_dic=None, solutio
     # If the node is a solution, its h value is 0
     if not solution:
         if HEURISTIC:
-            h = get_h_value(node, actions_dic, routes_dic)
+            h = get_h_value(node, db)
 
     f_value = g + h
     node.value = f_value
     return f_value
 
 
-def evaluate_plan_2(plan, joint_plan):
+def evaluate_plan(plan, joint_plan):
     action_list = [entry.action for entry in plan.entries]
 
     benefits = compute_benefits(action_list)
