@@ -407,15 +407,17 @@ class Planner:
                 node.agent_pos = self.agent_pos.copy()
                 node.agent_autonomy = self.agent_autonomy
                 node.agent_goals = self.agent_goals.copy()
+                current_time = 0
             else:
                 node = Node(parent)
+                current_time = parent.end_time
 
             # Fill actions statistics
             action1 = tup[0].copy()
             action2 = tup[1].copy()
             #  Calculates the time and distance according to agent's current pos/autonomy
-            action1 = self.db.fill_statistics(action1, current_pos=node.agent_pos)
-            action2 = self.db.fill_statistics(action2)
+            action1 = self.db.fill_statistics(action1, current_pos=node.agent_pos, current_time=current_time)
+            action2 = self.db.fill_statistics(action2, current_time=current_time)
 
             node.actions += [action1, action2]
 
@@ -534,7 +536,7 @@ class Planner:
             action1 = tup[0].copy()
             action2 = tup[1].copy()
             #  Calculates the time and distance according to agent's current pos/autonomy
-            action1 = self.db.fill_statistics(action1, current_pos=node.agent_pos)
+            action1 = self.db.fill_statistics(action1, current_pos=node.agent_pos, current_time=current_time)
             current_time += action1.get('statistics').get('time')
             action2 = self.db.fill_statistics(action2, current_autonomy=node.agent_autonomy,
                                               agent_max_autonomy=self.agent_max_autonomy, current_time=current_time)
@@ -637,8 +639,8 @@ class Planner:
             action2 = action2[0]
 
             # Fill statistics w.r.t. current position and autonomy
-            action1 = self.db.fill_statistics(action1, current_pos=current_position)
-            action2 = self.db.fill_statistics(action2)
+            action1 = self.db.fill_statistics(action1, current_pos=current_position, current_time=current_time)
+            action2 = self.db.fill_statistics(action2, current_time=current_time)
 
             # Check autonomy, go to charge in closest station if necessary
             customer_origin = action1.get("attributes").get("customer_origin")
@@ -659,7 +661,7 @@ class Planner:
                 goals.insert(0, customer)
 
                 # Get closest station to transport
-                station_actions = [self.db.fill_statistics(a, current_pos=current_position) for
+                station_actions = [self.db.fill_statistics(a, current_pos=current_position, current_time=current_time) for
                                    a in
                                    move_to_station_actions]
                 action1 = min(station_actions, key=lambda x: x.get("statistics").get("time"))

@@ -34,7 +34,7 @@ class Database:
         route = self.routes_dic.get(key)
         if route is None:
             # En el futur, demanar la ruta al OSRM
-            logger.info("ERROR :: There is no route for key \"", key, "\" in the routes_dic")
+            logger.critical(f"ERROR :: There is no route for key {key} in the routes_dic")
             exit()
         return route
 
@@ -137,6 +137,17 @@ class Database:
                     res.append((a, b))
         return res
 
+    def extract_route(self, action):
+        origin = action.get('statistics').get('movement_start')
+        if action.get('type') == 'PICK-UP':
+            destination = action.get('attributes').get('customer_origin')
+        elif action.get('type') == 'MOVE-TO-DEST':
+            destination = action.get('attributes').get('customer_dest')
+        else:
+            destination = action.get('attributes').get('station_position')
+
+        return self.get_route(origin, destination)
+
     def fill_statistics(self, action, current_pos=None, current_autonomy=None, agent_max_autonomy=None, current_time=None):
         if action.get('type') == 'PICK-UP':
             # distance from transport position to customer origin
@@ -147,6 +158,8 @@ class Database:
             time = self.meters_to_seconds(dist)
             action['statistics']['dist'] = dist
             action['statistics']['time'] = time
+            action['statistics']['init'] = current_time
+            action['statistics']['movement_start'] = p1
 
         elif action.get('type') == 'MOVE-TO-DEST':
             # distance from customer_origin to customer_destination
@@ -157,16 +170,21 @@ class Database:
             time = self.meters_to_seconds(dist)
             action['statistics']['dist'] = dist
             action['statistics']['time'] = time
+            action['statistics']['init'] = current_time
+            action['statistics']['movement_start'] = p1
 
         elif action.get('type') == 'MOVE-TO-STATION':
             # distance from transport position to station position
             p1 = current_pos
             p2 = action.get('attributes').get('station_position')
+
             route = self.get_route(p1, p2)
             dist = route.get('distance')
             time = self.meters_to_seconds(dist)
             action['statistics']['dist'] = dist
             action['statistics']['time'] = time
+            action['statistics']['init'] = current_time
+            action['statistics']['movement_start'] = p1
 
         elif action.get('type') == 'CHARGE':
 

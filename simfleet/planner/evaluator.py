@@ -1,8 +1,8 @@
 from loguru import logger
 
-from simfleet.planner.congestion import check_charge_congestion
+from simfleet.planner.congestion import check_charge_congestion, check_road_congestion
 from simfleet.planner.constants import STARTING_FARE, PRICE_PER_KM, TRAVEL_PENALTY, PRICE_PER_kWh, TIME_PENALTY, \
-    INVALID_CHARGE_PENALTY, HEURISTIC, STATION_CONGESTION
+    INVALID_CHARGE_PENALTY, HEURISTIC, STATION_CONGESTION, ROAD_CONGESTION
 
 
 def get_benefit(action):
@@ -33,6 +33,9 @@ def compute_costs(action_list, table_of_goals, db):
         # For actions that entail a movement, pay a penalty per km (10%)
         if action.get('type') != 'CHARGE':
             costs += get_travel_cost(action)
+            if ROAD_CONGESTION:
+                # Compute road congestion
+                check_road_congestion(action, db)
 
         # For actions that entail charging, pay for the charged electricity
         else:
@@ -58,12 +61,12 @@ def compute_costs(action_list, table_of_goals, db):
                 }
 
                 if STATION_CONGESTION:
-                    congestion_cost = check_charge_congestion(usage, station, charge_cost, db)
+                    charge_congestion = check_charge_congestion(usage, station, charge_cost, db)
 
-                    if charge_cost != congestion_cost:
+                    if charge_cost != charge_congestion:
                         logger.warning(
-                            f"Charging cost incremented by congestion from {charge_cost} to {congestion_cost}")
-                        costs += congestion_cost
+                            f"Charging cost incremented by congestion from {charge_cost} to {charge_congestion}")
+                        costs += charge_congestion
                 else:
                     costs += charge_cost
 

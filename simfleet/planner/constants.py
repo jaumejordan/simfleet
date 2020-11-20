@@ -16,6 +16,7 @@ INVALID_CHARGE_PENALTY = 10000 # invalid charge actions have its cost multiplied
 # proposing them
 HEURISTIC = True
 STATION_CONGESTION = True
+ROAD_CONGESTION = True
 
 # # Congestion test 1
 # CONFIG_FILE = "configs/congestion1.json"
