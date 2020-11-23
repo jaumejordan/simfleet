@@ -4,6 +4,8 @@ import numpy as np
 from loguru import logger
 from shapely.geometry import LineString, Point, GeometryCollection, MultiLineString, MultiPoint
 
+from simfleet.planner.generators_utils import timing
+
 
 def get_electric_grid(station, power_grids):
     for i in power_grids.keys():
@@ -82,7 +84,9 @@ def charge_congestion_function(bound_power_percentage, limit_power, power_consum
         return cost + ((occupation - bound_power_percentage) * cost) * mean_overlap
 
 
-def check_road_congestion(a1, db):
+def check_road_congestion(a1, original_cost, db):
+    # TODO extract from database's config file
+    bound_route_percentage = 0.3
     # List to store the intersection percentages with other routes
     res = []
     # Extract a1's time interval
@@ -91,13 +95,13 @@ def check_road_congestion(a1, db):
 
     # Extract a1's route
     a1_route = db.extract_route(a1)
-    a1_distance = a1_route.get('distance') # calculated by OSRM
+    a1_distance = a1_route.get('distance')  # calculated by OSRM
 
     # Get all non CHARGE type actions which occur in overlapping intervals to action's a1 timespan
     if db.joint_plan.get('joint') is not None:
         for entry in db.joint_plan.get('joint').entries:
             a2 = entry.action
-            if a2.get('type') != 'CHARGE':
+            if a2.get('agent') != a1.get('agent') and a2.get('type') != 'CHARGE':
                 a2_interval = [a2.get('statistics').get('init'),
                                a2.get('statistics').get('init') + a2.get('statistics').get('time')]
 
@@ -114,13 +118,19 @@ def check_road_congestion(a1, db):
                                 f"Invalid percentage: {intersec_distance} / {a1_distance} = {intersec_percentage}")
                         if intersec_percentage > 1:
                             intersec_percentage = 1
+                        if intersec_percentage > 0.2:
+                            res.append(intersec_percentage)
 
-                        res.append(intersec_percentage)
-
-        if len(res) > 0:
-
-            logger.error(f"Route intersected with another {len(res)} routes. Intersection percentages: {res}. "
-                         f"Avg: {round(sum(res)/len(res),2)}")
+    if len(res) > 0:
+        logger.error(f"Route intersected with another {len(res)} routes. "
+                     f"Avg: {round(sum(res) / len(res), 2)} Intersection percentages: {res}.")
+        return travel_congestion_function(bound_route_percentage,
+                                          cost=original_cost,
+                                          mean_overlap=sum(res) / len(res),
+                                          num_agents=len(res),
+                                          total_agents=len(db.agents))
+    else:
+        return original_cost
 
 
 def route_intersection_distance(r1, r2):
@@ -155,6 +165,17 @@ def route_intersection_distance(r1, r2):
             logger.critical(f"Intersection is of an uncontrolled class: {type(x)}")
 
     return distance
+
+
+def travel_congestion_function(bound_route_percentage, cost, mean_overlap, num_agents, total_agents):
+    aux = num_agents / total_agents
+    if aux < bound_route_percentage:
+        return cost
+    else:
+        logger.debug(
+            f"Overlaps: {mean_overlap}, num_agents: {num_agents}, original_cost: {cost}, "
+            f"increment: {((aux - bound_route_percentage) * cost) * mean_overlap}")
+        return cost + ((aux - bound_route_percentage) * cost) * mean_overlap
 
 
 def measure_linestring(ob):

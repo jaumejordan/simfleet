@@ -15,7 +15,7 @@ MAX_STATION_DIST = 1500 # maximum distance to a station to consider it a place t
 INVALID_CHARGE_PENALTY = 10000 # invalid charge actions have its cost multiplied 100 times to discorage agents to keep
 # proposing them
 HEURISTIC = True
-STATION_CONGESTION = True
+STATION_CONGESTION = False
 ROAD_CONGESTION = True
 
 # # Congestion test 1

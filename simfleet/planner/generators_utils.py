@@ -1,14 +1,30 @@
 import math
+import time
 
 import geopandas as gpd
 import geopy.distance
 import requests
 import shapely
+from loguru import logger
 from shapely.geometry import Polygon, Point
 from geopy.distance import vincenty
 
 MIN_AUTONOMY = 2
+
+
 # ------------------------------------------- AUXILIARY FUNCTIONS -------------------------------------------#
+
+def timing(f):
+    def wrap(*args, **kwargs):
+        logger.debug('Starting function {}'.format(f.__name__))
+        time1 = time.time()
+        ret = f(*args, **kwargs)
+        time2 = time.time()
+        logger.debug('%s function took %0.3f ms' % (f.__name__, (time2 - time1) * 1000.0))
+        return ret
+
+    return wrap
+
 
 def isPerfectSquare(x):
     # Find floating point value of
@@ -269,9 +285,10 @@ def distance_in_meters(coord1, coord2):
     """
     return vincenty(coord1, coord2).meters
 
+
 def has_enough_autonomy(autonomy, transport_position, customer_orig, customer_dest):
     if autonomy <= MIN_AUTONOMY:
-        #logger.warning("{} has not enough autonomy ({}).".format(self.agent.name, autonomy))
+        # logger.warning("{} has not enough autonomy ({}).".format(self.agent.name, autonomy))
         return False
     travel_km = calculate_km_expense(transport_position, customer_orig, customer_dest)
     # logger.debug("Transport {} has autonomy {} when max autonomy is {}"
@@ -282,6 +299,7 @@ def has_enough_autonomy(autonomy, transport_position, customer_orig, customer_de
         #                                                                                 autonomy, travel_km))
         return False
     return True
+
 
 def calculate_km_expense(origin, start, dest=None):
     fir_distance = distance_in_meters(origin, start)

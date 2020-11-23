@@ -26,9 +26,8 @@ class BestResponse:
         # self.actions_dic = actions_dic
         # self.routes_dic = routes_dic
         self.joint_plan = None
-        self.agents = None
-        self.list_of_plans = None
-        self.list_of_togs = []
+        self.agents = database.agents
+        self.list_of_plans = database.list_of_plans
         self.best_prev_plan = {}
         self.station_usage = {}
         self.power_grids = {1: {'stations': [], 'limit_power': 0}}
@@ -51,53 +50,6 @@ class BestResponse:
 
     def update_db(self):
         self.db.joint_plan = self.joint_plan
-
-    # Creates Transport Agents that will act as players in the Best Response game
-    def create_agents(self):
-        self.list_of_plans = {}
-        agents = []
-        for agent in self.db.config_dic.get('transports'):
-            agent_id = agent.get('name')
-            agent_dic = {
-                'id': agent_id,
-                'initial_position': agent.get('position'),
-                'max_autonomy': agent.get('autonomy'),
-                'current_autonomy': agent.get('current_autonomy')
-            }
-            agents.append(agent_dic)
-            self.list_of_plans[agent_id] = []
-            self.best_prev_plan[agent_id] = (0, None)
-
-        self.agents = agents
-        self.assign_goals()
-
-        logger.debug(f"Agents loaded {self.agents}")
-
-    def assign_goals(self):
-        # List with all customers
-        customer_dics = self.db.config_dic.get('customers')
-        customers = []
-        for customer in customer_dics:
-            customers.append(customer.get('name'))
-
-        # Number of customers each agent will initially pick up
-        customers_per_agent = math.ceil(len(customers) / len(self.agents))
-
-        for agent in self.agents:
-
-            if len(customers) >= customers_per_agent:
-                # Assign their customers
-                goals = random.sample(customers, k=customers_per_agent)
-                # TODO hardcoded to repartir 1 2 3
-                # goals.append(customers[0])
-                # customers.pop(0)
-                customers = [c for c in customers if c not in goals]
-            else:
-                goals = customers.copy()
-
-            agent['goals'] = goals
-
-            logger.info(f"Goals for agent {agent.get('id')}: {goals}")
 
     def init_station_usage(self):
         for station in self.db.config_dic.get('stations'):
@@ -497,7 +449,7 @@ class BestResponse:
         # Read dictionary data
         self.initialize()
         # Create players
-        self.create_agents()
+        # self.create_agents()
 
         # Assign random order
         # random.shuffle(self.agents)

@@ -1,4 +1,6 @@
 import json
+import math
+import random
 
 from loguru import logger
 
@@ -9,6 +11,7 @@ VERBOSE = 0
 
 class Database:
     def __init__(self):
+
         try:
             f2 = open(CONFIG_FILE, "r")
             self.config_dic = json.load(f2)
@@ -23,7 +26,12 @@ class Database:
             print(str(e))
             exit()
 
+        self.agents = None
         self.joint_plan = {}
+        self.list_of_plans = {}
+        self.best_prev_plan = {}
+
+        self.create_agents()
 
     def reload_actions(self):
         f2 = open(ACTIONS_FILE, "r")
@@ -37,6 +45,52 @@ class Database:
             logger.critical(f"ERROR :: There is no route for key {key} in the routes_dic")
             exit()
         return route
+
+    # Creates Transport Agents that will act as players in the Best Response game
+    def create_agents(self):
+        agents = []
+        for agent in self.config_dic.get('transports'):
+            agent_id = agent.get('name')
+            agent_dic = {
+                'id': agent_id,
+                'initial_position': agent.get('position'),
+                'max_autonomy': agent.get('autonomy'),
+                'current_autonomy': agent.get('current_autonomy')
+            }
+            agents.append(agent_dic)
+            self.list_of_plans[agent_id] = []
+            self.best_prev_plan[agent_id] = (0, None)
+
+        self.agents = agents
+        self.assign_goals()
+
+        logger.debug(f"Agents loaded {self.agents}")
+
+    def assign_goals(self):
+        # List with all customers
+        customer_dics = self.config_dic.get('customers')
+        customers = []
+        for customer in customer_dics:
+            customers.append(customer.get('name'))
+
+        # Number of customers each agent will initially pick up
+        customers_per_agent = math.ceil(len(customers) / len(self.agents))
+
+        for agent in self.agents:
+
+            if len(customers) >= customers_per_agent:
+                # Assign their customers
+                goals = random.sample(customers, k=customers_per_agent)
+                # TODO hardcoded to repartir 1 2 3
+                # goals.append(customers[0])
+                # customers.pop(0)
+                customers = [c for c in customers if c not in goals]
+            else:
+                goals = customers.copy()
+
+            agent['goals'] = goals
+
+            logger.info(f"Goals for agent {agent.get('id')}: {goals}")
 
     #############################################################
     ##################### STATION FUNCTIONS #####################

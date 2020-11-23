@@ -32,10 +32,17 @@ def compute_costs(action_list, table_of_goals, db):
     for action in action_list:
         # For actions that entail a movement, pay a penalty per km (10%)
         if action.get('type') != 'CHARGE':
-            costs += get_travel_cost(action)
+            travel_cost = get_travel_cost(action)
             if ROAD_CONGESTION:
                 # Compute road congestion
-                check_road_congestion(action, db)
+                road_congestion = check_road_congestion(action, travel_cost, db)
+
+                if travel_cost != road_congestion:
+                    costs += road_congestion
+                    logger.warning(
+                        f"Travel cost incremented by congestion from {travel_cost} to {road_congestion}")
+                else:
+                    costs += travel_cost
 
         # For actions that entail charging, pay for the charged electricity
         else:
