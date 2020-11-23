@@ -2,7 +2,7 @@ from math import radians, cos, sin, asin, sqrt
 
 import numpy as np
 from loguru import logger
-from shapely.geometry import LineString, Point, GeometryCollection
+from shapely.geometry import LineString, Point, GeometryCollection, MultiLineString, MultiPoint
 
 
 def get_electric_grid(station, power_grids):
@@ -58,8 +58,8 @@ def check_charge_congestion(u1, station, original_cost, db):
                 congestion_percentage = congestion_time / (u1.get('end_charge') - u1.get('init_charge'))
                 overlaps = np.append(overlaps, [congestion_percentage])
 
-    mean_overlap = overlaps.mean()
     if congested_agents > 0:
+        mean_overlap = overlaps.mean()
         return charge_congestion_function(bound_power_percentage, limit_power, power_consumption, original_cost,
                                           mean_overlap)
     else:
@@ -91,7 +91,7 @@ def check_road_congestion(a1, db):
 
     # Extract a1's route
     a1_route = db.extract_route(a1)
-    a1_distance = a1_route.get('distance')
+    a1_distance = a1_route.get('distance') # calculated by OSRM
 
     # Get all non CHARGE type actions which occur in overlapping intervals to action's a1 timespan
     if db.joint_plan.get('joint') is not None:
@@ -110,14 +110,17 @@ def check_road_congestion(a1, db):
                         # Compute intersection %
                         intersec_percentage = intersec_distance / a1_distance
                         if intersec_percentage > 1.1:
-                            logger.critical(f"Invalid percentage: {intersec_distance } / {a1_distance} = {intersec_percentage}")
+                            logger.critical(
+                                f"Invalid percentage: {intersec_distance} / {a1_distance} = {intersec_percentage}")
                         if intersec_percentage > 1:
                             intersec_percentage = 1
 
                         res.append(intersec_percentage)
 
         if len(res) > 0:
-            logger.error(f"Route intersected with another {len(res)} routes. Intersection percentages: {res}")
+
+            logger.error(f"Route intersected with another {len(res)} routes. Intersection percentages: {res}. "
+                         f"Avg: {round(sum(res)/len(res),2)}")
 
 
 def route_intersection_distance(r1, r2):
@@ -125,24 +128,44 @@ def route_intersection_distance(r1, r2):
     a = path_to_linestring(r1.get('path'))
     b = path_to_linestring(r2.get('path'))
     x = a.intersection(b)
-    logger.warning(f"Intersection is {x}")
     # intersection can be POINT, LINESTRING EMPTY, LINESTRING, MULTILINESTRING or GEOMETRYCOLLECTION
     # if the routes intersect, check how much they do so
-    if isinstance(x, GeometryCollection):
-        for ob in x:
-            # if part of the intersection is a LineString
-            if isinstance(ob, LineString):
-                # get list of coordinates (path) from LineString
-                piece = linestring_to_path(ob)
-                # calculate distance between each pair of points according to Harversine formula
-                for i in range(0, len(piece) - 1):
-                    point1 = piece[i]
-                    point2 = piece[i + 1]
-                    distance += haversine(point1[0], point1[1], point2[0], point2[1])
-            elif isinstance(ob, Point):
-                # do nothing
+    if not x.is_empty:
+        if isinstance(x, GeometryCollection):
+            for ob in x:
+                # if part of the intersection is a LineString
+                if isinstance(ob, LineString):
+                    distance += measure_linestring(ob)
+                elif isinstance(ob, Point):
+                    # do nothing
+                    distance += 0
+        elif isinstance(x, LineString):
+            distance += measure_linestring(x)
+        elif isinstance(x, MultiLineString):
+            for ob in list(x):
+                distance += measure_linestring(ob)
+        elif isinstance(x, Point):  # x is of class POINT
+            # do nothing
+            distance += 0
+        elif isinstance(x, MultiPoint):
+            # do nothing
+            for ob in list(x):
                 distance += 0
+        else:
+            logger.critical(f"Intersection is of an uncontrolled class: {type(x)}")
 
+    return distance
+
+
+def measure_linestring(ob):
+    distance = 0
+    # get list of coordinates (path) from LineString
+    piece = linestring_to_path(ob)
+    # calculate distance between each pair of points according to Harversine formula
+    for i in range(0, len(piece) - 1):
+        point1 = piece[i]
+        point2 = piece[i + 1]
+        distance += haversine(point1[0], point1[1], point2[0], point2[1])
     return distance
 
 

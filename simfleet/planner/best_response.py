@@ -12,7 +12,7 @@ from simfleet.planner.plan import JointPlan
 from simfleet.planner.planner import Planner
 
 INITIAL_JOINT_PLAN = False
-INITIAL_GREEDY_PLAN = False
+INITIAL_GREEDY_PLAN = True
 LOOP_DETECTION = True
 CONSIDER_PREV_PLAN = False
 VERBOSE = 0
