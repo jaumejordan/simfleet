@@ -4,7 +4,7 @@ import random
 
 from loguru import logger
 
-from simfleet.planner.constants import CONFIG_FILE, ACTIONS_FILE, ROUTES_FILE, SPEED, MAX_STATION_DIST
+from simfleet.planner.constants import CONFIG_FILE, ACTIONS_FILE, ROUTES_FILE, SPEED, MAX_STATION_DIST, PRINT_OUTPUT
 
 VERBOSE = 0
 
@@ -64,8 +64,6 @@ class Database:
         self.agents = agents
         self.assign_goals()
 
-        logger.debug(f"Agents loaded {self.agents}")
-
     def assign_goals(self):
         # List with all customers
         customer_dics = self.config_dic.get('customers')
@@ -80,17 +78,16 @@ class Database:
 
             if len(customers) >= customers_per_agent:
                 # Assign their customers
-                goals = random.sample(customers, k=customers_per_agent)
+                # goals = random.sample(customers, k=customers_per_agent)
                 # TODO hardcoded to repartir 1 2 3
-                # goals.append(customers[0])
-                # customers.pop(0)
+                goals = customers[0:customers_per_agent]
                 customers = [c for c in customers if c not in goals]
             else:
                 goals = customers.copy()
 
             agent['goals'] = goals
-
-            logger.info(f"Goals for agent {agent.get('id')}: {goals}")
+            if PRINT_OUTPUT > 0:
+                logger.info(f"Goals for agent {agent.get('id')}: {goals}")
 
     #############################################################
     ##################### STATION FUNCTIONS #####################
@@ -104,7 +101,8 @@ class Database:
         for usage in self.joint_plan.get('station_usage').get(station):
             if usage.get('agent') != agent and usage.get('inv') != 'INV':
                 if usage.get('at_station') == at_station:
-                    logger.warning(f"Found simultaneous charge among agents {usage.get('agent')} and {agent}")
+                    if PRINT_OUTPUT > 0:
+                        logger.warning(f"Found simultaneous charge among agents {usage.get('agent')} and {agent}")
                     return True
         return False
 

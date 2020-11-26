@@ -4,6 +4,8 @@
 # PENALTY = 0.1 # 10% of the traveled km
 # PRICE_PER_kWh = 0.0615
 # GOAL_PERCENTAGE = 1
+PRINT_OUTPUT = 1
+
 
 SPEED = 2000  # km/h
 STARTING_FARE = 5
@@ -14,8 +16,13 @@ TIME_PENALTY = 1
 MAX_STATION_DIST = 1500 # maximum distance to a station to consider it a place to charge
 INVALID_CHARGE_PENALTY = 10000 # invalid charge actions have its cost multiplied 100 times to discorage agents to keep
 # proposing them
+
+# Search / BR speedups
 HEURISTIC = True
-STATION_CONGESTION = False
+INITIAL_GREEDY_PLAN = True
+
+# Congestions
+STATION_CONGESTION = True
 ROAD_CONGESTION = True
 
 # # Congestion test 1

@@ -13,7 +13,7 @@ start = time.time()
 br.run()
 # br.obtain_best_plans()
 end = time.time()
-logger.debug(f'\tBRPS process time: {end - start}')
+logger.debug(f'\tBest-Response process time: {end - start:.3f}')
 
 
 def test_planner():

@@ -21,6 +21,9 @@ class Node:
             self.agent_goals = []
             # List with names of already served customers
             self.completed_goals = []
+            # Attributes for evaluation
+            self.benefits = 0
+            self.costs = 0
 
             # Llista customers atesos + Llista de customers per atendre
 
@@ -34,6 +37,8 @@ class Node:
             # New
             self.agent_goals = parent.agent_goals[:]  # .copy()
             self.completed_goals = parent.completed_goals[:]  # .copy()
+            self.benefits = parent.benefits
+            self.costs = parent.costs
 
         # Independent values for every node
         #   own f-value

@@ -9,7 +9,7 @@ import time
 
 from loguru import logger
 
-from simfleet.planner.constants import ACTIONS_FILE, HEURISTIC
+from simfleet.planner.constants import ACTIONS_FILE, HEURISTIC, PRINT_OUTPUT
 from simfleet.planner.evaluator import evaluate_node, evaluate_plan
 from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_expense
 from simfleet.planner.node import Node
@@ -120,6 +120,8 @@ class Planner:
         # Plan from a specific node
         self.start_node = start_node
 
+        self.planning_time = -1
+
         self.create_table_of_goals()
 
     # Reads plan of every agent (joint plan) and fills the corresponding table of goals
@@ -151,7 +153,8 @@ class Planner:
         for usage in self.joint_plan.get('station_usage').get(station):
             if usage.get('agent') != agent and usage.get('inv') != 'INV':
                 if usage.get('at_station') == at_station:
-                    logger.warning(f"Found simultaneous charge among agents {usage.get('agent')} and {agent}")
+                    if PRINT_OUTPUT > 0:
+                        logger.warning(f"Found simultaneous charge among agents {usage.get('agent')} and {agent}")
                     return True
         return False
 
@@ -229,7 +232,8 @@ class Planner:
             if self.joint_plan["individual"][self.agent_id] is not None:
                 if self.joint_plan["individual"][self.agent_id].utility > 0:
                     self.best_solution_value = self.joint_plan["individual"][self.agent_id].utility
-                    logger.warning(f"Using {self.best_solution_value} as lower bound for plan utility")
+                    if PRINT_OUTPUT > 0:
+                        logger.warning(f"Using {self.best_solution_value} as lower bound for plan utility")
 
     def run(self):
 
@@ -366,14 +370,15 @@ class Planner:
                 logger.info(self.plan.to_string_plan())
 
         # Print process statistics
-        # if VERBOSE > 0:
-        logger.info("Process statistics:")
-        # Amount of generated nodes
-        logger.info(f'\tGenerated nodes - {self.generated_nodes}')
-        # Max queue length
-        logger.info(f'\tMax. queue length - {self.max_queue_length}')
+        self.planning_time = end - start
+        if PRINT_OUTPUT > 0:
+            logger.info("Process statistics:")
+            # Amount of generated nodes
+            logger.info(f'\tGenerated nodes - {self.generated_nodes}')
+            # Max queue length
+            logger.info(f'\tMax. queue length - {self.max_queue_length}')
 
-        logger.debug(f'\tPlanning process time: {end - start}')
+            logger.debug(f'\tPlanning process time: {self.planning_time:.3f} s')
 
     # TODO modify for fixed goals
     def create_customer_nodes(self, parent=None):
@@ -581,8 +586,8 @@ class Planner:
         self.plan = Plan(node.actions, node.value, node.completed_goals)
 
     def greedy_initial_plan(self):
-
-        logger.info(f"Creating greedy initial plan for agent {self.agent_id}")
+        if PRINT_OUTPUT > 0:
+            logger.info(f"Creating greedy initial plan for agent {self.agent_id}")
 
         # Get actions
         dic_file = open(ACTIONS_FILE, "r")
@@ -624,7 +629,6 @@ class Planner:
                          'distance'))
                 )
             #   Get tuple with closest customer
-            logger.info(customer_distances)
             closest_goal = min(customer_distances, key=lambda x: x[1])
             #   Extract closest customer and delete it from goals
             customer = closest_goal[0]
@@ -707,9 +711,9 @@ class Planner:
         self.plan = Plan(actions, -1, completed_goals)
         utility = evaluate_plan(self.plan, self.db)
         self.plan.utility = utility
-
-        logger.info(f"Agent {self.agent_id} initial plan:")
-        logger.info(self.plan.to_string_plan())
+        if PRINT_OUTPUT > 0:
+            logger.info(f"Agent {self.agent_id} initial plan:")
+            logger.info(self.plan.to_string_plan())
 
     def plan_from_node(self):
 
@@ -828,16 +832,16 @@ class Planner:
                 logger.info(self.plan.to_string_plan())
 
         # Print process statistics
-        # if VERBOSE > 0:
-        logger.info("Process statistics:")
-        # Amount of generated nodes
-        logger.info(f'\tGenerated nodes - {self.generated_nodes}')
-        # # Amount of expanded nodes
-        # logger.info(f'\tExpanded nodes - {self.expanded_nodes}')
-        # Max queue length
-        logger.info(f'\tMax. queue length - {self.max_queue_length}')
+        if PRINT_OUTPUT > 0:
+            logger.info("Process statistics:")
+            # Amount of generated nodes
+            logger.info(f'\tGenerated nodes - {self.generated_nodes}')
+            # # Amount of expanded nodes
+            # logger.info(f'\tExpanded nodes - {self.expanded_nodes}')
+            # Max queue length
+            logger.info(f'\tMax. queue length - {self.max_queue_length}')
 
-        logger.debug(f'\tPlanning process time: {end - start}')
+            logger.debug(f'\tPlanning process time: {end - start:.3f}')
 
 
 if __name__ == '__main__':

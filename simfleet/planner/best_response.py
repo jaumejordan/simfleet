@@ -6,13 +6,12 @@ import random
 from loguru import logger
 
 from simfleet.planner.constants import CONFIG_FILE, ACTIONS_FILE, \
-    ROUTES_FILE
+    ROUTES_FILE, INITIAL_GREEDY_PLAN, PRINT_OUTPUT
 from simfleet.planner.evaluator import evaluate_plan
 from simfleet.planner.plan import JointPlan
 from simfleet.planner.planner import Planner
 
 INITIAL_JOINT_PLAN = False
-INITIAL_GREEDY_PLAN = True
 LOOP_DETECTION = True
 CONSIDER_PREV_PLAN = False
 VERBOSE = 0
@@ -31,6 +30,7 @@ class BestResponse:
         self.best_prev_plan = {}
         self.station_usage = {}
         self.power_grids = {1: {'stations': [], 'limit_power': 0}}
+        self.planning_times = []
 
     # Load dictionary data
     def initialize(self):
@@ -74,8 +74,9 @@ class BestResponse:
                 self.power_grids[1]['stations'].append(station.get('name'))
                 self.power_grids[1]['limit_power'] += station.get('power')
         # TODO delete later
-        for grid in self.power_grids.keys():
-            logger.error(self.power_grids[grid])
+        if PRINT_OUTPUT > 0:
+            for grid in self.power_grids.keys():
+                logger.error(self.power_grids[grid])
 
     # Prepares the data structure to store the Joint plan
     def init_joint_plan(self):
@@ -286,20 +287,23 @@ class BestResponse:
     def create_initial_plans(self):
         for a in self.agents:
             agent_id = a.get('id')
-            logger.info(f"Agent \'{agent_id}\''s turn")
-            logger.info("-------------------------------------------------------------------------")
-            logger.info(f"Creating first plan for agent {agent_id}")
+            if PRINT_OUTPUT > 0:
+                logger.info(f"Agent \'{agent_id}\''s turn")
+                logger.info("-------------------------------------------------------------------------")
+                logger.info(f"Creating first plan for agent {agent_id}")
             planner = self.create_planner(a)
             planner.run()
             new_plan = planner.plan
+            self.planning_times.append(planner.planning_time)
             self.check_update_joint_plan(agent_id, None, new_plan)
 
     def create_initial_greedy_plans(self):
         for a in self.agents:
             agent_id = a.get('id')
-            logger.info(f"Agent \'{agent_id}\''s turn")
-            logger.info("-------------------------------------------------------------------------")
-            logger.info(f"Creating GREEDY initial plan for agent {agent_id}")
+            if PRINT_OUTPUT > 0:
+                logger.info(f"Agent \'{agent_id}\''s turn")
+                logger.info("-------------------------------------------------------------------------")
+                logger.info(f"Creating GREEDY initial plan for agent {agent_id}")
             planner = self.create_planner(a)
             planner.greedy_initial_plan()
             new_plan = planner.plan
@@ -307,14 +311,16 @@ class BestResponse:
 
     def propose_plan(self, a):
         agent_id = a.get('id')
-        logger.info("\n")
-        logger.info(f"Agent \'{agent_id}\''s turn")
-        logger.info("-------------------------------------------------------------------------")
+        if PRINT_OUTPUT > 0:
+            logger.info("\n")
+            logger.info(f"Agent \'{agent_id}\''s turn")
+            logger.info("-------------------------------------------------------------------------")
         # Get plan from previous round
         prev_plan = self.get_individual_plan(a)
         # if previous plan is None (or Empty), indicates the agent could not find a plan in the previous round
         if prev_plan is None:
-            logger.info(f"Agent {agent_id} has no previous plan")
+            if PRINT_OUTPUT > 0:
+                logger.info(f"Agent {agent_id} has no previous plan")
         else:
             # Get previous plan utility
             prev_utility = prev_plan.utility
@@ -323,20 +329,24 @@ class BestResponse:
             updated_utility = evaluate_plan(prev_plan, self.db)
             # updated_utility = self.evaluate_plan(prev_plan)
             if prev_utility != updated_utility:
-                logger.warning(f"Agent {agent_id} had its plan utility reduced "
-                               f"from {prev_utility:.4f} to {updated_utility:.4f}")
+                if PRINT_OUTPUT > 0:
+                    logger.warning(f"Agent {agent_id} had its plan utility reduced "
+                                   f"from {prev_utility:.4f} to {updated_utility:.4f}")
                 # NEW if the utility of the plan had changed, update it in the joint plan
                 prev_plan.utility = updated_utility
                 self.joint_plan["individual"][agent_id].utility = updated_utility
 
             else:
-                logger.info(f"The utility of agent's {agent_id} plan has not changed")
+                if PRINT_OUTPUT > 0:
+                    logger.info(f"The utility of agent's {agent_id} plan has not changed")
 
         # Propose new plan as best response to joint plan
-        logger.info("Searching for new plan proposal...")
+        if PRINT_OUTPUT > 0:
+            logger.info("Searching for new plan proposal...")
         planner = self.create_planner(a)
         planner.run()
         new_plan = planner.plan
+        self.planning_times.append(planner.planning_time)
 
         self.check_update_joint_plan(agent_id, prev_plan, new_plan)
 
@@ -346,21 +356,25 @@ class BestResponse:
         if new_plan is None:
             # if both the previous and new plans where None, indicate that the agent did not change its proposal
             if prev_plan is None:
-                logger.error(
-                    f"Agent {agent_id} could not find any plan"
-                )
+                if PRINT_OUTPUT > 0:
+                    logger.error(
+                        f"Agent {agent_id} could not find any plan"
+                    )
                 self.update_joint_plan(agent_id, new_plan)
-                logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
+                if PRINT_OUTPUT > 0:
+                    logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
                 self.joint_plan["no_change"][agent_id] = True
 
             else:
                 # the planner did not find any feasible plan (utility of prev plan was negative but planner returned None)
                 if prev_plan.utility < 0:
-                    logger.error(
-                        f"Agent {agent_id} could not find any plan"
-                    )
+                    if PRINT_OUTPUT > 0:
+                        logger.error(
+                            f"Agent {agent_id} could not find any plan"
+                        )
                     self.update_joint_plan(agent_id, new_plan)
-                    logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
+                    if PRINT_OUTPUT > 0:
+                        logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
                     self.joint_plan["no_change"][agent_id] = False
 
                 # the planner found the same plan as before (utility of prev plan was positive but planner retuned None)
@@ -373,8 +387,9 @@ class BestResponse:
                     # logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
                     # self.joint_plan["no_change"][agent_id] = False
                     # logger.critical("NO DEURIA ENTRAR ACÍ")
-                    logger.error(
-                        f"Agent {agent_id} could not improve its previous plan (it found the same one than in the previous round)")
+                    if PRINT_OUTPUT > 0:
+                        logger.error(
+                            f"Agent {agent_id} could not improve its previous plan (it found the same one than in the previous round)")
                     self.joint_plan["no_change"][agent_id] = True
 
         # Planner returns something that is not NONE
@@ -382,16 +397,18 @@ class BestResponse:
             new_utility = new_plan.utility
             # if the prev_plan was None (either 1st turn or couldn't find plan last round) accept new plan
             if prev_plan is None:
-                logger.warning(
-                    f"Agent {agent_id} found a plan with utility {new_utility:.4f}")
-                logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
+                if PRINT_OUTPUT > 0:
+                    logger.warning(
+                        f"Agent {agent_id} found a plan with utility {new_utility:.4f}")
+                    logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
                 self.update_joint_plan(agent_id, new_plan)
                 self.joint_plan["no_change"][agent_id] = False
             # Case 2) Agent finds a new plan that improves its utility
             elif not new_plan.equals(prev_plan):  # != prev_plan.utility:
-                logger.warning(
-                    f"Agent {agent_id} found new plan with utility {new_utility:.4f}")
-                logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
+                if PRINT_OUTPUT > 0:
+                    logger.warning(
+                        f"Agent {agent_id} found new plan with utility {new_utility:.4f}")
+                    logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
                 self.update_joint_plan(agent_id, new_plan)
                 self.joint_plan["no_change"][agent_id] = False
 
@@ -426,7 +443,8 @@ class BestResponse:
         for i in range(len(self.list_of_plans[agent_id])):
             for j in range(i + 1, len(self.list_of_plans[agent_id])):
                 if self.list_of_plans[agent_id][i].equals(self.list_of_plans[agent_id][j]):
-                    logger.critical(f'Detected loop in agent {agent_id} plans in indexes {i} and {j}')
+                    if PRINT_OUTPUT > 0:
+                        logger.critical(f'Detected loop in agent {agent_id} plans in indexes {i} and {j}')
                     detections += 1
                     plan1 = self.list_of_plans[agent_id][i]
                     plan2 = self.list_of_plans[agent_id][j]
@@ -434,7 +452,8 @@ class BestResponse:
                     # logger.info(f'Index {j}, plan {plan2.to_string_plan()}')
 
         if detections > 0:
-            logger.critical(f"Agent {agent_id} has {detections} pairs of equal plans in the list of previous plans")
+            if PRINT_OUTPUT > 0:
+                logger.critical(f"Agent {agent_id} has {detections} pairs of equal plans in the list of previous plans")
             return True
         return False
 
@@ -442,7 +461,7 @@ class BestResponse:
         logger.debug("\n")
         logger.debug("#########################################################################")
         logger.debug("CURRENT GAME STATE")
-        logger.debug(f"tBest Response turn {game_turn}")
+        logger.debug(f"Best Response turn {game_turn}")
         self.db.print_joint_plan()
 
     def run(self):
@@ -454,24 +473,22 @@ class BestResponse:
         # Assign random order
         # random.shuffle(self.agents)
         # logger.debug("ATTENTION, NOT RANDOMIZING ORDER")
-        logger.warning("ATTENTION, RANDOMIZING ORDER")
-        logger.debug(f"Agent order {self.agents}")
+        if PRINT_OUTPUT > 0:
+            logger.warning("ATTENTION, RANDOMIZING ORDER")
+            logger.debug(f"Agent order {self.agents}")
 
         # Initialize data structure
         self.init_joint_plan()
-
-        if INITIAL_JOINT_PLAN:
-            self.feasible_joint_plan()
-            self.print_game_state()
 
         game_turn = 0
         i = 0
         while not self.stop() and game_turn < 1000:  # 1000
             i += 1
             game_turn += 1
-            logger.info("*************************************************************************")
-            logger.info(f"\t\t\t\t\t\t\tBest Response turn {game_turn}")
-            logger.info("*************************************************************************")
+            if PRINT_OUTPUT > 0:
+                logger.info("*************************************************************************")
+                logger.info(f"\t\t\t\t\t\t\tBest Response turn {game_turn}")
+                logger.info("*************************************************************************")
             # First turn of the game, agents propose their initial plan
             if game_turn == 1 and INITIAL_GREEDY_PLAN:
                 self.create_initial_greedy_plans()
@@ -483,9 +500,12 @@ class BestResponse:
             if game_turn > 1:
                 for a in self.agents:
                     self.propose_plan(a)
-            self.print_game_state(game_turn)
+            if PRINT_OUTPUT > 0:
+                self.print_game_state(game_turn)
 
         logger.info("END OF GAME")
+        avg_planning_time = sum(self.planning_times)/len(self.planning_times)
+        logger.debug(f"Agents planned {len(self.planning_times)} times. Avg. planning time: {avg_planning_time:.3f}")
 
 
 if __name__ == '__main__':

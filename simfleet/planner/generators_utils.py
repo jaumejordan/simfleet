@@ -16,7 +16,7 @@ MIN_AUTONOMY = 2
 
 def timing(f):
     def wrap(*args, **kwargs):
-        logger.debug('Starting function {}'.format(f.__name__))
+        # logger.debug('Starting function {}'.format(f.__name__))
         time1 = time.time()
         ret = f(*args, **kwargs)
         time2 = time.time()

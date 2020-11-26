@@ -13,6 +13,7 @@ def get_electric_grid(station, power_grids):
             return i
 
 
+#@timing
 def check_charge_congestion(u1, station, original_cost, db):
     station_usage = db.joint_plan.get('station_usage')
     power_grids = db.joint_plan.get('power_grids')
@@ -76,11 +77,11 @@ def charge_congestion_function(bound_power_percentage, limit_power, power_consum
 
     if occupation < bound_power_percentage:
         return cost
-    else:  # més d'un bound_power_percentage% d'cupació de la xarxa
+    else:  # occupation és més d'un bound_power_percentage% d'cupació de la xarxa
         # aplicar funció de cost segons (ocupation - bound_power_percentage)
-        logger.debug(
-            f"Overlaps: {mean_overlap}, power_consumption: {power_consumption}, original_cost: {cost}, "
-            f"increment: {((occupation - bound_power_percentage) * cost) * mean_overlap}")
+        # logger.debug(
+        #     f"Overlaps: {mean_overlap}, power_consumption: {power_consumption}, original_cost: {cost}, "
+        #     f"increment: {((occupation - bound_power_percentage) * cost) * mean_overlap}")
         return cost + ((occupation - bound_power_percentage) * cost) * mean_overlap
 
 
@@ -122,8 +123,8 @@ def check_road_congestion(a1, original_cost, db):
                             res.append(intersec_percentage)
 
     if len(res) > 0:
-        logger.error(f"Route intersected with another {len(res)} routes. "
-                     f"Avg: {round(sum(res) / len(res), 2)} Intersection percentages: {res}.")
+        # logger.error(f"Route intersected with another {len(res)} routes. "
+        #              f"Avg: {round(sum(res) / len(res), 2)} Intersection percentages: {res}.")
         return travel_congestion_function(bound_route_percentage,
                                           cost=original_cost,
                                           mean_overlap=sum(res) / len(res),
@@ -172,9 +173,9 @@ def travel_congestion_function(bound_route_percentage, cost, mean_overlap, num_a
     if aux < bound_route_percentage:
         return cost
     else:
-        logger.debug(
-            f"Overlaps: {mean_overlap}, num_agents: {num_agents}, original_cost: {cost}, "
-            f"increment: {((aux - bound_route_percentage) * cost) * mean_overlap}")
+        # logger.debug(
+        #     f"Overlaps: {mean_overlap}, num_agents: {num_agents}, original_cost: {cost}, "
+        #     f"increment: {((aux - bound_route_percentage) * cost) * mean_overlap}")
         return cost + ((aux - bound_route_percentage) * cost) * mean_overlap
 
 

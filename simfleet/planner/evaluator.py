@@ -2,7 +2,7 @@ from loguru import logger
 
 from simfleet.planner.congestion import check_charge_congestion, check_road_congestion
 from simfleet.planner.constants import STARTING_FARE, PRICE_PER_KM, TRAVEL_PENALTY, PRICE_PER_kWh, TIME_PENALTY, \
-    INVALID_CHARGE_PENALTY, HEURISTIC, STATION_CONGESTION, ROAD_CONGESTION
+    INVALID_CHARGE_PENALTY, HEURISTIC, STATION_CONGESTION, ROAD_CONGESTION, PRINT_OUTPUT
 
 
 def get_benefit(action):
@@ -28,6 +28,11 @@ def compute_benefits(action_list):
 # Action_list must be node.actions or plan.entries
 # table of goals must be list of tuples or dictionary
 def compute_costs(action_list, table_of_goals, db):
+    # New: only print warning when evaluating (or reevaluating) a plan, not a node
+    # Evaluating a node
+    node = False
+    if isinstance(table_of_goals, list):
+        node = True
     costs = 0
     for action in action_list:
         # For actions that entail a movement, pay a penalty per km (10%)
@@ -39,8 +44,10 @@ def compute_costs(action_list, table_of_goals, db):
 
                 if travel_cost != road_congestion:
                     costs += road_congestion
-                    logger.warning(
-                        f"Travel cost incremented by congestion from {travel_cost} to {road_congestion}")
+                    if not node:
+                        if PRINT_OUTPUT > 0:
+                            logger.warning(
+                                f"Travel cost incremented by congestion from {travel_cost} to {road_congestion}")
                 else:
                     costs += travel_cost
 
@@ -71,8 +78,10 @@ def compute_costs(action_list, table_of_goals, db):
                     charge_congestion = check_charge_congestion(usage, station, charge_cost, db)
 
                     if charge_cost != charge_congestion:
-                        logger.warning(
-                            f"Charging cost incremented by congestion from {charge_cost} to {charge_congestion}")
+                        if not node:
+                            if PRINT_OUTPUT > 0:
+                                logger.warning(
+                                    f"Charging cost incremented by congestion from {charge_cost} to {charge_congestion}")
                         costs += charge_congestion
                 else:
                     costs += charge_cost
@@ -154,11 +163,25 @@ def get_h_value_open_goals(self, node, db):
 
 
 def evaluate_node(node, db, solution=False):
-    benefits = compute_benefits(node.actions)
-    costs = compute_costs(node.actions, node.completed_goals, db)
+    # Now if we are evaluating a solution, since it is a node that could not add new actions, we do not need to
+    # evaluate the last two actions again; actually the value of the node is already correct, we just have to ensure
+    # that it has no h value.
+    if solution:
+        g = node.benefits - node.costs
+        node.value = g
+        return g
+
+    # Only evaluate new actions
+    action_list = node.actions[-2:]
+
+    benefits = compute_benefits(action_list)
+    costs = compute_costs(action_list, node.completed_goals, db)
+
+    node.benefits += benefits
+    node.costs += costs
 
     # Utility (or g value) = benefits - costs
-    g = benefits - costs
+    g = node.benefits - node.costs
 
     # Calculate heuristic value
     h = 0
