@@ -1,3 +1,6 @@
+from itertools import permutations
+from operator import itemgetter
+
 from loguru import logger
 
 from simfleet.planner.congestion import check_charge_congestion, check_road_congestion
@@ -116,7 +119,6 @@ def already_served(node):
 
 
 def get_h_value(node, db):
-
     benefits = 0
     costs = 0
     agent_id = node.actions[0].get('agent')
@@ -144,6 +146,71 @@ def get_h_value(node, db):
     return h
 
 
+def best_permutation_heuristic(node, db):
+    agent = node.actions[0].get('agent')
+    served_customers = already_served(node)
+    non_served_customers = [x for x in node.agent_goals if x not in already_served(node)]
+    position = node.agent_pos
+    key = str(position) + str(served_customers) + str(non_served_customers)
+    logger.debug(" ")
+    logger.debug("Looking for best permutation...")
+    logger.debug(f"Key is {key}")
+    # If the best order for that situation is already calculated
+    if db.optimal_orders.get(agent).get(key) is not None:
+        return db.optimal_orders.get(agent).get(key)[0]
+    else:  # Calculate best order and the reported utility
+        time = node.end_time
+        optimal_permutation = get_optimal_permutation(agent, position, time, non_served_customers, db)
+        db.optimal_orders[agent][key] = optimal_permutation
+        return optimal_permutation[0]
+
+
+def get_optimal_permutation(agent, position, time, customers, db):
+    ranking = []
+    permut = get_all_permutations(customers)
+    logger.debug(f"Permutations: {permut}")
+    for order in permut:
+        order_list = list(order)
+        logger.debug(f"\torder is {order}")
+        value = get_order_utility(agent, position, time, order_list, db)
+        ranking.append((value, order))
+    logger.debug(f"Ranking: {ranking}")
+    best_order = max(ranking, key=itemgetter(0))  # tuple[0] = value, tuple[1] = order
+    logger.debug(f"Best order is {best_order}")
+    return best_order
+
+
+# Given a list of elements, returns every possible ordering of its elements
+def get_all_permutations(list_of_elems):
+    return list(permutations(list_of_elems))
+
+
+# Given a list of customers in a certain order, returns the utility obtained from serving
+# all customers in the determined order
+def get_order_utility(agent, position, time, order, db):
+    costs = 0
+    benefits = 0
+    current_pos = position
+    current_time = time
+    while len(order) > 0:
+        # Extract next customer
+        customer = order.pop(0)
+        # Get customer actions
+        action1, action2 = db.get_customer_couple(agent, customer)
+        action1 = db.fill_statistics(action1, current_pos=current_pos, current_time=current_time)
+        action2 = db.fill_statistics(action2, current_time=current_time)
+        # Compute costs
+        waiting_time = current_time + action1.get('statistics').get('time')
+        travel_cost = get_travel_cost(action1) + get_travel_cost(action2)
+        costs += waiting_time + travel_cost
+        # Compute benefit
+        benefits += get_benefit(action2) + 1000
+        # Update position and time
+        current_pos = action2.get('attributes').get('customer_dest')
+        current_time += waiting_time + action2.get('statistics').get('time')
+    return benefits - costs
+
+
 def get_h_value_open_goals(self, node, db):
     h = 0
     for key in self.table_of_goals.keys():
@@ -167,8 +234,14 @@ def evaluate_node(node, db, solution=False):
     # evaluate the last two actions again; actually the value of the node is already correct, we just have to ensure
     # that it has no h value.
     if solution:
+        logger.info(" ")
+        logger.info("Solution node")
+        logger.info(f"Node benefits: {node.benefits}")
+        logger.info(f"Node costs: {node.costs}")
         g = node.benefits - node.costs
+        logger.info(f"G-value: {g}")
         node.value = g
+        logger.info(f"F-value: {node.value}")
         return g
 
     # Only evaluate new actions
@@ -179,9 +252,15 @@ def evaluate_node(node, db, solution=False):
 
     node.benefits += benefits
     node.costs += costs
+    logger.info(" ")
+    logger.info("Non-solution node")
+    logger.info(f"Node benefits: {node.benefits}")
+    logger.info(f"Node costs: {node.costs}")
 
     # Utility (or g value) = benefits - costs
     g = node.benefits - node.costs
+
+    logger.info(f"G-value: {g}")
 
     # Calculate heuristic value
     h = 0
@@ -189,9 +268,13 @@ def evaluate_node(node, db, solution=False):
     if not solution:
         if HEURISTIC:
             h = get_h_value(node, db)
+            # h = best_permutation_heuristic(node, db)
+
+    logger.info(f"H-value: {h}")
 
     f_value = g + h
     node.value = f_value
+    logger.info(f"F-value: {node.value}")
     return f_value
 
 

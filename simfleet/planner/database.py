@@ -1,10 +1,12 @@
 import json
 import math
-import random
+from itertools import permutations
+from operator import itemgetter
 
 from loguru import logger
 
 from simfleet.planner.constants import CONFIG_FILE, ACTIONS_FILE, ROUTES_FILE, SPEED, MAX_STATION_DIST, PRINT_OUTPUT
+from simfleet.planner.evaluator import get_travel_cost, get_benefit
 
 VERBOSE = 0
 
@@ -30,6 +32,7 @@ class Database:
         self.joint_plan = {}
         self.list_of_plans = {}
         self.best_prev_plan = {}
+        self.optimal_orders = {}
 
         self.create_agents()
 
@@ -60,6 +63,7 @@ class Database:
             agents.append(agent_dic)
             self.list_of_plans[agent_id] = []
             self.best_prev_plan[agent_id] = (0, None)
+            self.optimal_orders[agent_id] = {}
 
         self.agents = agents
         self.assign_goals()
@@ -178,6 +182,31 @@ class Database:
                     res.append((a, b))
         return res
 
+    def get_customer_couple(self, agent, customer_id):
+        agent_actions = self.actions_dic.get(agent)
+        pick_up_actions = agent_actions.get("PICK-UP")
+        move_to_dest_actions = agent_actions.get("MOVE-TO-DEST")
+
+        for action in pick_up_actions:
+            if action.get('attributes').get('customer_id') == customer_id:
+                action1 = action
+                break
+        for action in move_to_dest_actions:
+            if action.get('attributes').get('customer_id') == customer_id:
+                action2 = action
+                break
+
+        return action1, action2
+
+    def get_customer_couple2(self, agent, customer_id):
+        agent_actions = [a for a in self.actions_dic if a.get('agent') == agent]
+        pick_up_actions = [a for a in agent_actions if a.get('type') == 'PICK-UP']
+        move_to_dest_actions = [a for a in agent_actions if a.get('type') == 'MOVE-TO-DEST']
+        action1 = [a for a in pick_up_actions if a.get('attributes').get('customer_id') == customer_id]
+        action2 = [a for a in move_to_dest_actions if a.get('attributes').get('customer_id') == customer_id]
+
+        return action1[0], action2[0]
+
     # Given two lists of actions, returns the move-to-station / charge tuple for the same station
     # TODO modify for only n closer stations
     def get_station_couples(self, move_to_station_actions, charge_actions):
@@ -200,7 +229,8 @@ class Database:
 
         return self.get_route(origin, destination)
 
-    def fill_statistics(self, action, current_pos=None, current_autonomy=None, agent_max_autonomy=None, current_time=None):
+    def fill_statistics(self, action, current_pos=None, current_autonomy=None, agent_max_autonomy=None,
+                        current_time=None):
         if action.get('type') == 'PICK-UP':
             # distance from transport position to customer origin
             p1 = current_pos
