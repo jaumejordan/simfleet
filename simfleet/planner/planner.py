@@ -292,41 +292,43 @@ class Planner:
             if VERBOSE > 1:
                 parent.print_node()
 
-            # If the last action is a customer service, consider charging
-            # otherwise consider ONLY customer actions (avoids consecutive charging actions)
-            consider_charge = False
-            not_full = False
-            if parent.actions[-1].get('type') == 'MOVE-TO-DEST':
-                consider_charge = True
+            if len(parent.already_served()) < len(parent.agent_goals):
 
-            if VERBOSE > 0:
-                logger.info("Generating CUSTOMER children nodes...")
-            # Generate one child node per customer left to serve and return whether some customer could not be
-            # picked up because of autonomy
-            generate_charging = self.create_customer_nodes(parent)
-            customer_children = len(parent.children)
-            if VERBOSE > 0:
-                logger.info(f'{customer_children:5d} customer children have been created')
+                # If the last action is a customer service, consider charging
+                # otherwise consider ONLY customer actions (avoids consecutive charging actions)
+                consider_charge = False
+                not_full = False
+                if parent.actions[-1].get('type') == 'MOVE-TO-DEST':
+                    consider_charge = True
 
-            # Add charging consideration when the autonomy is not full
-            if CHARGE_WHEN_NOT_FULL:
-                if parent.agent_autonomy < self.agent_max_autonomy:
-                    if VERBOSE > 1:
-                        logger.warning(
-                            f'Node autonomy {parent.agent_autonomy} < max autonomy {self.agent_max_autonomy}')
-                    not_full = True
-
-            # logger.warning(f'{consider_charge}, {generate_charging}, {CHARGE_WHEN_NOT_FULL}, {not_full}')
-
-            # if we consider charging actions AND during the creation of customer nodes there was a customer
-            # that could not be reached because of autonomy, create charge nodes.
-            if (consider_charge and generate_charging) or (CHARGE_WHEN_NOT_FULL and not_full):
                 if VERBOSE > 0:
-                    logger.info("Generating CHARGE children nodes...")
-                self.create_charge_nodes(parent)
-                charge_children = len(parent.children) - customer_children
+                    logger.info("Generating CUSTOMER children nodes...")
+                # Generate one child node per customer left to serve and return whether some customer could not be
+                # picked up because of autonomy
+                generate_charging = self.create_customer_nodes(parent)
+                customer_children = len(parent.children)
                 if VERBOSE > 0:
-                    logger.info(f'{charge_children:5d} charge children have been created')
+                    logger.info(f'{customer_children:5d} customer children have been created')
+
+                # Add charging consideration when the autonomy is not full
+                if CHARGE_WHEN_NOT_FULL:
+                    if parent.agent_autonomy < self.agent_max_autonomy:
+                        if VERBOSE > 1:
+                            logger.warning(
+                                f'Node autonomy {parent.agent_autonomy} < max autonomy {self.agent_max_autonomy}')
+                        not_full = True
+
+                # logger.warning(f'{consider_charge}, {generate_charging}, {CHARGE_WHEN_NOT_FULL}, {not_full}')
+
+                # if we consider charging actions AND during the creation of customer nodes there was a customer
+                # that could not be reached because of autonomy, create charge nodes.
+                if (consider_charge and generate_charging) or (CHARGE_WHEN_NOT_FULL and not_full):
+                    if VERBOSE > 0:
+                        logger.info("Generating CHARGE children nodes...")
+                    self.create_charge_nodes(parent)
+                    charge_children = len(parent.children) - customer_children
+                    if VERBOSE > 0:
+                        logger.info(f'{charge_children:5d} charge children have been created')
 
             # If after this process the node has no children, it is a solution Node
             if not parent.children:
@@ -590,15 +592,11 @@ class Planner:
             logger.info(f"Creating greedy initial plan for agent {self.agent_id}")
 
         # Get actions
-        dic_file = open(ACTIONS_FILE, "r")
-        actions_dic = json.load(dic_file)
-        agent_actions = actions_dic.get(self.agent_id)
+
+        agent_actions = self.db.actions_dic.get(self.agent_id)
 
         pick_up_actions = agent_actions.get("PICK-UP")
         move_to_dest_actions = agent_actions.get("MOVE-TO-DEST")
-
-        move_to_station_actions = agent_actions.get("MOVE-TO-STATION")
-        charge_actions = agent_actions.get("CHARGE")
 
         actions = []
         goals = self.agent_goals
@@ -610,7 +608,7 @@ class Planner:
             current_position = self.agent_pos
             current_autonomy = self.agent_autonomy
             max_autonomy = self.agent_max_autonomy
-            if not actions:
+            if len(actions) == 0:
                 current_time = 0
             else:
                 current_time = sum([a.get('statistics').get('time') for a in actions])
@@ -654,9 +652,11 @@ class Planner:
             if not has_enough_autonomy(current_autonomy, current_position, customer_origin, customer_dest):
 
                 # Before a charge, reload actions
-                dic_file = open(ACTIONS_FILE, "r")
-                actions_dic = json.load(dic_file)
-                agent_actions = actions_dic.get(self.agent_id)
+                self.db.reload_actions()
+                agent_actions = self.db.actions_dic.get(self.agent_id)
+
+                pick_up_actions = agent_actions.get("PICK-UP")
+                move_to_dest_actions = agent_actions.get("MOVE-TO-DEST")
 
                 move_to_station_actions = agent_actions.get("MOVE-TO-STATION")
                 charge_actions = agent_actions.get("CHARGE")
