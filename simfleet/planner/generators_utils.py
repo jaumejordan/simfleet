@@ -286,7 +286,23 @@ def distance_in_meters(coord1, coord2):
     return vincenty(coord1, coord2).meters
 
 
-def has_enough_autonomy(autonomy, transport_position, customer_orig, customer_dest):
+def has_enough_autonomy(autonomy, dist1, dist2=0):
+    travel_km = calculate_km_expense(dist1, dist2)
+    if travel_km >= 30.0:
+        logger.critical(f"The trip requires more autonomy than the taxi's maximum autonomy")
+        exit()
+    # TODO comprovar que l'agent no es quede a 0 d'autonomia
+    if autonomy - travel_km <= 0:
+        # logger.error(f"Taxi does not have enough autonomy; Autonomy: {autonomy}, travel_km: {travel_km}")
+        return False
+    return True
+
+
+def calculate_km_expense(fir_distance, sec_distance=0):
+    return (fir_distance + sec_distance) // 1000
+
+
+def has_enough_autonomy_old(autonomy, transport_position, customer_orig, customer_dest):
     if autonomy <= MIN_AUTONOMY:
         # logger.warning("{} has not enough autonomy ({}).".format(self.agent.name, autonomy))
         return False
@@ -301,7 +317,7 @@ def has_enough_autonomy(autonomy, transport_position, customer_orig, customer_de
     return True
 
 
-def calculate_km_expense(origin, start, dest=None):
+def calculate_km_expense_old(origin, start, dest=None):
     fir_distance = distance_in_meters(origin, start)
     sec_distance = distance_in_meters(start, dest)
     if dest is None:

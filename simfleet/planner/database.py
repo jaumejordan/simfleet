@@ -1,12 +1,10 @@
 import json
 import math
-from itertools import permutations
-from operator import itemgetter
 
 from loguru import logger
 
-from simfleet.planner.constants import CONFIG_FILE, ACTIONS_FILE, ROUTES_FILE, SPEED, MAX_STATION_DIST, PRINT_OUTPUT
-from simfleet.planner.evaluator import get_travel_cost, get_benefit
+from simfleet.planner.constants import CONFIG_FILE, ACTIONS_FILE, ROUTES_FILE, SPEED, PRINT_OUTPUT
+from simfleet.planner.generators_utils import has_enough_autonomy
 
 VERBOSE = 0
 
@@ -137,7 +135,7 @@ class Database:
 
         return queue, len(queue) > self.get_station_places(station)
 
-    def filter_station_actions(self, agent_id, agent_pos):
+    def filter_station_actions(self, agent_id, agent_pos, agent_autonomy):
 
         self.reload_actions()
         agent_actions = self.actions_dic.get(agent_id)
@@ -145,21 +143,23 @@ class Database:
         move_to_station_actions = agent_actions.get("MOVE-TO-STATION")
         charge_actions = agent_actions.get("CHARGE")
 
-        max_dist = MAX_STATION_DIST
+        # max_dist = MAX_STATION_DIST
 
         filtered_move_actions = []
         filtered_stations = []
-        while len(filtered_move_actions) == 0:
-            for a in move_to_station_actions:
-                route = self.get_route(agent_pos, a.get('attributes').get('station_position'))
-                if route.get('distance') <= max_dist:
-                    filtered_move_actions.append(a.copy())
-                    filtered_stations.append(a.get('attributes').get('station_id'))
-            max_dist += 250
+
+        for a in move_to_station_actions:
+            route = self.get_route(agent_pos, a.get('attributes').get('station_position'))
+            if has_enough_autonomy(agent_autonomy, route.get('distance')):
+                filtered_move_actions.append(a.copy())
+                filtered_stations.append(a.get('attributes').get('station_id'))
+            # max_dist += 250
 
         filtered_charge_actions = [a for a in charge_actions if
                                    a.get('attributes').get('station_id') in filtered_stations]
 
+        # logger.info(f" ")
+        # logger.info(f"{len(filtered_stations)} reachable stations")
         return filtered_move_actions, filtered_charge_actions
 
     #############################################################
@@ -259,7 +259,7 @@ class Database:
             # distance from transport position to station position
             p1 = current_pos
             p2 = action.get('attributes').get('station_position')
-
+            # logger.debug(f"Station {action.get('attributes').get('station_id')} in position {p2}")
             route = self.get_route(p1, p2)
             dist = route.get('distance')
             time = self.meters_to_seconds(dist)

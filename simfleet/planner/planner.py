@@ -442,7 +442,7 @@ class Planner:
             # Check if there's enough autonomy to do the customer action
             customer_origin = node.actions[-2].get("attributes").get("customer_origin")
             customer_dest = node.actions[-1].get("attributes").get("customer_dest")
-            if not has_enough_autonomy(node.agent_autonomy, node.agent_pos, customer_origin, customer_dest):
+            if not has_enough_autonomy(node.agent_autonomy, action1.get('statistics').get('dist'), action2.get('statistics').get('dist')):
                 # activate generation of station initial nodes
                 generate_charging = True
                 # delete node object
@@ -457,9 +457,8 @@ class Planner:
             node.set_end_time()
 
             # Update position and autonomy
-            node.agent_autonomy -= calculate_km_expense(node.agent_pos,
-                                                        node.actions[-1].get('attributes').get('customer_origin'),
-                                                        node.actions[-1].get('attributes').get('customer_dest'))
+            node.agent_autonomy -= calculate_km_expense(action1.get('statistics').get('dist'), action2.get('statistics').get('dist'))
+
             node.agent_pos = node.actions[-1].get('attributes').get('customer_dest')
 
             # Add served customer to completed_goals
@@ -508,73 +507,67 @@ class Planner:
         return generate_charging
 
     def create_charge_nodes(self, parent=None):
-        # # dic_file = open(ACTIONS_FILE, "r")
-        # # actions_dic = json.load(dic_file)
-        # # agent_actions = actions_dic.get(self.agent_id)
-        #
-        # self.db.reload_actions()
-        # agent_actions = self.db.actions_dic.get(self.agent_id)
-        #
-        # move_to_station_actions = agent_actions.get("MOVE-TO-STATION")
-        # charge_actions = agent_actions.get("CHARGE")
 
         # Filter stations to consider only those within a distance of 2km
+
         if parent is None:
-            agent_pos = self.agent_pos
-
+            filtered_move_actions, filtered_charge_actions = self.db.filter_station_actions(self.agent_id,
+                                                                                            self.agent_pos,
+                                                                                            self.agent_autonomy)
         else:
-            agent_pos = parent.agent_pos
+            filtered_move_actions, filtered_charge_actions = self.db.filter_station_actions(self.agent_id,
+                                                                                            parent.agent_pos,
+                                                                                            parent.agent_autonomy)
 
-        filtered_move_actions, filtered_charge_actions = self.db.filter_station_actions(self.agent_id, agent_pos)
+        if len(filtered_move_actions) > 0:
 
-        # for tup in get_station_couples(move_to_station_actions, charge_actions):
-        for tup in self.db.get_station_couples(filtered_move_actions, filtered_charge_actions):
-            if parent is None:
-                node = Node()
-                node.agent_pos = self.agent_pos
-                node.agent_autonomy = self.agent_autonomy
-                node.agent_goals = self.agent_goals
-                current_time = 0
-            else:
-                node = Node(parent)
-                current_time = parent.end_time
+            for tup in self.db.get_station_couples(filtered_move_actions, filtered_charge_actions):
+                if parent is None:
+                    node = Node()
+                    node.agent_pos = self.agent_pos
+                    node.agent_autonomy = self.agent_autonomy
+                    node.agent_goals = self.agent_goals
+                    current_time = 0
+                else:
+                    node = Node(parent)
+                    current_time = parent.end_time
 
-            # Fill actions statistics
-            action1 = tup[0].copy()
-            action2 = tup[1].copy()
-            #  Calculates the time and distance according to agent's current pos/autonomy
-            action1 = self.db.fill_statistics(action1, current_pos=node.agent_pos, current_time=current_time)
-            current_time += action1.get('statistics').get('time')
-            action2 = self.db.fill_statistics(action2, current_autonomy=node.agent_autonomy,
-                                              agent_max_autonomy=self.agent_max_autonomy, current_time=current_time)
+                # Fill actions statistics
+                action1 = tup[0].copy()
+                action2 = tup[1].copy()
+                #  Calculates the time and distance according to agent's current pos/autonomy
+                action1 = self.db.fill_statistics(action1, current_pos=node.agent_pos, current_time=current_time)
+                current_time += action1.get('statistics').get('time')
+                action2 = self.db.fill_statistics(action2, current_autonomy=node.agent_autonomy,
+                                                  agent_max_autonomy=self.agent_max_autonomy, current_time=current_time)
 
-            node.actions += [action1, action2]
+                node.actions += [action1, action2]
 
-            # Once the actions are set, calculate node end time
-            node.set_end_time()
+                # Once the actions are set, calculate node end time
+                node.set_end_time()
 
-            # Update position and autonomy after charge
-            node.agent_autonomy = self.agent_max_autonomy
-            node.agent_pos = node.actions[-2].get('attributes').get('station_position')
+                # Update position and autonomy after charge
+                node.agent_autonomy = self.agent_max_autonomy
+                node.agent_pos = node.actions[-2].get('attributes').get('station_position')
 
-            # Evaluate node
-            value = evaluate_node(node, self.db)
+                # Evaluate node
+                value = evaluate_node(node, self.db)
 
-            if self.best_solution_prune:
-                # If the value is higher than best solution value, add node to open_nodes
-                if value > self.best_solution_value:
-                    # Add node to parent's children
+                if self.best_solution_prune:
+                    # If the value is higher than best solution value, add node to open_nodes
+                    if value > self.best_solution_value:
+                        # Add node to parent's children
+                        if parent is not None:
+                            parent.children.append(node)
+                        # Push node in the priority queue
+                        heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
+                        self.generated_nodes += 1
+                else:
                     if parent is not None:
                         parent.children.append(node)
                     # Push node in the priority queue
                     heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
                     self.generated_nodes += 1
-            else:
-                if parent is not None:
-                    parent.children.append(node)
-                # Push node in the priority queue
-                heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
-                self.generated_nodes += 1
 
     def check_update_best_solution(self, node):
         if self.best_solution_value < node.value:
@@ -649,7 +642,7 @@ class Planner:
             customer_dest = action2.get("attributes").get("customer_dest")
 
             # Need to charge
-            if not has_enough_autonomy(current_autonomy, current_position, customer_origin, customer_dest):
+            if not has_enough_autonomy(current_autonomy, action1.get('statistics').get('dist'), action2.get('statistics').get('dist')):
 
                 # Before a charge, reload actions
                 self.db.reload_actions()
@@ -692,9 +685,7 @@ class Planner:
                 # Add actions to action list
                 actions += [action1, action2]
                 # Update position and autonomy
-                self.agent_autonomy -= calculate_km_expense(current_position,
-                                                            action2.get('attributes').get('customer_origin'),
-                                                            action2.get('attributes').get('customer_dest'))
+                self.agent_autonomy -= calculate_km_expense(action1.get('statistics').get('dist'), action2.get('statistics').get('dist'))
                 self.agent_pos = action2.get('attributes').get('customer_dest')
 
                 # Add served customer to completed_goals

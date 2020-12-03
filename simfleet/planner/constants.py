@@ -13,7 +13,7 @@ PRICE_PER_KM = 1.08  # 0
 TRAVEL_PENALTY = 0.1  # 10% of the traveled km
 PRICE_PER_kWh = 0.0615
 TIME_PENALTY = 1
-MAX_STATION_DIST = 1500 # maximum distance to a station to consider it a place to charge
+# MAX_STATION_DIST = 10000 # maximum distance to a station to consider it a place to charge
 INVALID_CHARGE_PENALTY = 10000 # invalid charge actions have its cost multiplied 100 times to discorage agents to keep
 # proposing them
 

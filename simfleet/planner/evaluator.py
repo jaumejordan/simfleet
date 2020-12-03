@@ -111,13 +111,15 @@ def get_h_value(node, db):
 
 
 def best_permutation_heuristic(node, db):
-    agent = node.actions[0].get('agent')
-    served_customers = node.already_served()
-    non_served_customers = [x for x in node.agent_goals if x not in node.already_served()]
 
+    # Check if there are customers left to serve
+    non_served_customers = [x for x in node.agent_goals if x not in node.already_served()]
     if len(non_served_customers) == 0:
         return 0
 
+    # Generate dictionary key
+    agent = node.actions[0].get('agent')
+    served_customers = node.already_served()
     position = node.agent_pos
     key = str(position) + str(served_customers) + str(non_served_customers)
 
@@ -129,9 +131,11 @@ def best_permutation_heuristic(node, db):
     # If the best order for that situation is already calculated
     if db.optimal_orders.get(agent).get(key) is not None:
         return db.optimal_orders.get(agent).get(key)[0]
-    else:  # Calculate best order and the reported utility
+    else:
+        # Calculate best order and the reported utility
         time = node.end_time
 
+        # If there is only one customer left to serve it has no sense to calculate all possible permutations
         if len(non_served_customers) == 1:
             order = non_served_customers[:]
             optimal_permutation = (get_order_utility(agent, position, time, order, db),
@@ -270,6 +274,8 @@ def compute_costs(action_list, table_of_goals, db):
                                 f"Travel cost incremented by congestion from {travel_cost} to {road_congestion}")
                 else:
                     costs += travel_cost
+            else:
+                costs += travel_cost
 
         # For actions that entail charging, pay for the charged electricity
         else:
@@ -277,24 +283,23 @@ def compute_costs(action_list, table_of_goals, db):
             if action.get('inv') == 'INV':
                 costs += INVALID_CHARGE_PENALTY
             else:
-                # Create station usage from action
-                agent = action.get('agent')
-                station = action.get('attributes').get('station_id')
-                at_station = action.get('statistics').get('at_station')
-                init_charge = action.get('statistics').get('init_charge')
-                end_time = at_station + action.get('statistics').get('time')
-                power = action.get('statistics').get('need')
-                inv = action.get('inv')
-                usage = {
-                    'agent': agent,
-                    'at_station': at_station,
-                    'init_charge': init_charge,
-                    'end_charge': end_time,
-                    'power': power,
-                    'inv': inv
-                }
-
                 if STATION_CONGESTION:
+                    # Create station usage from action
+                    agent = action.get('agent')
+                    station = action.get('attributes').get('station_id')
+                    at_station = action.get('statistics').get('at_station')
+                    init_charge = action.get('statistics').get('init_charge')
+                    end_time = at_station + action.get('statistics').get('time')
+                    power = action.get('statistics').get('need')
+                    inv = action.get('inv')
+                    usage = {
+                        'agent': agent,
+                        'at_station': at_station,
+                        'init_charge': init_charge,
+                        'end_charge': end_time,
+                        'power': power,
+                        'inv': inv
+                    }
                     charge_congestion = check_charge_congestion(usage, station, charge_cost, db)
 
                     if charge_cost != charge_congestion:
@@ -303,6 +308,8 @@ def compute_costs(action_list, table_of_goals, db):
                                 logger.warning(
                                     f"Charging cost incremented by congestion from {charge_cost} to {charge_congestion}")
                         costs += charge_congestion
+                    else:
+                        costs += charge_cost
                 else:
                     costs += charge_cost
 
