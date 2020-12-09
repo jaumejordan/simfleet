@@ -511,13 +511,17 @@ class Planner:
         # Filter stations to consider only those within a distance of 2km
 
         if parent is None:
+            non_served_customers = self.agent_goals
             filtered_move_actions, filtered_charge_actions = self.db.filter_station_actions(self.agent_id,
                                                                                             self.agent_pos,
-                                                                                            self.agent_autonomy)
+                                                                                            self.agent_autonomy,
+                                                                                            non_served_customers)
         else:
+            non_served_customers = [x for x in self.agent_goals if x not in parent.already_served()]
             filtered_move_actions, filtered_charge_actions = self.db.filter_station_actions(self.agent_id,
                                                                                             parent.agent_pos,
-                                                                                            parent.agent_autonomy)
+                                                                                            parent.agent_autonomy,
+                                                                                            non_served_customers)
 
         if len(filtered_move_actions) > 0:
 

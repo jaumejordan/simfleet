@@ -504,6 +504,8 @@ class BestResponse:
                 self.print_game_state(game_turn)
 
         logger.info("END OF GAME")
+        avg_reachable_stations = sum(self.db.reachable_stations)/len(self.db.reachable_stations)
+        logger.info(f"Avg. reachable stations: {avg_reachable_stations}")
         avg_planning_time = sum(self.planning_times)/len(self.planning_times)
         logger.debug(f"Agents planned {len(self.planning_times)} times. Avg. planning time: {avg_planning_time:.3f}")
 

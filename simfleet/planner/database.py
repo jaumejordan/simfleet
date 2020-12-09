@@ -1,9 +1,10 @@
 import json
 import math
 
+from geopy.distance import vincenty
 from loguru import logger
 
-from simfleet.planner.constants import CONFIG_FILE, ACTIONS_FILE, ROUTES_FILE, SPEED, PRINT_OUTPUT
+from simfleet.planner.constants import CONFIG_FILE, ACTIONS_FILE, ROUTES_FILE, SPEED, PRINT_OUTPUT, RADIUS
 from simfleet.planner.generators_utils import has_enough_autonomy
 
 VERBOSE = 0
@@ -12,6 +13,7 @@ VERBOSE = 0
 class Database:
     def __init__(self):
 
+        self.reachable_stations = []
         try:
             f2 = open(CONFIG_FILE, "r")
             self.config_dic = json.load(f2)
@@ -91,6 +93,11 @@ class Database:
             if PRINT_OUTPUT > 0:
                 logger.info(f"Goals for agent {agent.get('id')}: {goals}")
 
+    def get_customer_origin(self, customer_id):
+        for customer in self.config_dic.get('customers'):
+            if customer.get('name') == customer_id:
+                return customer.get('position')
+
     #############################################################
     ##################### STATION FUNCTIONS #####################
     #############################################################
@@ -135,7 +142,7 @@ class Database:
 
         return queue, len(queue) > self.get_station_places(station)
 
-    def filter_station_actions(self, agent_id, agent_pos, agent_autonomy):
+    def filter_station_actions_old(self, agent_id, agent_pos, agent_autonomy):
 
         self.reload_actions()
         agent_actions = self.actions_dic.get(agent_id)
@@ -160,6 +167,65 @@ class Database:
 
         # logger.info(f" ")
         # logger.info(f"{len(filtered_stations)} reachable stations")
+        return filtered_move_actions, filtered_charge_actions
+
+    def filter_station_actions(self, agent_id, agent_pos, agent_autonomy, non_served_customers):
+
+        self.reload_actions()
+        agent_actions = self.actions_dic.get(agent_id)
+
+        move_to_station_actions = agent_actions.get("MOVE-TO-STATION")
+        charge_actions = agent_actions.get("CHARGE")
+
+        # max_dist = MAX_STATION_DIST
+
+        filtered_move_actions = []
+        filtered_stations = []
+
+
+        # # find furthest customer among non_served
+        # max_dist = -1
+        # for customer in non_served_customers:
+        #     origin = self.get_customer_origin(customer)
+        #     route = self.get_route(agent_pos, origin)
+        #     if route.get('distance') > max_dist:
+        #         max_dist = route.get('distance')
+        # max_dist = math.inf
+        # logger.info(f" ")
+        # logger.warning(f"Autonomy is {agent_autonomy}km")
+        # logger.warning(f"Max customer dist is {max_dist}m")
+
+        # assign to each customer its own distance
+        customer_dists = {}
+        for customer in non_served_customers:
+            origin = self.get_customer_origin(customer)
+            route = self.get_route(agent_pos, origin)
+            customer_dists[customer] = route.get('distance')
+
+        for a in move_to_station_actions:
+            # Station attributes
+            station_id = a.get('attributes').get('station_id')
+            station_position = a.get('attributes').get('station_position')
+
+            route = self.get_route(agent_pos, station_position)
+            # Check if station is reachable
+            if has_enough_autonomy(agent_autonomy, route.get('distance')):
+                # Check if it is close to any of the non served customers
+                for customer in non_served_customers:
+                    # route = self.get_route(self.get_customer_origin(customer), station_position)
+                    # if route.get('distance') <= RADIUS:
+                    distance = vincenty(self.get_customer_origin(customer), station_position).meters
+                    # if distance <= max_dist:
+                    if distance <= customer_dists.get(customer):
+                        filtered_move_actions.append(a.copy())
+                        filtered_stations.append(station_id)
+                        break
+
+        filtered_charge_actions = [a for a in charge_actions if
+                                   a.get('attributes').get('station_id') in filtered_stations]
+
+        logger.info(f"{len(filtered_stations)} reachable stations")
+        self.reachable_stations.append(len(filtered_stations))
         return filtered_move_actions, filtered_charge_actions
 
     #############################################################
