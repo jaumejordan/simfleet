@@ -46,8 +46,8 @@ class Plan:
         return s
 
     def equals(self, o):
-        equal = self.utility == o.utility
-        equal = equal and (len(self.entries) == len(o.entries))
+        # equal = self.utility == o.utility
+        equal = (len(self.entries) == len(o.entries))
         for i in range(len(self.entries)):
             equal = equal and self.entries[i].equals(o.entries[i])
         return equal

@@ -361,7 +361,7 @@ class Database:
                 queue, check = self.check_station_queue(agent, station, current_time)
                 if VERBOSE > 0:
                     logger.info(f"There are {len(queue)} agents in front of {agent}")
-                # Get que last X agents of the queue which are in front of you, where X is the number of stations
+                # Get que last X agents of the queue which are in front of you, where X is the number of (stations?) poles
                 # if check, there are more agents in front of me than places in the station
                 if check:
                     # keep only last X to arrive
@@ -377,7 +377,7 @@ class Database:
                     logger.info(
                         f"Agent {agent} will begin charging at time {init_charge:.4f} after waiting {waiting_time:.4f} seconds")
             elif available_poles < 0:
-                logger.critical(f"Error computing available poles: {available_poles} at time {current_time}")
+                logger.critical(f"Error computing available poles for station {station}: {available_poles} at time {current_time}")
                 logger.debug("\n")
                 logger.debug("Station usage:")
                 for station in self.joint_plan.get('station_usage').keys():

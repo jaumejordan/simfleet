@@ -246,6 +246,31 @@ class BestResponse:
                     current_agent['inv'] = 'INV'
                     # To mark it as invalid:
                     #   Go to current_agent's plan, look for the appropriate charge action and flag it
+                    # agent = current_agent.get('agent')
+                    # agent_plan = self.joint_plan.get('individual').get(agent)
+                    # for entry in agent_plan.entries:
+                    #     action = entry.action
+                    #     if action.get('type') == 'CHARGE':
+                    #         if action.get('statistics').get('init_charge') == current_agent.get('init_charge'):
+                    #             action['inv'] = 'INV'
+
+                else:
+                    del current_agent['inv']
+                #     # To mark it as invalid:
+                #     #   Go to current_agent's plan, look for the appropriate charge action and flag it
+                #     agent = current_agent.get('agent')
+                #     agent_plan = self.joint_plan.get('individual').get(agent)
+                #     for entry in agent_plan.entries:
+                #         action = entry.action
+                #         if action.get('type') == 'CHARGE':
+                #             if action.get('statistics').get('init_charge') == current_agent.get('init_charge'):
+                #                 action['inv'] = None
+
+    def flag_invalid_charge_actions(self):
+        for station in self.joint_plan.get('station_usage').keys():
+            usage_list = self.joint_plan.get('station_usage').get(station)
+            for current_agent in usage_list:
+                if current_agent.get('inv') == 'INV':
                     agent = current_agent.get('agent')
                     agent_plan = self.joint_plan.get('individual').get(agent)
                     for entry in agent_plan.entries:
@@ -253,7 +278,6 @@ class BestResponse:
                         if action.get('type') == 'CHARGE':
                             if action.get('statistics').get('init_charge') == current_agent.get('init_charge'):
                                 action['inv'] = 'INV'
-
     # Checks stopping criteria of Best Response algorithm
     def stop(self):
 
@@ -331,7 +355,8 @@ class BestResponse:
             if prev_utility != updated_utility:
                 if PRINT_OUTPUT > 0:
                     logger.warning(f"Agent {agent_id} had its plan utility reduced "
-                                   f"from {prev_utility:.4f} to {updated_utility:.4f}")
+                                   f"from {prev_utility} to {updated_utility}")
+                                 # f"from {prev_utility:.4f} to {updated_utility:.4f}")
                 # NEW if the utility of the plan had changed, update it in the joint plan
                 prev_plan.utility = updated_utility
                 self.joint_plan["individual"][agent_id].utility = updated_utility
@@ -394,6 +419,7 @@ class BestResponse:
 
         # Planner returns something that is not NONE
         else:
+
             new_utility = new_plan.utility
             # if the prev_plan was None (either 1st turn or couldn't find plan last round) accept new plan
             if prev_plan is None:
@@ -403,11 +429,13 @@ class BestResponse:
                     logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
                 self.update_joint_plan(agent_id, new_plan)
                 self.joint_plan["no_change"][agent_id] = False
+            # if new_plan.equals(prev_plan):
+            #     logger.critical(f"Agent {agent_id} found the same plan as previous round")
             # Case 2) Agent finds a new plan that improves its utility
             elif not new_plan.equals(prev_plan):  # != prev_plan.utility:
                 if PRINT_OUTPUT > 0:
                     logger.warning(
-                        f"Agent {agent_id} found new plan with utility {new_utility:.4f}")
+                        f"Agent {agent_id} found new plan with utility {new_utility}")
                     logger.debug(f"Updating agent's {agent_id} plan in the joint_plan")
                 self.update_joint_plan(agent_id, new_plan)
                 self.joint_plan["no_change"][agent_id] = False
@@ -500,6 +528,7 @@ class BestResponse:
             if game_turn > 1:
                 for a in self.agents:
                     self.propose_plan(a)
+            self.flag_invalid_charge_actions()
             if PRINT_OUTPUT > 0:
                 self.print_game_state(game_turn)
 

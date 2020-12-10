@@ -74,19 +74,20 @@ ROAD_CONGESTION = True
 # ROUTES_FILE = "routes/problem5-routes.json"
 #  # 20 taxi, 60 customer, 20% is 12 customers per taxi, 10% is 6 per taxi
 
-# Experimentation - 20 taxi, 60 customer, 32 stations (genetic)
-# 4 rondes, 150 segons
-CONFIG_FILE = "configs/20taxi-60customer-32stations-config.json"
-ACTIONS_FILE = "actions/20taxi-60customer-32stations-actions.json"
-ROUTES_FILE = "routes/50taxi-200customer-32stations-routes.json"
-
-# # Experimentation - 50 taxi, 150 customer, 16 stations (genetic)
-# # 7 rondes, 2048 segons
-# CONFIG_FILE = "configs/50taxi-150customer-16stations-config.json"
-# ACTIONS_FILE = "actions/50taxi-150customer-16stations-actions.json"
+# # Experimentation - 20 taxi, 60 customer, 32 stations (genetic)
+# # 4 rondes, 150 segons
+# CONFIG_FILE = "configs/20taxi-60customer-32stations-config.json"
+# ACTIONS_FILE = "actions/20taxi-60customer-32stations-actions.json"
 # ROUTES_FILE = "routes/50taxi-200customer-32stations-routes.json"
 
+ # Experimentation - 50 taxi, 150 customer, 16 stations (genetic)
+# 7 rondes, 2048 segons
+CONFIG_FILE = "configs/50taxi-150customer-16stations-config.json"
+ACTIONS_FILE = "actions/50taxi-150customer-16stations-actions.json"
+ROUTES_FILE = "routes/50taxi-200customer-32stations-routes.json"
+
 # # Experimentation - 50 taxi, 150 customer, 32 stations (genetic)
+# Converges in 4 BR turns in aprox 600s (3.76s avg planning)
 # CONFIG_FILE = "configs/50taxi-150customer-32stations-config.json"
 # ACTIONS_FILE = "actions/50taxi-200customer-32stations-actions.json"
 # ROUTES_FILE = "routes/50taxi-200customer-32stations-routes.json"
