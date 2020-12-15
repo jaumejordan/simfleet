@@ -417,7 +417,7 @@ class Planner:
                 current_time = 0
             else:
                 node = Node(parent)
-                current_time = parent.end_time
+                current_time = sum(a.get('statistics').get('time') for a in parent.actions) # parent.end_time
 
             # Fill actions statistics
             action1 = tup[0].copy()
@@ -534,11 +534,12 @@ class Planner:
                     current_time = 0
                 else:
                     node = Node(parent)
-                    current_time = parent.end_time
+                    current_time = sum(a.get('statistics').get('time') for a in parent.actions)
 
                 # Fill actions statistics
                 action1 = tup[0].copy()
                 action2 = tup[1].copy()
+
                 #  Calculates the time and distance according to agent's current pos/autonomy
                 action1 = self.db.fill_statistics(action1, current_pos=node.agent_pos, current_time=current_time)
                 current_time += action1.get('statistics').get('time')

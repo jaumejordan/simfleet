@@ -359,6 +359,18 @@ class Database:
             #   2.2 If there is not, compute waiting time, add it to charging time to compute total time
             if available_poles == 0:
                 queue, check = self.check_station_queue(agent, station, current_time)
+                # FOR ERROR DEBUGGING
+                if len(queue) == 0:
+                    for station in self.joint_plan.get('station_usage').keys():
+                        if len(self.joint_plan.get('station_usage').get(station)) == 0:
+                            logger.debug(f"{station:20s} : []")
+                        else:
+                            logger.debug(f"{station:20s} : [")
+                            for usage in self.joint_plan.get('station_usage').get(station):
+                                logger.debug(f"\t{usage.get('agent'):10s}, {usage.get('at_station'):.4f}, "
+                                             f"{usage.get('init_charge'):.4f}, {usage.get('end_charge'):.4f}, "
+                                             f"{usage.get('inv')}")
+                            logger.debug("] \n")
                 if VERBOSE > 0:
                     logger.info(f"There are {len(queue)} agents in front of {agent}")
                 # Get que last X agents of the queue which are in front of you, where X is the number of (stations?) poles
@@ -368,8 +380,15 @@ class Database:
                     queue = queue[-self.get_station_places(station):]
                 # if not check, there are as many agents in front of me as places in the station
                 end_times = [x.get('end_charge') for x in queue]
-                # Get charge init time
-                init_charge = min(end_times)
+                # FOR ERROR DEBUGGING
+                try:
+                    # Get charge init time
+                    init_charge = min(end_times)
+                except ValueError:
+                    logger.error(f"Queue: {queue}")
+                    logger.error(f"Check: {check}")
+                    logger.error(f"end_times: {end_times}")
+                    self.print_joint_plan()
                 # end_charge = init_charge + charging_time
                 # Compute waiting time
                 waiting_time = init_charge - current_time
@@ -398,6 +417,25 @@ class Database:
                     logger.info(f"There are available places")
                     logger.info(
                         f"Agent {agent} will begin charging at time {init_charge:.4f} after waiting {waiting_time:.4f} seconds")
+            # FOR ERROR DEBUGGING
+            if init_charge < current_time:
+                logger.critical("Error computing charge times")
+                logger.error(f"Available_poles: {available_poles}")
+                logger.error(f"Queue: {queue}")
+                logger.error(f"Check: {check}")
+                logger.error(f"end_times: {end_times}")
+                logger.debug("Station usage:")
+                for station in self.joint_plan.get('station_usage').keys():
+                    if len(self.joint_plan.get('station_usage').get(station)) == 0:
+                        logger.debug(f"{station:20s} : []")
+                    else:
+                        logger.debug(f"{station:20s} : [")
+                        for usage in self.joint_plan.get('station_usage').get(station):
+                            logger.debug(f"\t{usage.get('agent'):10s}, {usage.get('at_station'):.4f}, "
+                                         f"{usage.get('init_charge'):.4f}, {usage.get('end_charge'):.4f}, "
+                                         f"{usage.get('inv')}")
+                        logger.debug("] \n")
+                exit()
 
             # Write times
             #   arrival at the station

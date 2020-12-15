@@ -254,8 +254,8 @@ class BestResponse:
                     #         if action.get('statistics').get('init_charge') == current_agent.get('init_charge'):
                     #             action['inv'] = 'INV'
 
-                else:
-                    del current_agent['inv']
+                # else:
+                #     del current_agent['inv']
                 #     # To mark it as invalid:
                 #     #   Go to current_agent's plan, look for the appropriate charge action and flag it
                 #     agent = current_agent.get('agent')
@@ -531,7 +531,7 @@ class BestResponse:
             self.flag_invalid_charge_actions()
             if PRINT_OUTPUT > 0:
                 self.print_game_state(game_turn)
-
+        logger.info(f"Best Response turn {game_turn}")
         logger.info("END OF GAME")
         avg_reachable_stations = sum(self.db.reachable_stations)/len(self.db.reachable_stations)
         logger.info(f"Avg. reachable stations: {avg_reachable_stations}")

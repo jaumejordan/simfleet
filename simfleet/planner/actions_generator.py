@@ -217,21 +217,7 @@ def create_charge_action(agent, station_id, power):
 
 
 def save_actions(config_file, output_file_name):
-    if output_file_name is None:
-        try:
-            extra = len(config_file.split(".")[1]) + 1
-            output_file_name = config_file[:-extra] + "3config-actions.json"
-            # print("aslufhauiohfa", output_file_name)
-        except Exception as e:
-            print(str(e))
-            exit()
-    else:
-        try:
-            extra = len(config_file.split(".")[1]) + 1
-            output_file_name = output_file_name[:-extra] + "3config-actions.json"
-        except Exception as e:
-            print(str(e))
-            exit()
+    output_file_name = "actions/100taxi-300customer-20stations-actions.json"
     save_json(config_file, global_actions, output_file_name)
 
 
@@ -418,7 +404,7 @@ if __name__ == '__main__':
     config_file = str(sys.argv[1])
     if len(sys.argv) > 2:
         # output_file_name = str(sys.argv[2])
-        output_file_name = "actions/last-execution.json"
+        output_file_name = "actions/100taxi-200customer-20stations-actions.json"
         print("Output file name will be: ", output_file_name)
 
     config_dic = load_config(config_file)
