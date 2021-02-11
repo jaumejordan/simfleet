@@ -7,7 +7,7 @@ import requests
 import shapely
 from loguru import logger
 from shapely.geometry import Polygon, Point
-from geopy.distance import vincenty
+from geopy.distance import geodesic
 
 MIN_AUTONOMY = 2
 
@@ -283,7 +283,8 @@ def distance_in_meters(coord1, coord2):
     Returns:
         float: distance meters between the two coordinates
     """
-    return vincenty(coord1, coord2).meters
+    logger.warning("Using distance_in_meters function with new geodesic distance")
+    return geodesic(coord1, coord2).meters
 
 
 def has_enough_autonomy(autonomy, dist1, dist2=0):

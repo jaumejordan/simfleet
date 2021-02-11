@@ -217,7 +217,7 @@ def create_charge_action(agent, station_id, power):
 
 
 def save_actions(config_file, output_file_name):
-    output_file_name = "actions/100taxi-300customer-20stations-actions.json"
+    output_file_name = "actions/200taxi-400customer-20stations-actions.json"
     save_json(config_file, global_actions, output_file_name)
 
 

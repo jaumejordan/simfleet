@@ -222,6 +222,6 @@ if __name__ == '__main__':
 
     routes = asyncio.run(calculate_routes(t, s, cp))
 
-    outfile = open("routes/100taxi-300customer-20stations-routes.json", "w+")
+    outfile = open("routes/200taxi-400customer-20stations-routes.json", "w+")
     json.dump(routes, outfile, indent=4)
     outfile.close()
