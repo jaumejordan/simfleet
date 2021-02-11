@@ -20,11 +20,17 @@ INVALID_CHARGE_PENALTY = 10000 # invalid charge actions have its cost multiplied
 
 # Search / BR speedups
 HEURISTIC = True
+OLD_HEURISTIC = False
+NEW_HEURISTIC = not OLD_HEURISTIC
 INITIAL_GREEDY_PLAN = True
 
 # Congestions
 STATION_CONGESTION = True
-ROAD_CONGESTION = True
+ROAD_CONGESTION = False
+
+# Memory management
+RELOAD_ACTIONS = False
+DEEPCOPY = not RELOAD_ACTIONS
 
 # # Congestion test 1
 # CONFIG_FILE = "configs/congestion1.json"
@@ -61,11 +67,11 @@ ROAD_CONGESTION = True
 #  # 5 taxi, 10 customer, 40% is 4 customers per taxi
 
 
-# # Experimentation - problem 4
-# CONFIG_FILE = "configs/problem4-config.json"
-# ACTIONS_FILE = "actions/problem4-actions.json"
-# ROUTES_FILE = "routes/problem4-routes.json"
-# # 10 taxi, 30 customer, 30% is 9 customers per taxi, 20% is 6 per taxi
+# Experimentation - problem 4
+CONFIG_FILE = "configs/problem4-config.json"
+ACTIONS_FILE = "actions/problem4-actions.json"
+ROUTES_FILE = "routes/problem4-routes.json"
+# 10 taxi, 30 customer, 30% is 9 customers per taxi, 20% is 6 per taxi
 
 
 #  # Experimentation - problem 5
@@ -80,11 +86,11 @@ ROAD_CONGESTION = True
 # ACTIONS_FILE = "actions/20taxi-60customer-32stations-actions.json"
 # ROUTES_FILE = "routes/50taxi-200customer-32stations-routes.json"
 
- # Experimentation - 50 taxi, 150 customer, 16 stations (genetic)
-# 7 rondes, 2048 segons
-CONFIG_FILE = "configs/50taxi-150customer-16stations-config.json"
-ACTIONS_FILE = "actions/50taxi-150customer-16stations-actions.json"
-ROUTES_FILE = "routes/50taxi-200customer-32stations-routes.json"
+#  # Experimentation - 50 taxi, 150 customer, 16 stations (genetic)
+# # 7 rondes, 2048 segons
+# CONFIG_FILE = "configs/50taxi-150customer-16stations-config.json"
+# ACTIONS_FILE = "actions/50taxi-150customer-16stations-actions.json"
+# ROUTES_FILE = "routes/50taxi-200customer-32stations-routes.json"
 #
 # # Experimentation - 50 taxi, 150 customer, 32 stations (genetic)
 # # Converges in 4 BR turns in aprox 600s (3.76s avg planning)
@@ -102,10 +108,15 @@ ROUTES_FILE = "routes/50taxi-200customer-32stations-routes.json"
 # ACTIONS_FILE = "actions/100taxi-200customer-20stations-actions.json"
 # ROUTES_FILE = "routes/100taxi-200customer-20stations-routes.json"
 
-# Experimentation - 100 taxi, 300 customer, 20 stations (uniform)
-CONFIG_FILE = "configs/100taxi-300customer-20stations-config.json"
-ACTIONS_FILE = "actions/100taxi-300customer-20stations-actions.json"
-ROUTES_FILE = "routes/100taxi-300customer-20stations-routes.json"
+# # Experimentation - 100 taxi, 300 customer, 20 stations (uniform)
+# CONFIG_FILE = "configs/100taxi-300customer-20stations-config.json"
+# ACTIONS_FILE = "actions/100taxi-300customer-20stations-actions.json"
+# ROUTES_FILE = "routes/100taxi-300customer-20stations-routes.json"
+
+# # Experimentation - 200 taxi, 400 customer, 20 stations (uniform)
+# CONFIG_FILE = "configs/200taxi-400customer-20stations-config.json"
+# ACTIONS_FILE = "actions/200taxi-400customer-20stations-actions.json"
+# ROUTES_FILE = "routes/200taxi-400customer-20stations-routes.json"
 
 
 # CONFIG_FILE = "configs/10taxi-config.json"

@@ -5,7 +5,7 @@ from loguru import logger
 
 from simfleet.planner.congestion import check_charge_congestion, check_road_congestion
 from simfleet.planner.constants import STARTING_FARE, PRICE_PER_KM, TRAVEL_PENALTY, PRICE_PER_kWh, TIME_PENALTY, \
-    INVALID_CHARGE_PENALTY, HEURISTIC, STATION_CONGESTION, ROAD_CONGESTION, PRINT_OUTPUT
+    INVALID_CHARGE_PENALTY, HEURISTIC, STATION_CONGESTION, ROAD_CONGESTION, PRINT_OUTPUT, OLD_HEURISTIC, NEW_HEURISTIC
 
 HEURISTIC_VERBOSE = 0
 #############################################################
@@ -54,8 +54,10 @@ def evaluate_node(node, db, solution=False):
     # If the node is a solution, its h value is 0
     if not solution:
         if HEURISTIC:
-            # h = get_h_value(node, db)
-            h = best_permutation_heuristic(node, db)
+            if OLD_HEURISTIC:
+                h = get_h_value(node, db)
+            elif NEW_HEURISTIC:
+                h = best_permutation_heuristic(node, db)
     if HEURISTIC_VERBOSE > 0:
         logger.info(f"H-value: {h}")
 

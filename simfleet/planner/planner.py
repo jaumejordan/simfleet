@@ -1,6 +1,7 @@
 """
 Develops a plan for a TransportAgent
 """
+import copy
 import heapq
 import json
 import math
@@ -9,7 +10,7 @@ import time
 
 from loguru import logger
 
-from simfleet.planner.constants import ACTIONS_FILE, HEURISTIC, PRINT_OUTPUT
+from simfleet.planner.constants import ACTIONS_FILE, HEURISTIC, PRINT_OUTPUT, RELOAD_ACTIONS, DEEPCOPY
 from simfleet.planner.evaluator import evaluate_node, evaluate_plan
 from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_expense
 from simfleet.planner.node import Node
@@ -384,8 +385,8 @@ class Planner:
 
     # TODO modify for fixed goals
     def create_customer_nodes(self, parent=None):
-
-        self.db.reload_actions()
+        if RELOAD_ACTIONS:
+            self.db.reload_actions()
         agent_actions = self.db.actions_dic.get(self.agent_id)
         # agent_actions = self.actions_dic.get(self.agent_id)
 
@@ -411,17 +412,19 @@ class Planner:
             if DEBUG: logger.info(f'Planing to serve customer {customer_to_serve}')
             if parent is None:
                 node = Node()
-                node.agent_pos = self.agent_pos.copy()
-                node.agent_autonomy = self.agent_autonomy
-                node.agent_goals = self.agent_goals.copy()
+                node.agent_pos = copy.deepcopy(self.agent_pos)
+                node.agent_autonomy = copy.deepcopy(self.agent_autonomy)
+                node.agent_goals = copy.deepcopy(self.agent_goals)
                 current_time = 0
             else:
                 node = Node(parent)
                 current_time = sum(a.get('statistics').get('time') for a in parent.actions) # parent.end_time
-
             # Fill actions statistics
-            action1 = tup[0].copy()
-            action2 = tup[1].copy()
+            # action1 = tup[0].copy()
+            # action2 = tup[1].copy()
+            action1 = tup[0]
+            action2 = tup[1]
+
             #  Calculates the time and distance according to agent's current pos/autonomy
             action1 = self.db.fill_statistics(action1, current_pos=node.agent_pos, current_time=current_time)
             action2 = self.db.fill_statistics(action2, current_time=current_time)
@@ -528,17 +531,19 @@ class Planner:
             for tup in self.db.get_station_couples(filtered_move_actions, filtered_charge_actions):
                 if parent is None:
                     node = Node()
-                    node.agent_pos = self.agent_pos
-                    node.agent_autonomy = self.agent_autonomy
-                    node.agent_goals = self.agent_goals
+                    node.agent_pos = copy.deepcopy(self.agent_pos)
+                    node.agent_autonomy = copy.deepcopy(self.agent_autonomy)
+                    node.agent_goals = copy.deepcopy(self.agent_goals)
                     current_time = 0
                 else:
                     node = Node(parent)
                     current_time = sum(a.get('statistics').get('time') for a in parent.actions)
 
                 # Fill actions statistics
-                action1 = tup[0].copy()
-                action2 = tup[1].copy()
+                # action1 = tup[0].copy()
+                # action2 = tup[1].copy()
+                action1 = tup[0]
+                action2 = tup[1]
 
                 #  Calculates the time and distance according to agent's current pos/autonomy
                 action1 = self.db.fill_statistics(action1, current_pos=node.agent_pos, current_time=current_time)
@@ -573,6 +578,8 @@ class Planner:
                     # Push node in the priority queue
                     heapq.heappush(self.open_nodes, (-1 * value, id(node), node))
                     self.generated_nodes += 1
+        else:
+            logger.critical(f"Agent {self.agent_id} can't reach any station with autonomy {self.agent_autonomy}")
 
     def check_update_best_solution(self, node):
         if self.best_solution_value < node.value:
@@ -634,9 +641,16 @@ class Planner:
 
             # Get customer actions
             action1 = [a for a in pick_up_actions if a.get('attributes').get('customer_id') == customer]
-            action1 = action1[0]
+            if DEEPCOPY:
+                action1 = copy.deepcopy(action1[0])
+            else:
+                action1 = action1[0]
+
             action2 = [a for a in move_to_dest_actions if a.get('attributes').get('customer_id') == customer]
-            action2 = action2[0]
+            if DEEPCOPY:
+                action2 = copy.deepcopy(action2[0])
+            else:
+                action2 = action2[0]
 
             # Fill statistics w.r.t. current position and autonomy
             action1 = self.db.fill_statistics(action1, current_pos=current_position, current_time=current_time)
@@ -648,9 +662,9 @@ class Planner:
 
             # Need to charge
             if not has_enough_autonomy(current_autonomy, action1.get('statistics').get('dist'), action2.get('statistics').get('dist')):
-
-                # Before a charge, reload actions
-                self.db.reload_actions()
+                if RELOAD_ACTIONS:
+                    # Before a charge, reload actions
+                    self.db.reload_actions()
                 agent_actions = self.db.actions_dic.get(self.agent_id)
 
                 pick_up_actions = agent_actions.get("PICK-UP")
@@ -663,16 +677,28 @@ class Planner:
                 goals.insert(0, customer)
 
                 # Get closest station to transport
-                station_actions = [self.db.fill_statistics(a, current_pos=current_position, current_time=current_time) for
-                                   a in
-                                   move_to_station_actions]
-                action1 = min(station_actions, key=lambda x: x.get("statistics").get("time"))
+                if DEEPCOPY:
+                    station_actions = [self.db.fill_statistics(copy.deepcopy(a), current_pos=current_position, current_time=current_time) for
+                                       a in
+                                       move_to_station_actions]
+                else:
+                    station_actions = [self.db.fill_statistics(a, current_pos=current_position,
+                                                               current_time=current_time) for
+                                       a in
+                                       move_to_station_actions]
+                if DEEPCOPY:
+                    action1 = copy.deepcopy(min(station_actions, key=lambda x: x.get("statistics").get("time")))
+                else:
+                    action1 = min(station_actions, key=lambda x: x.get("statistics").get("time"))
                 station_id = action1.get('attributes').get('station_id')
                 current_time += action1.get('statistics').get('time')
 
                 # Get actions for that station and fill statistics w.r.t. current position and autonomy
                 action2 = [a for a in charge_actions if a.get('attributes').get('station_id') == station_id]
-                action2 = action2[0]
+                if DEEPCOPY:
+                    action2 = copy.deepcopy(action2[0])
+                else:
+                    action2 = action2[0]
 
                 action2 = self.db.fill_statistics(action2, current_autonomy=current_autonomy,
                                                   agent_max_autonomy=self.agent_max_autonomy, current_time=current_time)
