@@ -1,3 +1,5 @@
+import copy
+
 from loguru import logger
 
 
@@ -30,15 +32,15 @@ class Node:
         # If there is parent, inherit attributes
         else:
             self.parent = parent
-            self.agent_pos = parent.agent_pos[:]
-            self.agent_autonomy = parent.agent_autonomy  # .copy()
-            self.init_time = parent.end_time  # .copy()
-            self.actions = parent.actions[:]  # .copy()
+            self.agent_pos = copy.deepcopy(parent.agent_pos)
+            self.agent_autonomy = copy.deepcopy(parent.agent_autonomy)  # .copy()
+            self.init_time = copy.deepcopy(parent.end_time)  # .copy()
+            self.actions = copy.deepcopy(parent.actions) # .copy()
             # New
-            self.agent_goals = parent.agent_goals[:]  # .copy()
-            self.completed_goals = parent.completed_goals[:]  # .copy()
-            self.benefits = parent.benefits
-            self.costs = parent.costs
+            self.agent_goals = copy.deepcopy(parent.agent_goals) # .copy()
+            self.completed_goals = copy.deepcopy(parent.completed_goals)  # .copy()
+            self.benefits = copy.deepcopy(parent.benefits)
+            self.costs = copy.deepcopy(parent.costs)
 
         # Independent values for every node
         #   own f-value

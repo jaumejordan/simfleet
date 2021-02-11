@@ -1,18 +1,20 @@
+import copy
 import json
 import math
 
-from geopy.distance import vincenty
+from geopy.distance import geodesic
 from loguru import logger
 
-from simfleet.planner.constants import CONFIG_FILE, ACTIONS_FILE, ROUTES_FILE, SPEED, PRINT_OUTPUT, RADIUS
+from simfleet.planner.constants import CONFIG_FILE, ACTIONS_FILE, ROUTES_FILE, SPEED, PRINT_OUTPUT, RELOAD_ACTIONS, \
+    DEEPCOPY
 from simfleet.planner.generators_utils import has_enough_autonomy
 
 VERBOSE = 0
-
+FILTERED_STATIONS_LOGGER = 0
 
 class Database:
     def __init__(self):
-
+        # this parameter is to print the average value of reachable stations at the end of the BRPS process
         self.reachable_stations = []
         try:
             f2 = open(CONFIG_FILE, "r")
@@ -87,7 +89,7 @@ class Database:
                 goals = customers[0:customers_per_agent]
                 customers = [c for c in customers if c not in goals]
             else:
-                goals = customers.copy()
+                goals = copy.deepcopy(customers) # customers.copy()
 
             agent['goals'] = goals
             if PRINT_OUTPUT > 0:
@@ -144,7 +146,8 @@ class Database:
 
     def filter_station_actions_old(self, agent_id, agent_pos, agent_autonomy):
 
-        self.reload_actions()
+        if RELOAD_ACTIONS:
+            self.reload_actions()
         agent_actions = self.actions_dic.get(agent_id)
 
         move_to_station_actions = agent_actions.get("MOVE-TO-STATION")
@@ -158,7 +161,7 @@ class Database:
         for a in move_to_station_actions:
             route = self.get_route(agent_pos, a.get('attributes').get('station_position'))
             if has_enough_autonomy(agent_autonomy, route.get('distance')):
-                filtered_move_actions.append(a.copy())
+                filtered_move_actions.append(copy.deepcopy(a)) # a.copy())
                 filtered_stations.append(a.get('attributes').get('station_id'))
             # max_dist += 250
 
@@ -171,7 +174,8 @@ class Database:
 
     def filter_station_actions(self, agent_id, agent_pos, agent_autonomy, non_served_customers):
 
-        self.reload_actions()
+        if RELOAD_ACTIONS:
+            self.reload_actions()
         agent_actions = self.actions_dic.get(agent_id)
 
         move_to_station_actions = agent_actions.get("MOVE-TO-STATION")
@@ -214,17 +218,42 @@ class Database:
                 for customer in non_served_customers:
                     # route = self.get_route(self.get_customer_origin(customer), station_position)
                     # if route.get('distance') <= RADIUS:
-                    distance = vincenty(self.get_customer_origin(customer), station_position).meters
+                    distance = geodesic(self.get_customer_origin(customer), station_position).meters
                     # if distance <= max_dist:
                     if distance <= customer_dists.get(customer):
-                        filtered_move_actions.append(a.copy())
+                        filtered_move_actions.append(copy.deepcopy(a)) # a.copy())
                         filtered_stations.append(station_id)
                         break
+                    else:
+                        if FILTERED_STATIONS_LOGGER > 0:
+                            logger.warning(f"Agent {agent_id} CAN reach station {station_id} which is {route.get('distance')}m away with autonomy of {agent_autonomy}. "
+                                           f"However it is not close enough to customer {customer}.")
+                            logger.warning(f"Customer distance: {customer_dists.get(customer)}, station distance to customer {distance}")
+            else:
+                if FILTERED_STATIONS_LOGGER > 0:
+                    logger.warning(f"Agent {agent_id} can't reach station {station_id} which is {route.get('distance')}m away with autonomy of {agent_autonomy}")
+
+        # If after the process there are no stations in filtered_stations, repeat without customer restrictions
+        if len(filtered_stations) == 0:
+            for a in move_to_station_actions:
+                # Station attributes
+                station_id = a.get('attributes').get('station_id')
+                station_position = a.get('attributes').get('station_position')
+
+                route = self.get_route(agent_pos, station_position)
+                # Check if station is reachable
+                if has_enough_autonomy(agent_autonomy, route.get('distance')):
+                    filtered_move_actions.append(copy.deepcopy(a))
+                    filtered_stations.append(station_id)
+                else:
+                    if FILTERED_STATIONS_LOGGER > 0:
+                        logger.warning(
+                            f"Agent {agent_id} can't reach station {station_id} which is {route.get('distance')}m away with autonomy of {agent_autonomy}")
 
         filtered_charge_actions = [a for a in charge_actions if
                                    a.get('attributes').get('station_id') in filtered_stations]
 
-        logger.info(f"{len(filtered_stations)} reachable stations")
+        if FILTERED_STATIONS_LOGGER > 0: logger.info(f"{len(filtered_stations)} reachable stations")
         self.reachable_stations.append(len(filtered_stations))
         return filtered_move_actions, filtered_charge_actions
 
@@ -245,7 +274,10 @@ class Database:
             customer_id = a.get('attributes').get('customer_id')
             for b in move_to_dest_actions[:]:
                 if b.get('attributes').get('customer_id') == customer_id:
-                    res.append((a, b))
+                    if DEEPCOPY:
+                        res.append((copy.deepcopy(a), copy.deepcopy(b)))
+                    else:
+                        res.append((a, b))
         return res
 
     def get_customer_couple(self, agent, customer_id):
@@ -261,8 +293,11 @@ class Database:
             if action.get('attributes').get('customer_id') == customer_id:
                 action2 = action
                 break
+        if DEEPCOPY:
+            return copy.deepcopy(action1), copy.deepcopy(action2)
+        else:
+            return action1, action2
 
-        return action1, action2
 
     def get_customer_couple2(self, agent, customer_id):
         agent_actions = [a for a in self.actions_dic if a.get('agent') == agent]
@@ -281,7 +316,10 @@ class Database:
             station_id = a.get('attributes').get('station_id')
             for b in charge_actions:
                 if b.get('attributes').get('station_id') == station_id:
-                    res.append((a, b))
+                    if DEEPCOPY:
+                        res.append((copy.deepcopy(a), copy.deepcopy(b)))
+                    else:
+                        res.append((a, b))
         return res
 
     def extract_route(self, action):
@@ -373,7 +411,7 @@ class Database:
                             logger.debug("] \n")
                 if VERBOSE > 0:
                     logger.info(f"There are {len(queue)} agents in front of {agent}")
-                # Get que last X agents of the queue which are in front of you, where X is the number of (stations?) poles
+                # Get que last X agents of the queue which are in front of you, where X is the number of poles
                 # if check, there are more agents in front of me than places in the station
                 if check:
                     # keep only last X to arrive
@@ -495,5 +533,10 @@ class Database:
         logger.debug("No change in plan:")
         for agent in self.joint_plan.get('no_change').keys():
             logger.debug(f"{agent:20s} : {self.joint_plan.get('no_change').get(agent)}")
+
+        logger.debug("\n")
+        logger.debug("Agent utilities:")
+        for agent in self.joint_plan.get('individual').keys():
+            logger.debug(f"{agent:20s} : {self.joint_plan.get('individual').get(agent).utility:.4f}")
 
         logger.debug("#########################################################################")
