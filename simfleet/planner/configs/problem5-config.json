@@ -1080,7 +1080,8 @@
             ],
             "places": 2,
             "power": 5,
-            "icon": "electric_station"
+            "icon": "electric_station",
+            "power_grid": 1
         },
         {
             "name": "station2",
@@ -1091,7 +1092,8 @@
             ],
             "places": 2,
             "power": 5,
-            "icon": "electric_station"
+            "icon": "electric_station",
+            "power_grid": 1
         },
         {
             "name": "station3",
@@ -1102,7 +1104,8 @@
             ],
             "places": 2,
             "power": 5,
-            "icon": "electric_station"
+            "icon": "electric_station",
+            "power_grid": 1
         },
         {
             "name": "station4",
@@ -1113,7 +1116,8 @@
             ],
             "places": 2,
             "power": 5,
-            "icon": "electric_station"
+            "icon": "electric_station",
+            "power_grid": 2
         },
         {
             "name": "station5",
@@ -1124,7 +1128,8 @@
             ],
             "places": 2,
             "power": 5,
-            "icon": "electric_station"
+            "icon": "electric_station",
+            "power_grid": 2
         },
         {
             "name": "station6",
@@ -1135,7 +1140,8 @@
             ],
             "places": 2,
             "power": 5,
-            "icon": "electric_station"
+            "icon": "electric_station",
+            "power_grid": 2
         },
         {
             "name": "station7",
@@ -1146,7 +1152,8 @@
             ],
             "places": 2,
             "power": 5,
-            "icon": "electric_station"
+            "icon": "electric_station",
+            "power_grid": 3
         },
         {
             "name": "station8",
@@ -1157,7 +1164,8 @@
             ],
             "places": 2,
             "power": 5,
-            "icon": "electric_station"
+            "icon": "electric_station",
+            "power_grid": 3
         }
     ],
     "simulation_name": "Empty configuration",
