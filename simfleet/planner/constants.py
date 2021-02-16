@@ -26,11 +26,15 @@ INITIAL_GREEDY_PLAN = True
 
 # Congestions
 STATION_CONGESTION = True
-ROAD_CONGESTION = False
+ROAD_CONGESTION = True
 
 # Memory management
 RELOAD_ACTIONS = False
 DEEPCOPY = not RELOAD_ACTIONS
+
+# Congestion bound variables
+BOUND_POWER_PERCENTAGE = 0.5
+BOUND_ROUTE_PERCENTAGE = 0.3
 
 # # Congestion test 1
 # CONFIG_FILE = "configs/congestion1.json"
@@ -67,11 +71,11 @@ DEEPCOPY = not RELOAD_ACTIONS
 #  # 5 taxi, 10 customer, 40% is 4 customers per taxi
 
 
-# Experimentation - problem 4
-CONFIG_FILE = "configs/problem4-config.json"
-ACTIONS_FILE = "actions/problem4-actions.json"
-ROUTES_FILE = "routes/problem4-routes.json"
-# 10 taxi, 30 customer, 30% is 9 customers per taxi, 20% is 6 per taxi
+# # Experimentation - problem 4
+# CONFIG_FILE = "configs/problem4-config.json"
+# ACTIONS_FILE = "actions/problem4-actions.json"
+# ROUTES_FILE = "routes/problem4-routes.json"
+# # 10 taxi, 30 customer, 30% is 9 customers per taxi, 20% is 6 per taxi
 
 
 #  # Experimentation - problem 5
@@ -80,11 +84,11 @@ ROUTES_FILE = "routes/problem4-routes.json"
 # ROUTES_FILE = "routes/problem5-routes.json"
 #  # 20 taxi, 60 customer, 20% is 12 customers per taxi, 10% is 6 per taxi
 
-# # Experimentation - 20 taxi, 60 customer, 32 stations (genetic)
-# # 4 rondes, 150 segons
-# CONFIG_FILE = "configs/20taxi-60customer-32stations-config.json"
-# ACTIONS_FILE = "actions/20taxi-60customer-32stations-actions.json"
-# ROUTES_FILE = "routes/50taxi-200customer-32stations-routes.json"
+# Experimentation - 20 taxi, 60 customer, 32 stations (genetic)
+# 4 rondes, 150 segons
+CONFIG_FILE = "configs/20taxi-60customer-32stations-config.json"
+ACTIONS_FILE = "actions/20taxi-60customer-32stations-actions.json"
+ROUTES_FILE = "routes/50taxi-200customer-32stations-routes.json"
 
 #  # Experimentation - 50 taxi, 150 customer, 16 stations (genetic)
 # # 7 rondes, 2048 segons

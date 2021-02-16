@@ -67,6 +67,7 @@ class BestResponse:
                     self.power_grids[station.get('power_grid')]['limit_power'] += station.get('power')
                 # if not
                 else:
+                    self.power_grids[station.get('power_grid')] = {'stations': [], 'limit_power': 0}
                     self.power_grids[station.get('power_grid')]['stations'] = [station.get('name')]
                     self.power_grids[station.get('power_grid')]['limit_power'] = station.get('power')
             # if there is no grid indicated, add it to grid 1 (global grid)
@@ -76,7 +77,7 @@ class BestResponse:
         # TODO delete later
         if PRINT_OUTPUT > 0:
             for grid in self.power_grids.keys():
-                logger.error(self.power_grids[grid])
+                logger.error(f"Power grid {grid:2d}: {self.power_grids[grid]}")
 
     # Prepares the data structure to store the Joint plan
     def init_joint_plan(self):
@@ -278,6 +279,7 @@ class BestResponse:
                         if action.get('type') == 'CHARGE':
                             if action.get('statistics').get('init_charge') == current_agent.get('init_charge'):
                                 action['inv'] = 'INV'
+
     # Checks stopping criteria of Best Response algorithm
     def stop(self):
 
@@ -356,7 +358,7 @@ class BestResponse:
                 if PRINT_OUTPUT > 0:
                     logger.warning(f"Agent {agent_id} had its plan utility reduced "
                                    f"from {prev_utility} to {updated_utility}")
-                                 # f"from {prev_utility:.4f} to {updated_utility:.4f}")
+                    # f"from {prev_utility:.4f} to {updated_utility:.4f}")
                 # NEW if the utility of the plan had changed, update it in the joint plan
                 prev_plan.utility = updated_utility
                 self.joint_plan["individual"][agent_id].utility = updated_utility
@@ -520,7 +522,7 @@ class BestResponse:
             # First turn of the game, agents propose their initial plan
             if game_turn == 1 and INITIAL_GREEDY_PLAN:
                 self.create_initial_greedy_plans()
-            elif game_turn == 1 and not INITIAL_JOINT_PLAN :
+            elif game_turn == 1 and not INITIAL_JOINT_PLAN:
                 self.create_initial_plans()
             # In the following turns, the agents may have one of this two:
             # 1) A previous plan
@@ -533,9 +535,9 @@ class BestResponse:
                 self.print_game_state(game_turn)
         logger.info(f"Best Response turn {game_turn}")
         logger.info("END OF GAME")
-        avg_reachable_stations = sum(self.db.reachable_stations)/len(self.db.reachable_stations)
+        avg_reachable_stations = sum(self.db.reachable_stations) / len(self.db.reachable_stations)
         logger.info(f"Avg. reachable stations: {avg_reachable_stations}")
-        avg_planning_time = sum(self.planning_times)/len(self.planning_times)
+        avg_planning_time = sum(self.planning_times) / len(self.planning_times)
         logger.debug(f"Agents planned {len(self.planning_times)} times. Avg. planning time: {avg_planning_time:.3f}")
 
 

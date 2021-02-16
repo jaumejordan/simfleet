@@ -4,6 +4,7 @@ import numpy as np
 from loguru import logger
 from shapely.geometry import LineString, Point, GeometryCollection, MultiLineString, MultiPoint
 
+from simfleet.planner.constants import BOUND_ROUTE_PERCENTAGE, BOUND_POWER_PERCENTAGE
 from simfleet.planner.generators_utils import timing
 
 
@@ -22,7 +23,10 @@ def check_charge_congestion(u1, station, original_cost, db):
     current_grid = get_electric_grid(station, power_grids)
     limit_power = power_grids.get(current_grid).get('limit_power')
     # TODO extract from database's config file
-    bound_power_percentage = 0.5
+    if db.config_dic.get('power_grids') is not None:
+        bound_power_percentage = db.config_dic.get('power_grids').get(str(current_grid)).get('bound_power_percentage')
+    else:
+        bound_power_percentage = BOUND_POWER_PERCENTAGE
 
     # Compare against charges in stations of the same grid
     same_grid_charges = []
@@ -87,7 +91,7 @@ def charge_congestion_function(bound_power_percentage, limit_power, power_consum
 
 def check_road_congestion(a1, original_cost, db):
     # TODO extract from database's config file
-    bound_route_percentage = 0.3
+    bound_route_percentage = BOUND_ROUTE_PERCENTAGE
     # List to store the intersection percentages with other routes
     res = []
     # Extract a1's time interval
