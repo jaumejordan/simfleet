@@ -150,14 +150,6 @@ class Planner:
             if station.get('name') == station_name:
                 return station.get("places")
 
-    def check_simultaneous_charge(self, agent, station, at_station):
-        for usage in self.joint_plan.get('station_usage').get(station):
-            if usage.get('agent') != agent and usage.get('inv') != 'INV':
-                if usage.get('at_station') == at_station:
-                    if PRINT_OUTPUT > 0:
-                        logger.warning(f"Found simultaneous charge among agents {usage.get('agent')} and {agent}")
-                    return True
-        return False
 
     def check_available_poles(self, agent, station, at_station):
         c = 0

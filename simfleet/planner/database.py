@@ -500,8 +500,13 @@ class Database:
             if plan is None:
                 logger.debug(f"{agent:20s} : NO PLAN")
             else:
-                logger.debug(f"{agent:20s} : Plan with {len(plan.entries):2d} entries and utility {plan.utility:.4f}")
-                logger.debug(plan.to_string_plan())
+                if plan.inv is not None:
+                    logger.error(
+                        f"{agent:20s} : Plan with {len(plan.entries):2d} entries and utility {plan.utility:.4f}")
+                    logger.error(plan.to_string_plan())
+                else:
+                    logger.debug(f"{agent:20s} : Plan with {len(plan.entries):2d} entries and utility {plan.utility:.4f}")
+                    logger.debug(plan.to_string_plan())
 
         logger.debug("\n")
         logger.debug("Joint plan:")
@@ -524,7 +529,7 @@ class Database:
                         logger.debug(f"\t{usage.get('agent'):10s}, {usage.get('at_station'):.4f}, "
                                      f"{usage.get('init_charge'):.4f}, {usage.get('end_charge'):.4f}")
                     else:
-                        logger.debug(f"\t{usage.get('agent'):10s}, {usage.get('at_station'):.4f}, "
+                        logger.error(f"\t{usage.get('agent'):10s}, {usage.get('at_station'):.4f}, "
                                      f"{usage.get('init_charge'):.4f}, {usage.get('end_charge'):.4f}, "
                                      f"{usage.get('inv')}")
                 logger.debug("] \n")
@@ -536,7 +541,12 @@ class Database:
 
         logger.debug("\n")
         logger.debug("Agent utilities:")
+        utilities = []
         for agent in self.joint_plan.get('individual').keys():
+            utilities.append(self.joint_plan.get('individual').get(agent).utility)
             logger.debug(f"{agent:20s} : {self.joint_plan.get('individual').get(agent).utility:.4f}")
+
+        logger.debug("\n")
+        logger.debug(f"Avg. utility: {sum(utilities)/len(utilities):.4f}")
 
         logger.debug("#########################################################################")

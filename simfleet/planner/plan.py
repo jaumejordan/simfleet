@@ -5,6 +5,7 @@ class Plan:
         self.utility = value
         self.fill_entries(actions.copy())
         self.fill_goals(completed_goals.copy())
+        self.inv = None
 
     def fill_entries(self, actions):
         init_time = 0.0

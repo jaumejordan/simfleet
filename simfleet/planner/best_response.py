@@ -56,7 +56,7 @@ class BestResponse:
             self.station_usage[station.get('name')] = []
 
     def init_power_grids(self):
-        for station in self.config_dic.get('stations'):
+        for station in self.db.config_dic.get('stations'):
             # if the station is assigned to a grid
             if station.get('power_grid') is not None:
                 # if the grid already exists
@@ -279,6 +279,8 @@ class BestResponse:
                         if action.get('type') == 'CHARGE':
                             if action.get('statistics').get('init_charge') == current_agent.get('init_charge'):
                                 action['inv'] = 'INV'
+                                agent_plan.inv = True
+        self.update_db()
 
     # Checks stopping criteria of Best Response algorithm
     def stop(self):
@@ -495,12 +497,8 @@ class BestResponse:
         self.db.print_joint_plan()
 
     def run(self):
-        # Read dictionary data
-        self.initialize()
-        # Create players
-        # self.create_agents()
 
-        # Assign random order
+        # Assign random player order
         # random.shuffle(self.agents)
         # logger.debug("ATTENTION, NOT RANDOMIZING ORDER")
         if PRINT_OUTPUT > 0:
