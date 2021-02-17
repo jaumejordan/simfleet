@@ -8,6 +8,8 @@ from simfleet.planner.constants import STARTING_FARE, PRICE_PER_KM, TRAVEL_PENAL
     INVALID_CHARGE_PENALTY, HEURISTIC, STATION_CONGESTION, ROAD_CONGESTION, PRINT_OUTPUT, OLD_HEURISTIC, NEW_HEURISTIC
 
 HEURISTIC_VERBOSE = 0
+NO_BENEFITS = True
+
 #############################################################
 ####################### MAIN FUNCTIONS ######################
 #############################################################
@@ -108,12 +110,14 @@ def get_h_value(node, db):
         benefits += get_benefit(action) + 1000
         costs += get_travel_cost(action)
 
-    h = benefits - costs
+    if NO_BENEFITS:
+        h = 0 - costs
+    else:
+        h = benefits - costs
     return h
 
 
 def best_permutation_heuristic(node, db):
-
     # Check if there are customers left to serve
     non_served_customers = [x for x in node.agent_goals if x not in node.already_served()]
     if len(non_served_customers) == 0:
@@ -205,7 +209,10 @@ def get_order_utility(agent, position, time, order, db):
         # Update position and time
         current_pos = action2.get('attributes').get('customer_dest')
         current_time += (action1.get('statistics').get('time') + action2.get('statistics').get('time'))
+    if NO_BENEFITS:
+        return 0 - costs
     return benefits - costs
+
 
 
 def get_h_value_open_goals(self, node, db):
@@ -247,6 +254,8 @@ def compute_benefits(action_list):
     for action in action_list:
         if action.get('type') == 'MOVE-TO-DEST':
             benefits += get_benefit(action) + 1000
+    if NO_BENEFITS:
+        return 0
     return benefits
 
 
@@ -335,4 +344,3 @@ def compute_costs(action_list, table_of_goals, db):
             else:
                 costs += pick_up * TIME_PENALTY
     return costs
-
