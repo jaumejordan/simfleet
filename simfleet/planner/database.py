@@ -2,6 +2,7 @@ import copy
 import json
 import math
 
+import numpy as np
 from geopy.distance import geodesic
 from loguru import logger
 
@@ -11,6 +12,7 @@ from simfleet.planner.generators_utils import has_enough_autonomy
 
 VERBOSE = 0
 FILTERED_STATIONS_LOGGER = 0
+
 
 class Database:
     def __init__(self):
@@ -89,7 +91,7 @@ class Database:
                 goals = customers[0:customers_per_agent]
                 customers = [c for c in customers if c not in goals]
             else:
-                goals = copy.deepcopy(customers) # customers.copy()
+                goals = copy.deepcopy(customers)  # customers.copy()
 
             agent['goals'] = goals
             if PRINT_OUTPUT > 0:
@@ -161,7 +163,7 @@ class Database:
         for a in move_to_station_actions:
             route = self.get_route(agent_pos, a.get('attributes').get('station_position'))
             if has_enough_autonomy(agent_autonomy, route.get('distance')):
-                filtered_move_actions.append(copy.deepcopy(a)) # a.copy())
+                filtered_move_actions.append(copy.deepcopy(a))  # a.copy())
                 filtered_stations.append(a.get('attributes').get('station_id'))
             # max_dist += 250
 
@@ -185,7 +187,6 @@ class Database:
 
         filtered_move_actions = []
         filtered_stations = []
-
 
         # # find furthest customer among non_served
         # max_dist = -1
@@ -221,17 +222,20 @@ class Database:
                     distance = geodesic(self.get_customer_origin(customer), station_position).meters
                     # if distance <= max_dist:
                     if distance <= customer_dists.get(customer):
-                        filtered_move_actions.append(copy.deepcopy(a)) # a.copy())
+                        filtered_move_actions.append(copy.deepcopy(a))  # a.copy())
                         filtered_stations.append(station_id)
                         break
                     else:
                         if FILTERED_STATIONS_LOGGER > 0:
-                            logger.warning(f"Agent {agent_id} CAN reach station {station_id} which is {route.get('distance')}m away with autonomy of {agent_autonomy}. "
-                                           f"However it is not close enough to customer {customer}.")
-                            logger.warning(f"Customer distance: {customer_dists.get(customer)}, station distance to customer {distance}")
+                            logger.warning(
+                                f"Agent {agent_id} CAN reach station {station_id} which is {route.get('distance')}m away with autonomy of {agent_autonomy}. "
+                                f"However it is not close enough to customer {customer}.")
+                            logger.warning(
+                                f"Customer distance: {customer_dists.get(customer)}, station distance to customer {distance}")
             else:
                 if FILTERED_STATIONS_LOGGER > 0:
-                    logger.warning(f"Agent {agent_id} can't reach station {station_id} which is {route.get('distance')}m away with autonomy of {agent_autonomy}")
+                    logger.warning(
+                        f"Agent {agent_id} can't reach station {station_id} which is {route.get('distance')}m away with autonomy of {agent_autonomy}")
 
         # If after the process there are no stations in filtered_stations, repeat without customer restrictions
         if len(filtered_stations) == 0:
@@ -297,7 +301,6 @@ class Database:
             return copy.deepcopy(action1), copy.deepcopy(action2)
         else:
             return action1, action2
-
 
     def get_customer_couple2(self, agent, customer_id):
         agent_actions = [a for a in self.actions_dic if a.get('agent') == agent]
@@ -434,7 +437,8 @@ class Database:
                     logger.info(
                         f"Agent {agent} will begin charging at time {init_charge:.4f} after waiting {waiting_time:.4f} seconds")
             elif available_poles < 0:
-                logger.critical(f"Error computing available poles for station {station}: {available_poles} at time {current_time}")
+                logger.critical(
+                    f"Error computing available poles for station {station}: {available_poles} at time {current_time}")
                 logger.debug("\n")
                 logger.debug("Station usage:")
                 for station in self.joint_plan.get('station_usage').keys():
@@ -505,7 +509,8 @@ class Database:
                         f"{agent:20s} : Plan with {len(plan.entries):2d} entries and utility {plan.utility:.4f}")
                     logger.error(plan.to_string_plan())
                 else:
-                    logger.debug(f"{agent:20s} : Plan with {len(plan.entries):2d} entries and utility {plan.utility:.4f}")
+                    logger.debug(
+                        f"{agent:20s} : Plan with {len(plan.entries):2d} entries and utility {plan.utility:.4f}")
                     logger.debug(plan.to_string_plan())
 
         logger.debug("\n")
@@ -546,7 +551,9 @@ class Database:
             utilities.append(self.joint_plan.get('individual').get(agent).utility)
             logger.debug(f"{agent:20s} : {self.joint_plan.get('individual').get(agent).utility:.4f}")
 
+        utilities = np.array(utilities)
         logger.debug("\n")
-        logger.debug(f"Avg. utility: {sum(utilities)/len(utilities):.4f}")
+        logger.debug(
+            f"Mean utility: {utilities.mean():.4f}. Std deviation: {utilities.std():.4f}. Median: {np.median(utilities):.4f}.")
 
         logger.debug("#########################################################################")

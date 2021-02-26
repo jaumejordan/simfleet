@@ -1,5 +1,7 @@
 import asyncio
+import copy
 import json
+import math
 import sys
 
 import aiohttp
@@ -12,6 +14,10 @@ transport_info = {}
 ordered_global_actions = {}
 
 ROUTE_HOST = "http://osrm.gti-ia.upv.es/"
+
+counter = 0
+counter_previous = 0
+previous_routes = {}
 
 
 async def request_route_to_server(origin, destination, route_host="http://router.project-osrm.org/"):
@@ -95,29 +101,31 @@ routes = {
 """
 
 
-async def calculate_routes(transport_positions, station_positions, customer_points,
-                           previous_routes):  # customer_origins, customer_destinations):
-    counter = 0
-    counter_previous = 0
+async def calculate_routes(transport_positions, station_positions, customer_points):  # customer_origins, customer_destinations):
     routes = {}
+    # Number of customers each agent will initially pick up
+    customers = copy.deepcopy(customer_points)
+    customers_per_agent = math.ceil(len(customers) / len(transport_positions))
+    transport_goals = {}
+    customer_assigned_transport = {}
+    for transport in transport_positions:
+        if len(customers) >= customers_per_agent:
+            # Assign their customers
+            goals = customers[0:customers_per_agent]
+            customers = [c for c in customers if c not in goals]
+        else:
+            goals = copy.deepcopy(customers)  # customers.copy())
+
+        transport_goals[create_key(transport[0], transport[1])] = goals
+        for goal in goals:
+            customer_assigned_transport[create_key(goal[0], goal[1])] = transport
+
     # Calculate routes between transport positions and station positions
     # used if the transport has to charge before doing any assignment
     print("Calculating transport-station routes...")
     for t_pos in transport_positions:
         for s_pos in station_positions:
-            key = create_key(t_pos, s_pos)
-            if key in previous_routes:
-                value = previous_routes[key]
-                counter_previous += 1
-                if counter_previous % 100 == 0:
-                    print(f"Previous {counter_previous} route(s)")
-            else:
-                path, distance, duration = await request_route_to_server(t_pos, s_pos, ROUTE_HOST)
-                counter += 1
-                if counter % 100 == 0:
-                    print(f"Calculated {counter} route(s)")
-                # create key and value for routes dic
-                key, value = create_key_value(t_pos, s_pos, path, distance, duration)
+            key, value = await get_route(t_pos, s_pos)
             # save key and value
             routes[key] = value
 
@@ -125,21 +133,9 @@ async def calculate_routes(transport_positions, station_positions, customer_poin
     # used if the transport begin execution with a customer assignment
     print("\nCalculating transport-customer routes...")
     for t_pos in transport_positions:
-        for tup in customer_points:
+        for tup in transport_goals[create_key(t_pos[0], t_pos[1])]:
             c_origin = tup[0]
-            key = create_key(t_pos, c_origin)
-            if key in previous_routes:
-                value = previous_routes[key]
-                counter_previous += 1
-                if counter_previous % 100 == 0:
-                    print(f"Previous {counter_previous} route(s)")
-            else:
-                path, distance, duration = await request_route_to_server(t_pos, c_origin, ROUTE_HOST)
-                counter += 1
-                if counter % 100 == 0:
-                    print(f"Calculated {counter} route(s)")
-                # create key and value for routes dic
-                key, value = create_key_value(t_pos, c_origin, path, distance, duration)
+            key, value = await get_route(t_pos, c_origin)
             # save key and value
             routes[key] = value
 
@@ -149,19 +145,7 @@ async def calculate_routes(transport_positions, station_positions, customer_poin
     for s_pos in station_positions:
         for tup in customer_points:
             c_origin = tup[0]
-            key = create_key(s_pos, c_origin)
-            if key in previous_routes:
-                value = previous_routes[key]
-                counter_previous += 1
-                if counter_previous % 100 == 0:
-                    print(f"Previous {counter_previous} route(s)")
-            else:
-                path, distance, duration = await request_route_to_server(s_pos, c_origin, ROUTE_HOST)
-                counter += 1
-                if counter % 100 == 0:
-                    print(f"Calculated {counter} route(s)")
-                # create key and value for routes dic
-                key, value = create_key_value(s_pos, c_origin, path, distance, duration)
+            key, value = await get_route(s_pos, c_origin)
             # save key and value
             routes[key] = value
 
@@ -172,19 +156,7 @@ async def calculate_routes(transport_positions, station_positions, customer_poin
     for tup in customer_points:
         c_origin = tup[0]
         c_dest = tup[1]
-        key = create_key(c_origin, c_dest)
-        if key in previous_routes:
-            value = previous_routes[key]
-            counter_previous += 1
-            if counter_previous % 100 == 0:
-                print(f"Previous {counter_previous} route(s)")
-        else:
-            path, distance, duration = await request_route_to_server(c_origin, c_dest, ROUTE_HOST)
-            counter += 1
-            if counter % 100 == 0:
-                print(f"Calculated {counter} route(s)")
-            # create key and value for routes dic
-            key, value = create_key_value(c_origin, c_dest, path, distance, duration)
+        key, value = await get_route(c_origin, c_dest)
         # save key and value
         routes[key] = value
 
@@ -194,19 +166,7 @@ async def calculate_routes(transport_positions, station_positions, customer_poin
     for tup in customer_points:
         c_dest = tup[1]
         for s_pos in station_positions:
-            key = create_key(c_dest, s_pos)
-            if key in previous_routes:
-                value = previous_routes[key]
-                counter_previous += 1
-                if counter_previous % 100 == 0:
-                    print(f"Previous {counter_previous} route(s)")
-            else:
-                path, distance, duration = await request_route_to_server(c_dest, s_pos, ROUTE_HOST)
-                counter += 1
-                if counter % 100 == 0:
-                    print(f"Calculated {counter} route(s)")
-                # create key and value for routes dic
-                key, value = create_key_value(c_dest, s_pos, path, distance, duration)
+            key, value = await get_route(c_dest, s_pos)
             # save key and value
             routes[key] = value
 
@@ -215,21 +175,12 @@ async def calculate_routes(transport_positions, station_positions, customer_poin
     print("\nCalculating destination-origin routes...")
     for tup1 in customer_points:
         c_dest = tup1[1]
-        for tup2 in customer_points:
+        transport = customer_assigned_transport[create_key(tup1[0], tup1[1])]
+        for tup2 in transport_goals[create_key(transport[0], transport[1])]:
+            if tup1 == tup2:
+                continue
             c_origin = tup2[0]
-            key = create_key(c_dest, c_origin)
-            if key in previous_routes:
-                value = previous_routes[key]
-                counter_previous += 1
-                if counter_previous % 100 == 0:
-                    print(f"Previous {counter_previous} route(s)")
-            else:
-                path, distance, duration = await request_route_to_server(c_dest, c_origin, ROUTE_HOST)
-                counter += 1
-                if counter % 100 == 0:
-                    print(f"Calculated {counter} route(s)")
-                # create key and value for routes dic
-                key, value = create_key_value(c_dest, c_origin, path, distance, duration)
+            key, value = await get_route(c_dest, c_origin)
             # save key and value
             routes[key] = value
 
@@ -240,19 +191,36 @@ async def calculate_routes(transport_positions, station_positions, customer_poin
     return routes
 
 
+async def get_route(origin, destination):
+    global counter_previous, counter
+    key = create_key(origin, destination)
+    if key in previous_routes:
+        value = previous_routes[key]
+        counter_previous += 1
+        if counter_previous % 100 == 0:
+            print(f"Previous {counter_previous} route(s)")
+    else:
+        path, distance, duration = await request_route_to_server(origin, destination, ROUTE_HOST)
+        counter += 1
+        if counter % 100 == 0:
+            print(f"Calculated {counter} route(s)")
+        # create value for routes dic
+        value = create_value(path, distance, duration)
+    return key, value
+
+
 def create_key(k1, k2):
     key = str(k1) + ":" + str(k2)
     return key
 
 
-def create_key_value(k1, k2, path, dist, dur):
-    key = str(k1) + ":" + str(k2)
+def create_value(path, dist, dur):
     value = {
         "path": path,
         "distance": dist,
         "duration": dur
     }
-    return key, value
+    return value
 
 
 #######################################################################################################################
@@ -282,7 +250,8 @@ if __name__ == '__main__':
     routes_file = "routes/200taxi-600customer-20stations-routes.json"
     with open(routes_file, 'r') as f:
         previous_routes = json.load(f)
-    routes = asyncio.run(calculate_routes(t, s, cp, previous_routes))
+
+    routes = asyncio.run(calculate_routes(t, s, cp))
 
     outfile = open("routes/200taxi-600customer-20stations-routesb.json", "w+")
     json.dump(routes, outfile, indent=4)

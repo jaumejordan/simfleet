@@ -1,8 +1,8 @@
 import copy
 import json
 import math
-import random
 
+import numpy as np
 from loguru import logger
 
 from simfleet.planner.constants import CONFIG_FILE, ACTIONS_FILE, \
@@ -509,34 +509,34 @@ class BestResponse:
         self.init_joint_plan()
 
         game_turn = 0
-        i = 0
         while not self.stop() and game_turn < 1000:  # 1000
-            i += 1
-            game_turn += 1
             if PRINT_OUTPUT > 0:
                 logger.info("*************************************************************************")
                 logger.info(f"\t\t\t\t\t\t\tBest Response turn {game_turn}")
                 logger.info("*************************************************************************")
             # First turn of the game, agents propose their initial plan
-            if game_turn == 1 and INITIAL_GREEDY_PLAN:
+            if game_turn == 0 and INITIAL_GREEDY_PLAN:
                 self.create_initial_greedy_plans()
-            elif game_turn == 1 and not INITIAL_JOINT_PLAN:
+            elif game_turn == 0 and not INITIAL_JOINT_PLAN:
                 self.create_initial_plans()
             # In the following turns, the agents may have one of this two:
             # 1) A previous plan
             # 2) An empty plan, because it can't do any action that increases its utility
-            if game_turn > 1:
+            if game_turn > 0:
                 for a in self.agents:
                     self.propose_plan(a)
             self.flag_invalid_charge_actions()
             if PRINT_OUTPUT > 0:
                 self.print_game_state(game_turn)
+            game_turn += 1
         logger.info(f"Best Response turn {game_turn}")
         logger.info("END OF GAME")
         avg_reachable_stations = sum(self.db.reachable_stations) / len(self.db.reachable_stations)
         logger.info(f"Avg. reachable stations: {avg_reachable_stations}")
-        avg_planning_time = sum(self.planning_times) / len(self.planning_times)
-        logger.debug(f"Agents planned {len(self.planning_times)} times. Avg. planning time: {avg_planning_time:.3f}")
+        planning_times = np.array(self.planning_times)
+        logger.debug(
+            f"Agents planned {len(self.planning_times)} times. Avg. planning time: {planning_times.mean():.3f}. "
+            f"Std. dev planning time: {planning_times.std():.3f}")
 
 
 if __name__ == '__main__':
