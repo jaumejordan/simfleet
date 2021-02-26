@@ -55,14 +55,12 @@ BOUND_ROUTE_PERCENTAGE = 0.3
 # CONFIG_FILE = "configs/3-agent-config.json"
 # ACTIONS_FILE = "actions/3-agent-config-actions.json"
 # ROUTES_FILE = "routes/3-agent-config-routes.json"
-# GOAL_PERCENTAGE = 1 # 100%
 
 # # Experimentation - problem 2
 # CONFIG_FILE = "configs/problem2-config.json"
 # ACTIONS_FILE = "actions/problem2-actions.json"
 # ROUTES_FILE = "routes/problem2-routes.json"
 # # 3 taxi, 6 customer, 50% is 3 customers per taxi
-# GOAL_PERCENTAGE = 1
 
 #  # Experimentation - problem 3
 # CONFIG_FILE = "configs/problem3-config.json"

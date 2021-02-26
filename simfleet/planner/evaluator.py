@@ -36,7 +36,7 @@ def evaluate_node(node, db, solution=False):
     action_list = node.actions[-2:]
 
     benefits = compute_benefits(action_list)
-    costs = compute_costs(action_list, node.completed_goals, db)
+    costs, cost_dic = compute_costs(action_list, node.completed_goals, db)
 
     node.benefits += benefits
     node.costs += costs
@@ -74,12 +74,12 @@ def evaluate_plan(plan, db):
     action_list = [entry.action for entry in plan.entries]
 
     benefits = compute_benefits(action_list)
-    costs = compute_costs(action_list, plan.table_of_goals, db)
+    costs, cost_dic = compute_costs(action_list, plan.table_of_goals, db)
 
     # Utility (or g value) = benefits - costs
     utility = benefits - costs
 
-    return utility
+    return utility, cost_dic
 
 
 #############################################################
@@ -268,31 +268,56 @@ def compute_costs(action_list, table_of_goals, db):
     if isinstance(table_of_goals, list):
         is_node = True
 
-    costs = 0
+    cost_dic = {
+        'total_cost': 0,
+        'charge_cost': 0,
+        'charge_congestion': 0,
+        'travel_cost': 0,
+        'road_congestion': 0,
+        'waiting_overcost': 0,
+        'INV': 0
+    }
+
+    total_cost = 0
     for action in action_list:
         # For actions that entail a movement, pay a penalty per km (10%)
         if action.get('type') != 'CHARGE':
             travel_cost = get_travel_cost(action)
+            # Update cost dictionary
+            cost_dic['travel_cost'] += travel_cost
+
             if ROAD_CONGESTION:
                 # Compute road congestion
                 road_congestion = check_road_congestion(action, travel_cost, db)
 
                 if travel_cost != road_congestion:
-                    costs += road_congestion
+                    total_cost += road_congestion
+
+                    # Update cost dictionary
+                    cost_dic['road_congestion'] += (road_congestion - travel_cost)
+
                     if not is_node:
                         if PRINT_OUTPUT > 0:
                             logger.warning(
                                 f"Travel cost incremented by congestion from {travel_cost} to {road_congestion}")
                 else:
-                    costs += travel_cost
+                    total_cost += travel_cost
             else:
-                costs += travel_cost
+                total_cost += travel_cost
 
         # For actions that entail charging, pay for the charged electricity
         else:
             charge_cost = get_charge_cost(action)
+
+            # Update cost dictionary
+            cost_dic['charge_cost'] += charge_cost
+
             if action.get('inv') == 'INV':
-                costs += INVALID_CHARGE_PENALTY
+                total_cost += INVALID_CHARGE_PENALTY
+
+                # Update cost dictionary
+                cost_dic['INV'] += INVALID_CHARGE_PENALTY
+
             else:
                 if STATION_CONGESTION:
                     # Create station usage from action
@@ -314,15 +339,18 @@ def compute_costs(action_list, table_of_goals, db):
                     charge_congestion = check_charge_congestion(usage, station, charge_cost, db)
 
                     if charge_cost != charge_congestion:
+
+                        # Update cost dictionary
+                        cost_dic['charge_congestion'] += (charge_congestion - charge_cost)
                         if not is_node:
                             if PRINT_OUTPUT > 0:
                                 logger.warning(
                                     f"Charging cost incremented by congestion from {charge_cost} to {charge_congestion}")
-                        costs += charge_congestion
+                        total_cost += charge_congestion
                     else:
-                        costs += charge_cost
+                        total_cost += charge_cost
                 else:
-                    costs += charge_cost
+                    total_cost += charge_cost
 
         # For actions that pick up a customer, add waiting time as a cost
         if action.get('type') == 'PICK-UP':
@@ -340,7 +368,20 @@ def compute_costs(action_list, table_of_goals, db):
 
             # Add waiting time to costs
             if isinstance(pick_up, tuple):
-                costs += pick_up[1] * TIME_PENALTY
+                waiting_overcost = pick_up[1] * TIME_PENALTY
+
+                # Update cost dictionary
+                cost_dic['waiting_overcost'] += waiting_overcost
+
+                total_cost += waiting_overcost
             else:
-                costs += pick_up * TIME_PENALTY
-    return costs
+                waiting_overcost = pick_up * TIME_PENALTY
+
+                # Update cost dictionary
+                cost_dic['waiting_overcost'] += waiting_overcost
+
+                total_cost += waiting_overcost
+
+    # Update cost dictionary
+    cost_dic['total_cost'] += total_cost
+    return total_cost, cost_dic

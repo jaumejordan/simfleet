@@ -723,7 +723,7 @@ class Planner:
 
         # Create plan with agent action list
         self.plan = Plan(actions, -1, completed_goals)
-        utility = evaluate_plan(self.plan, self.db)
+        utility, _ = evaluate_plan(self.plan, self.db)
         self.plan.utility = utility
         if PRINT_OUTPUT > 0:
             logger.info(f"Agent {self.agent_id} initial plan:")
