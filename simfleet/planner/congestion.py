@@ -93,7 +93,7 @@ def check_road_congestion(a1, original_cost, db):
     # TODO extract from database's config file
     bound_route_percentage = BOUND_ROUTE_PERCENTAGE
     # List to store the intersection percentages with other routes
-    res = []
+    overlap_list = []
     # Extract a1's time interval
     a1_interval = [a1.get('statistics').get('init'),
                    a1.get('statistics').get('init') + a1.get('statistics').get('time')]
@@ -124,16 +124,16 @@ def check_road_congestion(a1, original_cost, db):
                         if intersec_percentage > 1:
                             intersec_percentage = 1
                         if intersec_percentage > 0.2:
-                            res.append(intersec_percentage)
+                            overlap_list.append(intersec_percentage)
 
-    if len(res) > 0:
+    if len(overlap_list) > 0:
         # logger.error(f"Route intersected with another {len(res)} routes. "
         #              f"Avg: {round(sum(res) / len(res), 2)} Intersection percentages: {res}.")
         return travel_congestion_function(bound_route_percentage,
                                           cost=original_cost,
                                           route_distance=a1_distance/1000,
-                                          mean_overlap=sum(res) / len(res),
-                                          num_agents=len(res),
+                                          mean_overlap=sum(overlap_list) / len(overlap_list),
+                                          num_agents=len(overlap_list),
                                           total_agents=len(db.agents))
     else:
         return original_cost

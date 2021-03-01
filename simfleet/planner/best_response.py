@@ -3,6 +3,7 @@ import json
 import math
 
 import numpy as np
+import pandas as pd
 from loguru import logger
 
 from simfleet.planner.constants import CONFIG_FILE, ACTIONS_FILE, \
@@ -11,7 +12,6 @@ from simfleet.planner.evaluator import evaluate_plan
 from simfleet.planner.plan import JointPlan
 from simfleet.planner.planner import Planner
 
-INITIAL_JOINT_PLAN = False
 LOOP_DETECTION = True
 CONSIDER_PREV_PLAN = False
 VERBOSE = 0
@@ -354,7 +354,7 @@ class BestResponse:
             prev_utility = prev_plan.utility
             # Calculate updated utility w.r.t. other agent's plans
             # CANVI
-            updated_utility = evaluate_plan(prev_plan, self.db)
+            updated_utility, _ = evaluate_plan(prev_plan, self.db)
             # updated_utility = self.evaluate_plan(prev_plan)
             if prev_utility != updated_utility:
                 if PRINT_OUTPUT > 0:
@@ -489,6 +489,43 @@ class BestResponse:
             return True
         return False
 
+    # Create dataframe with cost breakdown for each final agent plan
+    def cost_analysis(self):
+
+        # Dictionary to store all data
+        df_dic = {
+            'agent': [],
+            'total_cost': [],
+            'total_charge_cost': [],
+            'charge_cost': [],
+            'charge_congestion': [],
+            'total_travel_cost': [],
+            'travel_cost': [],
+            'road_congestion': [],
+            'waiting_overcost': [],
+            'INV': []
+        }
+
+        for agent in self.joint_plan.get('individual').keys():
+            plan = self.joint_plan.get('individual').get(agent)
+            _, cost_dic = evaluate_plan(plan, self.db)
+
+            # Update dataframe dictionary
+            df_dic['agent'].append(agent)
+            df_dic['total_cost'].append(cost_dic.get('total_cost'))
+            df_dic['charge_cost'].append(cost_dic.get('charge_cost'))
+            df_dic['charge_congestion'].append(cost_dic.get('charge_congestion'))
+            df_dic['total_charge_cost'].append(cost_dic.get('charge_cost')+cost_dic.get('charge_congestion'))
+            df_dic['travel_cost'].append(cost_dic.get('travel_cost'))
+            df_dic['road_congestion'].append(cost_dic.get('road_congestion'))
+            df_dic['total_travel_cost'].append(cost_dic.get('travel_cost')+cost_dic.get('road_congestion'))
+            df_dic['waiting_overcost'].append(cost_dic.get('waiting_overcost'))
+            df_dic['INV'].append(cost_dic.get('INV'))
+
+        # Dataframe from dic
+        df = pd.DataFrame.from_dict(df_dic)
+        logger.debug("\n"+df.to_string())
+
     def print_game_state(self, game_turn):
         logger.debug("\n")
         logger.debug("#########################################################################")
@@ -500,10 +537,10 @@ class BestResponse:
 
         # Assign random player order
         # random.shuffle(self.agents)
-        # logger.debug("ATTENTION, NOT RANDOMIZING ORDER")
+        # logger.warning("ATTENTION, RANDOMIZING ORDER")
         if PRINT_OUTPUT > 0:
-            logger.warning("ATTENTION, RANDOMIZING ORDER")
-            logger.debug(f"Agent order {self.agents}")
+            logger.debug("ATTENTION, NOT RANDOMIZING ORDER")
+            logger.debug(f"Agent order {[a.get('id') for a in self.agents]}")
 
         # Initialize data structure
         self.init_joint_plan()
@@ -517,7 +554,7 @@ class BestResponse:
             # First turn of the game, agents propose their initial plan
             if game_turn == 0 and INITIAL_GREEDY_PLAN:
                 self.create_initial_greedy_plans()
-            elif game_turn == 0 and not INITIAL_JOINT_PLAN:
+            elif game_turn == 0 and not INITIAL_GREEDY_PLAN:
                 self.create_initial_plans()
             # In the following turns, the agents may have one of this two:
             # 1) A previous plan
@@ -537,6 +574,7 @@ class BestResponse:
         logger.debug(
             f"Agents planned {len(self.planning_times)} times. Avg. planning time: {planning_times.mean():.3f}. "
             f"Std. dev planning time: {planning_times.std():.3f}")
+        self.cost_analysis()
 
 
 if __name__ == '__main__':
