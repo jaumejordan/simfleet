@@ -131,6 +131,7 @@ def check_road_congestion(a1, original_cost, db):
         #              f"Avg: {round(sum(res) / len(res), 2)} Intersection percentages: {res}.")
         return travel_congestion_function(bound_route_percentage,
                                           cost=original_cost,
+                                          route_distance=a1_distance/1000,
                                           mean_overlap=sum(res) / len(res),
                                           num_agents=len(res),
                                           total_agents=len(db.agents))
@@ -172,7 +173,7 @@ def route_intersection_distance(r1, r2):
     return distance
 
 
-def travel_congestion_function(bound_route_percentage, cost, mean_overlap, num_agents, total_agents):
+def travel_congestion_function(bound_route_percentage, cost, route_distance, mean_overlap, num_agents, total_agents):
     aux = num_agents / total_agents
     if aux < bound_route_percentage:
         return cost
@@ -180,7 +181,7 @@ def travel_congestion_function(bound_route_percentage, cost, mean_overlap, num_a
         # logger.debug(
         #     f"Overlaps: {mean_overlap}, num_agents: {num_agents}, original_cost: {cost}, "
         #     f"increment: {((aux - bound_route_percentage) * cost) * mean_overlap}")
-        return cost + ((aux - bound_route_percentage) * cost) * mean_overlap
+        return cost + ((aux - bound_route_percentage) * route_distance) * mean_overlap
 
 
 def measure_linestring(ob):

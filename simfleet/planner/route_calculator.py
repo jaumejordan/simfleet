@@ -6,8 +6,6 @@ import sys
 
 import aiohttp
 
-# from simfleet.utils import request_route_to_server
-
 config_dic = {}
 global_actions = {}
 transport_info = {}
@@ -101,24 +99,28 @@ routes = {
 """
 
 
-async def calculate_routes(transport_positions, station_positions, customer_points):  # customer_origins, customer_destinations):
+async def calculate_routes(transport_positions, station_positions,
+                           customer_points):  # customer_origins, customer_destinations):
     routes = {}
     # Number of customers each agent will initially pick up
     customers = copy.deepcopy(customer_points)
     customers_per_agent = math.ceil(len(customers) / len(transport_positions))
-    transport_goals = {}
-    customer_assigned_transport = {}
-    for transport in transport_positions:
+    print(f"customers: {len(customers)}. customers_per_agent: {customers_per_agent}")
+    transport_goals = []
+    customer_assigned_transport = []
+    transport_index = 0
+    for _ in transport_positions:
         if len(customers) >= customers_per_agent:
             # Assign their customers
             goals = customers[0:customers_per_agent]
-            customers = [c for c in customers if c not in goals]
+            customers = customers[customers_per_agent:]  # [c for c in customers if c not in goals]
         else:
             goals = copy.deepcopy(customers)  # customers.copy())
 
-        transport_goals[create_key(transport[0], transport[1])] = goals
-        for goal in goals:
-            customer_assigned_transport[create_key(goal[0], goal[1])] = transport
+        transport_goals.append(goals)
+        for _ in goals:
+            customer_assigned_transport.append(transport_index)
+        transport_index += 1
 
     # Calculate routes between transport positions and station positions
     # used if the transport has to charge before doing any assignment
@@ -132,8 +134,8 @@ async def calculate_routes(transport_positions, station_positions, customer_poin
     # Calculate routes between transport positions and customer origins
     # used if the transport begin execution with a customer assignment
     print("\nCalculating transport-customer routes...")
-    for t_pos in transport_positions:
-        for tup in transport_goals[create_key(t_pos[0], t_pos[1])]:
+    for transport_index, t_pos in enumerate(transport_positions):
+        for tup in transport_goals[transport_index]:
             c_origin = tup[0]
             key, value = await get_route(t_pos, c_origin)
             # save key and value
@@ -173,12 +175,12 @@ async def calculate_routes(transport_positions, station_positions, customer_poin
     # Calculate routes between customer destinations and customer origins
     # used if the transport starts a customer assignment after completing a customer assignment
     print("\nCalculating destination-origin routes...")
-    for tup1 in customer_points:
+    for customer_index, tup1 in enumerate(customer_points):
         c_dest = tup1[1]
-        transport = customer_assigned_transport[create_key(tup1[0], tup1[1])]
-        for tup2 in transport_goals[create_key(transport[0], transport[1])]:
-            if tup1 == tup2:
-                continue
+        transport = customer_assigned_transport[customer_index]
+        for tup2 in transport_goals[transport]:
+            # if tup1 == tup2:
+            #    continue
             c_origin = tup2[0]
             key, value = await get_route(c_dest, c_origin)
             # save key and value

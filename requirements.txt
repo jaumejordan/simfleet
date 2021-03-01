@@ -11,3 +11,4 @@ geopy==1.17.0
 XlsxWriter==1.1.2
 loguru>=0.3.2
 numpy
+aiohttp
