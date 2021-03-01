@@ -1,5 +1,6 @@
 import asyncio
 import copy
+import gzip
 import json
 import math
 import sys
@@ -54,8 +55,8 @@ async def request_route_to_server(origin, destination, route_host="http://router
 def load_config(config_file):
     config_dic = {}
     try:
-        f2 = open(config_file, "r")
-        config_dic = json.load(f2)
+        with open(config_file, 'r') as f:
+            config_dic = json.load(f)
     except Exception as e:
         print(str(e))
         exit()
@@ -231,30 +232,59 @@ def create_value(path, dist, dur):
 
 
 def usage():
-    print("Usage: python route_calculator.py <simfleet_config_file> (optional: <output_file_name>)")
+    print("Usage: python route_calculator.py <simfleet_config_file> <output_file_name>")
     exit()
 
 
+def read_routes_gzip(filename):
+    with gzip.open(filename, 'r') as fin:  # 4. gzip
+        json_bytes = fin.read()  # 3. bytes (i.e. UTF-8)
+
+    json_str = json_bytes.decode('utf-8')  # 2. string (i.e. JSON)
+    data = json.loads(json_str)
+    return data
+
+
+def store_routes_json(data, filename):
+    with open(filename, 'w') as fout:
+        json.dump(data, fout)
+
+
+def store_routes_gzip(data, filename):
+    data_str = json.dumps(data)
+    data_bytes = data_str.encode('utf-8')
+    with gzip.open(filename, 'w') as fout:
+        fout.write(data_bytes)
+
+
 if __name__ == '__main__':
+    cache = True
+    cache_file = "routes/cache.gzip"
     config_file = None
     output_file_name = None
 
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 3:
         usage()
 
     config_file = str(sys.argv[1])
-    if len(sys.argv) > 2:
-        output_file_name = str(sys.argv[2])
-        print("Output file name will be: ", output_file_name)
+    output_file_name = str(sys.argv[2])
+    print("Output file name will be: ", output_file_name)
+
+    if cache:
+        previous_routes = read_routes_gzip(cache_file)
+    else:
+        previous_routes = {}
 
     config_dic = load_config(config_file)
     t, s, cp = get_points()
-    routes_file = "routes/200taxi-600customer-20stations-routes.json"
-    with open(routes_file, 'r') as f:
-        previous_routes = json.load(f)
-
     routes = asyncio.run(calculate_routes(t, s, cp))
 
-    outfile = open("routes/200taxi-600customer-20stations-routesb.json", "w+")
-    json.dump(routes, outfile, indent=4)
-    outfile.close()
+    print("storing routes...")
+    store_routes_json(routes, output_file_name)
+
+    if cache and counter > 0:
+        print("storing cache...")
+        previous_routes = {**previous_routes, **routes}  # z = x | y # NOTE: 3.9+ ONLY
+        store_routes_gzip(previous_routes, cache_file)
+
+
