@@ -495,65 +495,60 @@ class Database:
     #############################################################
     ################## BEST RESPONSE FUNCTIONS ##################
     #############################################################
-
-    def print_joint_plan(self):
-        logger.debug("\n")
-        logger.debug("Individual plans:")
+    def to_string_joint_plan(self):
+        res = "\n"
+        res += "Individual plans:\n"
         for agent in self.joint_plan.get('individual').keys():
             plan = self.joint_plan.get('individual').get(agent)
             if plan is None:
-                logger.debug(f"{agent:20s} : NO PLAN")
+                res += f"{agent:20s} : NO PLAN\n"
             else:
                 if plan.inv is not None:
-                    logger.error(
-                        f"{agent:20s} : Plan with {len(plan.entries):2d} entries and utility {plan.utility:.4f}")
-                    logger.error(plan.to_string_plan())
+                    res += f"{agent:20s} : Plan with {len(plan.entries):2d} entries and utility {plan.utility:.4f}"
+                    res += plan.to_string_plan() + "\n"
                 else:
-                    logger.debug(
-                        f"{agent:20s} : Plan with {len(plan.entries):2d} entries and utility {plan.utility:.4f}")
-                    logger.debug(plan.to_string_plan())
+                    res += f"{agent:20s} : Plan with {len(plan.entries):2d} entries and utility {plan.utility:.4f}"
+                    res += plan.to_string_plan() + "\n"
 
-        logger.debug("\n")
-        logger.debug("Joint plan:")
-        logger.debug(self.joint_plan.get("joint").print_plan())
+        res += "\n"
+        res += "Joint plan:\n"
+        res += self.joint_plan.get("joint").print_plan()
 
-        logger.debug("\n")
-        logger.debug("Table of goals:")
+        res += "\n"
+        res += "Table of goals:\n"
         for customer in self.joint_plan.get('table_of_goals').keys():
-            logger.debug(f"{customer:20s} : {self.joint_plan.get('table_of_goals').get(customer)}")
+            res += f"{customer:20s} : {self.joint_plan.get('table_of_goals').get(customer)}\n"
 
-        logger.debug("\n")
-        logger.debug("Station usage:")
+        res += "\n"
+        res += "Station usage:\n"
         for station in self.joint_plan.get('station_usage').keys():
             if len(self.joint_plan.get('station_usage').get(station)) == 0:
-                logger.debug(f"{station:20s} : []")
+                res += f"{station:20s} : []\n"
             else:
-                logger.debug(f"{station:20s} : [")
+                res += f"{station:20s} : [\n"
                 for usage in self.joint_plan.get('station_usage').get(station):
                     if usage.get('inv') is None:
-                        logger.debug(f"\t{usage.get('agent'):10s}, {usage.get('at_station'):.4f}, "
-                                     f"{usage.get('init_charge'):.4f}, {usage.get('end_charge'):.4f}")
+                        res += f"\t{usage.get('agent'):10s}, {usage.get('at_station'):.4f}, {usage.get('init_charge'):.4f}, {usage.get('end_charge'):.4f}\n"
                     else:
-                        logger.error(f"\t{usage.get('agent'):10s}, {usage.get('at_station'):.4f}, "
-                                     f"{usage.get('init_charge'):.4f}, {usage.get('end_charge'):.4f}, "
-                                     f"{usage.get('inv')}")
-                logger.debug("] \n")
+                        res += f"\t{usage.get('agent'):10s}, {usage.get('at_station'):.4f}, {usage.get('init_charge'):.4f}, {usage.get('end_charge'):.4f}, {usage.get('inv')}\n"
+                res += "] \n"
 
-        logger.debug("\n")
-        logger.debug("No change in plan:")
+        res += "\n"
+        res += "No change in plan:\n"
         for agent in self.joint_plan.get('no_change').keys():
-            logger.debug(f"{agent:20s} : {self.joint_plan.get('no_change').get(agent)}")
+            res += f"{agent:20s} : {self.joint_plan.get('no_change').get(agent)}\n"
 
-        logger.debug("\n")
-        logger.debug("Agent utilities:")
+        res += "\n"
+        res += "Agent utilities:\n"
         utilities = []
         for agent in self.joint_plan.get('individual').keys():
             utilities.append(self.joint_plan.get('individual').get(agent).utility)
-            logger.debug(f"{agent:20s} : {self.joint_plan.get('individual').get(agent).utility:.4f}")
+            res += f"{agent:20s} : {self.joint_plan.get('individual').get(agent).utility:.4f}\n"
 
         utilities = np.array(utilities)
-        logger.debug("\n")
-        logger.debug(
-            f"Mean utility: {utilities.mean():.4f}. Std deviation: {utilities.std():.4f}. Median: {np.median(utilities):.4f}.")
+        res += "\n"
+        res += f"Mean utility: {utilities.mean():.4f}. Std deviation: {utilities.std():.4f}. Median: {np.median(utilities):.4f}.\n"
 
-        logger.debug("#########################################################################")
+        res += "#########################################################################\n\n"
+
+        return res

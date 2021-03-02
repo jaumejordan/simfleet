@@ -6,7 +6,6 @@
 # GOAL_PERCENTAGE = 1
 PRINT_OUTPUT = 1
 
-
 SPEED = 2000  # km/h
 STARTING_FARE = 5
 PRICE_PER_KM = 1.08  # 0
@@ -15,7 +14,7 @@ PRICE_PER_kWh = 0.0615
 TIME_PENALTY = 1
 # MAX_STATION_DIST = 10000 # maximum distance to a station to consider it a place to charge
 RADIUS = 5000
-INVALID_CHARGE_PENALTY = 10000 # invalid charge actions have its cost multiplied 100 times to discorage agents to keep
+INVALID_CHARGE_PENALTY = 10000  # invalid charge actions have its cost multiplied 100 times to discorage agents to keep
 # proposing them
 
 # Search / BR speedups
@@ -62,11 +61,11 @@ BOUND_ROUTE_PERCENTAGE = 0.3
 # ROUTES_FILE = "routes/problem2-routes.json"
 # # 3 taxi, 6 customer, 50% is 3 customers per taxi
 
-#  # Experimentation - problem 3
+# # Experimentation - problem 3
 # CONFIG_FILE = "configs/problem3-config.json"
 # ACTIONS_FILE = "actions/problem3-actions.json"
 # ROUTES_FILE = "routes/problem3-routes.json"
-#  # 5 taxi, 10 customer, 40% is 4 customers per taxi
+# # 5 taxi, 10 customer, 40% is 4 customers per taxi
 
 
 # # Experimentation - problem 4

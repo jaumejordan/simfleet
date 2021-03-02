@@ -1,6 +1,7 @@
 import copy
 import json
 import math
+import time
 
 import numpy as np
 import pandas as pd
@@ -453,9 +454,9 @@ class BestResponse:
 
             # Case 3) Agent finds the same plan it had proposed before
             elif new_plan.equals(prev_plan):
-                logger.critical("NO DEURIA ENTRAR ACÍ")
-                logger.info(
-                    f"Agent {agent_id} could not find a better plan (it found the same one than in the previous round)")
+                if PRINT_OUTPUT > 0:
+                    logger.info(
+                        f"Agent {agent_id} could not find a better plan (it found the same one than in the previous round)")
                 self.update_joint_plan(agent_id, new_plan)
                 self.joint_plan["no_change"][agent_id] = True
 
@@ -515,26 +516,39 @@ class BestResponse:
             df_dic['total_cost'].append(cost_dic.get('total_cost'))
             df_dic['charge_cost'].append(cost_dic.get('charge_cost'))
             df_dic['charge_congestion'].append(cost_dic.get('charge_congestion'))
-            df_dic['total_charge_cost'].append(cost_dic.get('charge_cost')+cost_dic.get('charge_congestion'))
+            df_dic['total_charge_cost'].append(cost_dic.get('charge_cost') + cost_dic.get('charge_congestion'))
             df_dic['travel_cost'].append(cost_dic.get('travel_cost'))
             df_dic['road_congestion'].append(cost_dic.get('road_congestion'))
-            df_dic['total_travel_cost'].append(cost_dic.get('travel_cost')+cost_dic.get('road_congestion'))
+            df_dic['total_travel_cost'].append(cost_dic.get('travel_cost') + cost_dic.get('road_congestion'))
             df_dic['waiting_overcost'].append(cost_dic.get('waiting_overcost'))
             df_dic['INV'].append(cost_dic.get('INV'))
 
         # Dataframe from dic
-        df = pd.DataFrame.from_dict(df_dic)
-        logger.debug("\n"+df.to_string())
+        return pd.DataFrame.from_dict(df_dic)
+
+    def to_string_cost_analysis(self):
+        df = self.cost_analysis()
+        return df.to_string()
+
+    def write_output(self, to_write):
+        timestr = time.strftime("%Y%m%d-%H%M%S")
+        filename = CONFIG_FILE
+        filename = filename.split('/', 1)[1]
+        filename = filename.split('.', 1)[0]
+        filename += "-" + timestr
+        with open(filename + ".txt", "w") as f:
+            f.write(to_write)
 
     def print_game_state(self, game_turn):
         logger.debug("\n")
         logger.debug("#########################################################################")
         logger.debug("CURRENT GAME STATE")
         logger.debug(f"Best Response turn {game_turn}")
-        self.db.print_joint_plan()
+        logger.debug(self.db.to_string_joint_plan())
 
     def run(self):
-
+        # BR starting time
+        start = time.time()
         # Assign random player order
         # random.shuffle(self.agents)
         # logger.warning("ATTENTION, RANDOMIZING ORDER")
@@ -566,15 +580,30 @@ class BestResponse:
             if PRINT_OUTPUT > 0:
                 self.print_game_state(game_turn)
             game_turn += 1
-        logger.info(f"Best Response turn {game_turn}")
-        logger.info("END OF GAME")
+
+        # BR finishing time
+        end = time.time()
+
+        # Joint plan to string
+        output_string = self.db.to_string_joint_plan()
+
+        # Cost breakdown to string
+        cost_analysis_string = self.to_string_cost_analysis()
+        output_string += cost_analysis_string + "\n\n"
+
+        # Final statistics to string
+        output_string += f"Best Response turn {game_turn}\n"
+        output_string += "END OF GAME\n"
+        output_string += "All agents have kept the same plan. Stop by CONVERGENCE\n"
         avg_reachable_stations = sum(self.db.reachable_stations) / len(self.db.reachable_stations)
-        logger.info(f"Avg. reachable stations: {avg_reachable_stations}")
+        output_string += f"Avg. reachable stations: {avg_reachable_stations}\n"
         planning_times = np.array(self.planning_times)
-        logger.debug(
-            f"Agents planned {len(self.planning_times)} times. Avg. planning time: {planning_times.mean():.3f}. "
-            f"Std. dev planning time: {planning_times.std():.3f}")
-        self.cost_analysis()
+        output_string += f"Agents planned {len(self.planning_times)} times. Avg. planning time: {planning_times.mean():.3f}. "
+        output_string += f"Std. dev planning time: {planning_times.std():.3f}\n"
+        output_string += f"Best-Response process time: {end - start:.3f}"
+
+        logger.info(output_string)
+        self.write_output(output_string)
 
 
 if __name__ == '__main__':

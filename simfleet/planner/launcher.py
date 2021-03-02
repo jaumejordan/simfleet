@@ -1,7 +1,3 @@
-import time
-
-from loguru import logger
-
 from simfleet.planner.best_response import BestResponse
 from simfleet.planner.database import Database
 from simfleet.planner.planner import Planner
@@ -9,11 +5,7 @@ from simfleet.planner.planner import Planner
 db = Database()
 
 br = BestResponse(database=db)
-start = time.time()
 br.run()
-# br.obtain_best_plans()
-end = time.time()
-logger.debug(f'\tBest-Response process time: {end - start:.3f}')
 
 
 def test_planner():
