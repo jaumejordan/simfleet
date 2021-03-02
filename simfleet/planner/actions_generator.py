@@ -390,7 +390,7 @@ def print_transport_actions(transport):
 
 
 def usage():
-    print("Usage: python action_generator.py <simfleet_config_file> (optional: <output_file_name>)")
+    print("Usage: python actions_generator.py <simfleet_config_file> <output_file_name>")
     exit()
 
 
@@ -398,13 +398,11 @@ if __name__ == '__main__':
     config_file = None
     output_file_name = None
 
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 3:
         usage()
 
     config_file = str(sys.argv[1])
-    #if len(sys.argv) > 2:
-        # output_file_name = str(sys.argv[2])
-    output_file_name = "./actions/200taxi-400customer-20stations-actions.json"
+    output_file_name = str(sys.argv[2])
     print("Output file name will be: ", output_file_name)
 
     config_dic = load_config(config_file)
