@@ -4,8 +4,7 @@ import numpy as np
 from loguru import logger
 from shapely.geometry import LineString, Point, GeometryCollection, MultiLineString, MultiPoint
 
-from simfleet.planner.constants import BOUND_ROUTE_PERCENTAGE, BOUND_POWER_PERCENTAGE
-from simfleet.planner.generators_utils import timing
+from constants import BOUND_ROUTE_PERCENTAGE, BOUND_POWER_PERCENTAGE
 
 
 def get_electric_grid(station, power_grids):
@@ -14,7 +13,7 @@ def get_electric_grid(station, power_grids):
             return i
 
 
-#@timing
+# @timing
 def check_charge_congestion(u1, station, original_cost, db):
     station_usage = db.joint_plan.get('station_usage')
     power_grids = db.joint_plan.get('power_grids')
@@ -131,7 +130,7 @@ def check_road_congestion(a1, original_cost, db):
         #              f"Avg: {round(sum(res) / len(res), 2)} Intersection percentages: {res}.")
         return travel_congestion_function(bound_route_percentage,
                                           cost=original_cost,
-                                          route_distance=a1_distance/1000,
+                                          route_distance=a1_distance / 1000,
                                           mean_overlap=sum(overlap_list) / len(overlap_list),
                                           num_agents=len(overlap_list),
                                           total_agents=len(db.agents))

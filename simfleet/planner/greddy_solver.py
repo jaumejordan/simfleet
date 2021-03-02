@@ -2,9 +2,10 @@ import copy
 
 from loguru import logger
 
-from simfleet.planner.best_response import BestResponse
-from simfleet.planner.database import Database
-from simfleet.planner.evaluator import evaluate_plan
+from best_response import BestResponse
+from database import Database
+from evaluator import evaluate_plan
+
 
 class GreedySolver:
 
@@ -171,8 +172,8 @@ class GreedySolver:
                 # variable i marks the position of the first previously invalid plan entry
 
                 # - Update times of every other action of the plan and their associated station usages (if any) -
-                for j in range(i+1, len(agent_plan.entries)):
-                    previous_entry = agent_plan.entries[j-1]
+                for j in range(i + 1, len(agent_plan.entries)):
+                    previous_entry = agent_plan.entries[j - 1]
                     current_entry = agent_plan.entries[j]
                     time_increment = previous_entry.end_time - current_entry.init_time
                     if time_increment < 0:
@@ -186,7 +187,7 @@ class GreedySolver:
 
                     if action.get('type') in ['PICK-UP', 'MOVE-TO-DEST', 'MOVE-TO-STATION']:
                         action.get('statistics')['init'] = action.get('statistics').get('init') + time_increment
-                    else: # charge action
+                    else:  # charge action
                         # unflag action, if it turns out invalid the BR will flag it again
                         action['inv'] = None
 
@@ -308,16 +309,16 @@ class GreedySolver:
             agent_plan.utility = updated_utility
         self.update_br()
 
+
 if __name__ == '__main__':
     gs = GreedySolver()
     gs.get_initial_greedy_plans()
     c = 0
     # We give it 100 iterations of fix_times to get a conflictless plan
-    while gs.invalid_joint_plan() and c<100:
+    while gs.invalid_joint_plan() and c < 100:
         logger.warning(c)
         gs.fix_times()
         gs.update_br()
         c += 1
     gs.evaluate_with_congestion()
     gs.db.print_joint_plan()
-

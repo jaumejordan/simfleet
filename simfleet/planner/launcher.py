@@ -1,6 +1,6 @@
-from simfleet.planner.best_response import BestResponse
-from simfleet.planner.database import Database
-from simfleet.planner.planner import Planner
+from best_response import BestResponse
+from database import Database
+from planner import Planner
 
 db = Database()
 

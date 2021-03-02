@@ -9,7 +9,7 @@ PRINT_OUTPUT = 1
 SPEED = 2000  # km/h
 STARTING_FARE = 5
 PRICE_PER_KM = 1.08  # 0
-TRAVEL_PENALTY = 0.1  # 10% of the traveled km
+TRAVEL_PENALTY = 0  # 10% of the traveled km
 PRICE_PER_kWh = 0.0615
 TIME_PENALTY = 1
 # MAX_STATION_DIST = 10000 # maximum distance to a station to consider it a place to charge
@@ -76,16 +76,16 @@ BOUND_ROUTE_PERCENTAGE = 0.3
 
 
 #  # Experimentation - problem 5
-# CONFIG_FILE = "configs/problem5-config.json"
-# ACTIONS_FILE = "actions/problem5-actions.json"
-# ROUTES_FILE = "routes/problem5-routes.json"
+CONFIG_FILE = "configs/problem5-config.json"
+ACTIONS_FILE = "actions/problem5-actions.json"
+ROUTES_FILE = "routes/problem5-routes.json"
 #  # 20 taxi, 60 customer, 20% is 12 customers per taxi, 10% is 6 per taxi
 
 # Experimentation - 20 taxi, 60 customer, 32 stations (genetic)
 # 4 rondes, 150 segons
-CONFIG_FILE = "configs/20taxi-60customer-32stations-config.json"
-ACTIONS_FILE = "actions/20taxi-60customer-32stations-actions.json"
-ROUTES_FILE = "routes/50taxi-200customer-32stations-routes.json"
+# CONFIG_FILE = "configs/20taxi-60customer-32stations-config.json"
+# ACTIONS_FILE = "actions/20taxi-60customer-32stations-actions.json"
+# ROUTES_FILE = "routes/50taxi-200customer-32stations-routes.json"
 
 #  # Experimentation - 50 taxi, 150 customer, 16 stations (genetic)
 # # 7 rondes, 2048 segons

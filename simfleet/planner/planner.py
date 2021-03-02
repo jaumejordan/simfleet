@@ -3,18 +3,17 @@ Develops a plan for a TransportAgent
 """
 import copy
 import heapq
-import json
 import math
 import random
 import time
 
 from loguru import logger
 
-from simfleet.planner.constants import ACTIONS_FILE, HEURISTIC, PRINT_OUTPUT, RELOAD_ACTIONS, DEEPCOPY
-from simfleet.planner.evaluator import evaluate_node, evaluate_plan
-from simfleet.planner.generators_utils import has_enough_autonomy, calculate_km_expense
-from simfleet.planner.node import Node
-from simfleet.planner.plan import Plan
+from constants import HEURISTIC, PRINT_OUTPUT, RELOAD_ACTIONS, DEEPCOPY
+from evaluator import evaluate_node, evaluate_plan
+from generators_utils import has_enough_autonomy, calculate_km_expense
+from node import Node
+from plan import Plan
 
 VERBOSE = 0  # 2, 1 or 0 according to verbosity level
 
@@ -149,7 +148,6 @@ class Planner:
         for station in self.db.config_dic.get('stations'):
             if station.get('name') == station_name:
                 return station.get("places")
-
 
     def check_available_poles(self, agent, station, at_station):
         c = 0
@@ -410,7 +408,7 @@ class Planner:
                 current_time = 0
             else:
                 node = Node(parent)
-                current_time = sum(a.get('statistics').get('time') for a in parent.actions) # parent.end_time
+                current_time = sum(a.get('statistics').get('time') for a in parent.actions)  # parent.end_time
             # Fill actions statistics
             # action1 = tup[0].copy()
             # action2 = tup[1].copy()
@@ -437,7 +435,8 @@ class Planner:
             # Check if there's enough autonomy to do the customer action
             customer_origin = node.actions[-2].get("attributes").get("customer_origin")
             customer_dest = node.actions[-1].get("attributes").get("customer_dest")
-            if not has_enough_autonomy(node.agent_autonomy, action1.get('statistics').get('dist'), action2.get('statistics').get('dist')):
+            if not has_enough_autonomy(node.agent_autonomy, action1.get('statistics').get('dist'),
+                                       action2.get('statistics').get('dist')):
                 # activate generation of station initial nodes
                 generate_charging = True
                 # delete node object
@@ -452,7 +451,8 @@ class Planner:
             node.set_end_time()
 
             # Update position and autonomy
-            node.agent_autonomy -= calculate_km_expense(action1.get('statistics').get('dist'), action2.get('statistics').get('dist'))
+            node.agent_autonomy -= calculate_km_expense(action1.get('statistics').get('dist'),
+                                                        action2.get('statistics').get('dist'))
 
             node.agent_pos = node.actions[-1].get('attributes').get('customer_dest')
 
@@ -653,7 +653,8 @@ class Planner:
             customer_dest = action2.get("attributes").get("customer_dest")
 
             # Need to charge
-            if not has_enough_autonomy(current_autonomy, action1.get('statistics').get('dist'), action2.get('statistics').get('dist')):
+            if not has_enough_autonomy(current_autonomy, action1.get('statistics').get('dist'),
+                                       action2.get('statistics').get('dist')):
                 if RELOAD_ACTIONS:
                     # Before a charge, reload actions
                     self.db.reload_actions()
@@ -670,7 +671,8 @@ class Planner:
 
                 # Get closest station to transport
                 if DEEPCOPY:
-                    station_actions = [self.db.fill_statistics(copy.deepcopy(a), current_pos=current_position, current_time=current_time) for
+                    station_actions = [self.db.fill_statistics(copy.deepcopy(a), current_pos=current_position,
+                                                               current_time=current_time) for
                                        a in
                                        move_to_station_actions]
                 else:
@@ -708,7 +710,8 @@ class Planner:
                 # Add actions to action list
                 actions += [action1, action2]
                 # Update position and autonomy
-                self.agent_autonomy -= calculate_km_expense(action1.get('statistics').get('dist'), action2.get('statistics').get('dist'))
+                self.agent_autonomy -= calculate_km_expense(action1.get('statistics').get('dist'),
+                                                            action2.get('statistics').get('dist'))
                 self.agent_pos = action2.get('attributes').get('customer_dest')
 
                 # Add served customer to completed_goals

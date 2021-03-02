@@ -6,9 +6,8 @@ import numpy as np
 from geopy.distance import geodesic
 from loguru import logger
 
-from simfleet.planner.constants import CONFIG_FILE, ACTIONS_FILE, ROUTES_FILE, SPEED, PRINT_OUTPUT, RELOAD_ACTIONS, \
-    DEEPCOPY
-from simfleet.planner.generators_utils import has_enough_autonomy
+from constants import CONFIG_FILE, ACTIONS_FILE, ROUTES_FILE, SPEED, PRINT_OUTPUT, RELOAD_ACTIONS, DEEPCOPY
+from generators_utils import has_enough_autonomy
 
 VERBOSE = 0
 FILTERED_STATIONS_LOGGER = 0

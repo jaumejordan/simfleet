@@ -35,9 +35,9 @@ class Node:
             self.agent_pos = copy.deepcopy(parent.agent_pos)
             self.agent_autonomy = copy.deepcopy(parent.agent_autonomy)  # .copy()
             self.init_time = copy.deepcopy(parent.end_time)  # .copy()
-            self.actions = copy.deepcopy(parent.actions) # .copy()
+            self.actions = copy.deepcopy(parent.actions)  # .copy()
             # New
-            self.agent_goals = copy.deepcopy(parent.agent_goals) # .copy()
+            self.agent_goals = copy.deepcopy(parent.agent_goals)  # .copy()
             self.completed_goals = copy.deepcopy(parent.completed_goals)  # .copy()
             self.benefits = copy.deepcopy(parent.benefits)
             self.costs = copy.deepcopy(parent.costs)

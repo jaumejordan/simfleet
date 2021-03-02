@@ -7,11 +7,10 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-from simfleet.planner.constants import CONFIG_FILE, ACTIONS_FILE, \
-    ROUTES_FILE, INITIAL_GREEDY_PLAN, PRINT_OUTPUT
-from simfleet.planner.evaluator import evaluate_plan
-from simfleet.planner.plan import JointPlan
-from simfleet.planner.planner import Planner
+from constants import CONFIG_FILE, ACTIONS_FILE, ROUTES_FILE, INITIAL_GREEDY_PLAN, PRINT_OUTPUT
+from evaluator import evaluate_plan
+from plan import JointPlan
+from planner import Planner
 
 LOOP_DETECTION = True
 CONSIDER_PREV_PLAN = False

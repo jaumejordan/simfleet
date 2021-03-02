@@ -3,12 +3,13 @@ from operator import itemgetter
 
 from loguru import logger
 
-from simfleet.planner.congestion import check_charge_congestion, check_road_congestion
-from simfleet.planner.constants import STARTING_FARE, PRICE_PER_KM, TRAVEL_PENALTY, PRICE_PER_kWh, TIME_PENALTY, \
+from congestion import check_charge_congestion, check_road_congestion
+from constants import STARTING_FARE, PRICE_PER_KM, TRAVEL_PENALTY, PRICE_PER_kWh, TIME_PENALTY, \
     INVALID_CHARGE_PENALTY, HEURISTIC, STATION_CONGESTION, ROAD_CONGESTION, PRINT_OUTPUT, OLD_HEURISTIC, NEW_HEURISTIC
 
 HEURISTIC_VERBOSE = 0
 NO_BENEFITS = True
+
 
 #############################################################
 ####################### MAIN FUNCTIONS ######################
@@ -212,7 +213,6 @@ def get_order_utility(agent, position, time, order, db):
     if NO_BENEFITS:
         return 0 - costs
     return benefits - costs
-
 
 
 def get_h_value_open_goals(self, node, db):
