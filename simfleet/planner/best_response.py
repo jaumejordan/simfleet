@@ -595,8 +595,9 @@ class BestResponse:
         output_string += f"Best Response turn {game_turn}\n"
         output_string += "END OF GAME\n"
         output_string += "All agents have kept the same plan. Stop by CONVERGENCE\n"
-        avg_reachable_stations = sum(self.db.reachable_stations) / len(self.db.reachable_stations)
-        output_string += f"Avg. reachable stations: {avg_reachable_stations}\n"
+        avg_reachable_stations = np.array(self.db.reachable_stations)
+        output_string += f"Avg. reachable stations: {avg_reachable_stations.mean():.2f}. Std. dev.: " \
+                         f"{avg_reachable_stations.std():.2f}. Median: {np.median(avg_reachable_stations):.2f}\n"
         planning_times = np.array(self.planning_times)
         output_string += f"Agents planned {len(self.planning_times)} times. Avg. planning time: {planning_times.mean():.3f}. "
         output_string += f"Std. dev planning time: {planning_times.std():.3f}\n"
