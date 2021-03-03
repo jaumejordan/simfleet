@@ -33,11 +33,6 @@ actions : {
 import json
 import sys
 
-from generators_utils import has_enough_autonomy, calculate_km_expense
-
-from simfleet.helpers import distance_in_meters
-#from simfleet.utils import request_route_to_server
-
 config_dic = {}
 global_actions = {}
 transport_info = {}
@@ -128,13 +123,6 @@ def generate_actions(config_dic):
     return actions
 
 
-# def create_action(agent, type, attributes):
-#     if type == "CUSTOMER":
-#         return create_customer_action(agent, attributes[0], attributes[1], attributes[2])
-#     else:
-#         return create_charge_action(agent, attributes[0], attributes[1])
-
-
 def create_pick_up_action(agent, customer_id, customer_origin):
     # Create action
     action = {}
@@ -177,8 +165,6 @@ def create_mode_to_dest_action(agent, customer_id, customer_origin, customer_des
         "dist": None
     }
 
-    # action = Action(agent, "CUSTOMER", attr, {})
-
     return action
 
 
@@ -217,7 +203,7 @@ def create_charge_action(agent, station_id, power):
 
 
 def save_actions(config_file, output_file_name):
-    #output_file_name = "actions/200taxi-400customer-20stations-actions.json"
+    # output_file_name = "actions/200taxi-400customer-20stations-actions.json"
     save_json(config_file, global_actions, output_file_name)
 
 
@@ -269,100 +255,6 @@ def save_json(config_file, dictionary, output_file_name=None):
     print("SUCCESS: " + output_file_name + " correctly generated.")
 
 
-def get_closest_customer_action(transport_actions, transport_position):
-    """
-    closest_station = min(station_positions,
-                          key=lambda x: distance_in_meters(x[1], self.agent.get_position()))
-    """
-    action_list = transport_actions.get("CUSTOMER")
-    # aux = []
-    # for action in action_list:
-    #     customer_origin = action.get("attributes").get("customer_origin")
-    #     aux.append((action, distance_in_meters(transport_position, customer_origin)))
-    #
-    # aux.sort(key=lambda x: x[1])
-
-    closest_action = min(action_list,
-                         key=lambda x: distance_in_meters(transport_position,
-                                                          x.get("attributes").get("customer_origin")))
-    distance = distance_in_meters(transport_position, closest_action.get("attributes").get("customer_origin"))
-    return (closest_action, distance)
-
-
-def get_closest_charge_action(transport_actions, transport_position):
-    action_list = transport_actions.get("CHARGE")
-
-    closest_action = min(action_list,
-                         key=lambda x: distance_in_meters(transport_position,
-                                                          x.get("attributes").get("station_position")))
-    distance = distance_in_meters(transport_position, closest_action.get("attributes").get("station_position"))
-    return (closest_action, distance)
-
-
-def get_ordered_action_list(transport):
-    # while there are still customer actions to do:
-    # get closest customer action
-    # if has enough autonomy
-    # calculate km expenses
-    # update autonomy
-
-    # append action to ordered list
-
-    # update current position
-
-    # delete completed customer action from to-do list
-
-    # else
-    # get closest station action
-    # append action to ordered list
-    # update autonomy
-    # update current position
-    # Initialize position and autonomy to the ones in the config file
-    current_position = transport_info.get(transport).get("position")
-    current_autonomy = transport_info.get(transport).get("current_autonomy")
-    max_autonomy = transport_info.get(transport).get("max_autonomy")
-    # Get transport actions
-    transport_action = global_actions.get(transport)
-    to_do_list = transport_action.get("CUSTOMER")
-    # to save ordered actions
-    ordered_actions = {}
-    step = 0
-    distance = 0
-    while len(to_do_list) > 0:
-        step += 1
-        closest_action = get_closest_customer_action(transport_action, current_position)
-        next_action = closest_action[0]
-        customer_origin = next_action.get("attributes").get("customer_origin")
-        customer_dest = next_action.get("attributes").get("customer_dest")
-        # Check if there's enough autonomy to do the closest customer action
-        if has_enough_autonomy(current_autonomy, current_position, customer_origin, customer_dest):
-            # Update autonomy
-            km_expenses = calculate_km_expense(current_position, customer_origin, customer_dest)
-            current_autonomy -= km_expenses
-            distance += closest_action[1]
-            # Update current position
-            current_position = customer_dest
-            # Add action to ordered action list
-            ordered_actions[step] = {"action": next_action, "distance": distance}
-            # Delete customer action from to-do list
-            to_do_list.remove(next_action)
-
-        # Charge at the closest station
-        else:
-            next_action = get_closest_charge_action(transport_action, current_position)
-            distance += next_action[1]
-            next_action = next_action[0]
-            station_position = next_action.get("attributes").get("station_position")
-            # Update autonomy
-            current_autonomy = max_autonomy
-            # Update current position
-            current_position = station_position
-            # Add action to ordered action list
-            ordered_actions[step] = {"action": next_action, "distance": distance}
-
-    return ordered_actions
-
-
 def print_transport_actions(transport):
     dic = ordered_global_actions.get(transport)
     print(
@@ -390,7 +282,7 @@ def print_transport_actions(transport):
 
 
 def usage():
-    print("Usage: python actions_generator.py <simfleet_config_file> <output_file_name>")
+    print("Usage: python action_generator.py <simfleet_config_file> (optional: <output_file_name>)")
     exit()
 
 
@@ -398,7 +290,7 @@ if __name__ == '__main__':
     config_file = None
     output_file_name = None
 
-    if len(sys.argv) < 3:
+    if len(sys.argv) < 2:
         usage()
 
     config_file = str(sys.argv[1])

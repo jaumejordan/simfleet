@@ -187,10 +187,11 @@ class BestResponse:
             if action.get('type') == 'CHARGE':
                 agent = action.get('agent')
                 station = action.get('attributes').get('station_id')
+                power = action.get('attributes').get('power')
                 at_station = entry.init_time
                 init_charge = action.get('statistics').get('init_charge')
                 end_time = entry.end_time
-                power = action.get('statistics').get('need')
+                # need = action.get('statistics').get('need')
                 inv = action.get('inv')
                 # Add usage to the list of usages of the corresponding station
                 self.station_usage[station].append({

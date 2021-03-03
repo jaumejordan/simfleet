@@ -326,7 +326,7 @@ def compute_costs(action_list, table_of_goals, db):
                     at_station = action.get('statistics').get('at_station')
                     init_charge = action.get('statistics').get('init_charge')
                     end_time = at_station + action.get('statistics').get('time')
-                    power = action.get('statistics').get('need')
+                    power = action.get('attributes').get('power')
                     inv = action.get('inv')
                     usage = {
                         'agent': agent,
