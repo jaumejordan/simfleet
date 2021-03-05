@@ -305,7 +305,7 @@ class GreedySolver:
     def evaluate_with_congestion(self):
         for agent in self.joint_plan.get('individual').keys():
             agent_plan = self.joint_plan.get('individual').get(agent)
-            updated_utility = evaluate_plan(agent_plan, self.db)
+            updated_utility, _ = evaluate_plan(agent_plan, self.db)
             agent_plan.utility = updated_utility
         self.update_br()
 

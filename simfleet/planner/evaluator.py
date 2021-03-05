@@ -25,6 +25,12 @@ def evaluate_node(node, db, solution=False):
             logger.info("Solution node")
             logger.info(f"Node benefits: {node.benefits}")
             logger.info(f"Node costs: {node.costs}")
+
+        # Penalise plans that don't serve every customer
+        action_list = node.actions
+        penalty = check_plan_completeness(action_list, db)
+        node.costs += penalty
+
         g = node.benefits - node.costs
         if HEURISTIC_VERBOSE > 0:
             logger.info(f"G-value: {g}")
@@ -76,6 +82,12 @@ def evaluate_plan(plan, db):
 
     benefits = compute_benefits(action_list)
     costs, cost_dic = compute_costs(action_list, plan.table_of_goals, db)
+
+    # Penalise plans that don't serve every customer
+    penalty = check_plan_completeness(action_list, db)
+    costs += penalty
+    cost_dic['total_cost'] += penalty
+    cost_dic['penalty'] = penalty
 
     # Utility (or g value) = benefits - costs
     utility = benefits - costs
@@ -279,6 +291,17 @@ def compute_costs(action_list, table_of_goals, db):
     }
 
     total_cost = 0
+
+    # # Get agent being evaluated
+    # agent_id = action_list[0].get('agent')
+    # # Get number of goals assigned to such an agent
+    # agent_list = [agent for agent in db.agents if
+    #               agent.get('id') == agent_id]  # there will only be a single agent in the list
+    # assigned_customers = len(agent_list[0].get('goals'))
+    # # Counter to check if the agent is serving all customers assigned to it
+    # pick_ups = 0
+    # # logger.debug(f"Assigned customers for agent {agent_id}: {assigned_customers}")
+
     for action in action_list:
         # For actions that entail a movement, pay a penalty per km (10%)
         if action.get('type') != 'CHARGE':
@@ -354,6 +377,7 @@ def compute_costs(action_list, table_of_goals, db):
 
         # For actions that pick up a customer, add waiting time as a cost
         if action.get('type') == 'PICK-UP':
+            # pick_ups += 1
             customer = action.get('attributes').get('customer_id')
             # Evaluating a node
             if isinstance(table_of_goals, list):
@@ -382,6 +406,28 @@ def compute_costs(action_list, table_of_goals, db):
 
                 total_cost += waiting_overcost
 
+    # # Penalize not serving every assigned customer
+    # while pick_ups < assigned_customers:
+    #     total_cost += 1000
+    #     pick_ups += 1
+
     # Update cost dictionary
     cost_dic['total_cost'] += total_cost
     return total_cost, cost_dic
+
+
+def check_plan_completeness(action_list, db):
+    penalty = 0
+    # Get agent being evaluated
+    agent_id = action_list[0].get('agent')
+    # Get number of goals assigned to such an agent
+    agent_list = [agent for agent in db.agents if
+                  agent.get('id') == agent_id]  # there will only be a single agent in the list
+    assigned_customers = len(agent_list[0].get('goals'))
+    # Check if the agent is serving all customers assigned to it
+    served_customers = len([action for action in action_list if action.get('type') == 'PICK-UP'])
+    # Penalize not serving every assigned customer
+    while served_customers < assigned_customers:
+        penalty += 1000
+        served_customers += 1
+    return penalty

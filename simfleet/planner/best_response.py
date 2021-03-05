@@ -504,7 +504,8 @@ class BestResponse:
             'travel_cost': [],
             'road_congestion': [],
             'waiting_overcost': [],
-            'INV': []
+            'penalty': [],
+            'INV': [],
         }
 
         for agent in self.joint_plan.get('individual').keys():
@@ -521,6 +522,7 @@ class BestResponse:
             df_dic['road_congestion'].append(cost_dic.get('road_congestion'))
             df_dic['total_travel_cost'].append(cost_dic.get('travel_cost') + cost_dic.get('road_congestion'))
             df_dic['waiting_overcost'].append(cost_dic.get('waiting_overcost'))
+            df_dic['penalty'].append(cost_dic.get('penalty'))
             df_dic['INV'].append(cost_dic.get('INV'))
 
         # Dataframe from dic
