@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-from constants import CONFIG_FILE, ACTIONS_FILE, ROUTES_FILE, INITIAL_GREEDY_PLAN, PRINT_OUTPUT
+from constants import CONFIG_FILE, ACTIONS_FILE, ROUTES_FILE, INITIAL_GREEDY_PLAN, PRINT_OUTPUT, POWER_PRICE_PER_KM
 from evaluator import evaluate_plan
 from plan import JointPlan
 from planner import Planner
@@ -491,7 +491,8 @@ class BestResponse:
         return False
 
     # Create dataframe with cost breakdown for each final agent plan
-    def cost_analysis(self):
+    # Old version
+    def cost_analysis_old(self):
 
         # Dictionary to store all data
         df_dic = {
@@ -528,8 +529,96 @@ class BestResponse:
         # Dataframe from dic
         return pd.DataFrame.from_dict(df_dic)
 
+    # Create dataframe with cost breakdown for each final agent plan
+    def cost_analysis(self):
+
+        # Dictionary to store all data
+        df_dic = {
+            'agent': [],
+            'total_cost': [],
+            'travelled_kms': [],
+            'total_travel_cost': [],
+            'travel_cost': [],
+            'road_congestion': [],
+            'charge_congestion': [],
+            'waiting_overcost': [],
+            # 'waiting_non_served': [], only active for a different waiting_time computation strategy
+            # 'waiting_served': [],
+            # 'INV': []
+        }
+
+        for agent in self.joint_plan.get('individual').keys():
+            plan = self.joint_plan.get('individual').get(agent)
+            _, cost_dic = evaluate_plan(plan, self.db)
+
+            # Update dataframe dictionary
+            df_dic['agent'].append(agent)
+            df_dic['total_cost'].append(cost_dic.get('total_cost'))
+            df_dic['travelled_kms'].append(cost_dic.get('travel_cost') / POWER_PRICE_PER_KM)
+            df_dic['total_travel_cost'].append(cost_dic.get('travel_cost') + cost_dic.get('road_congestion'))
+            df_dic['travel_cost'].append(cost_dic.get('travel_cost'))
+            df_dic['road_congestion'].append(cost_dic.get('road_congestion'))
+            df_dic['charge_congestion'].append(cost_dic.get('charge_congestion'))
+            df_dic['waiting_overcost'].append(cost_dic.get('waiting_overcost'))
+            # df_dic['waiting_non_served'].append(cost_dic.get('waiting_non_served'))
+            # df_dic['waiting_served'].append(cost_dic.get('waiting_served'))
+            # df_dic['INV'].append(cost_dic.get('INV'))
+
+        # Dataframe from dic
+        return pd.DataFrame.from_dict(df_dic)
+
+    # Used in old version
+    def extract_costs(self):
+        # consum per km = 0.14 kWh / km
+        # cost per km = 0.3€ *0.14 = 0.042€
+        # cost de carregar a la config de simfleet n_km = capacitat;
+        # carrega=capacitat-capacitat_actual;
+        # cost=carrega*cost_per_km
+
+        # Dictionary to store all data
+        df_dic = {
+            'agent': [],
+            'travelled_kms': [],
+            'travel_cost(€)': [],
+            'charge_expenses(€)': [],
+            'waiting_in_station_secs': [],
+        }
+
+        for agent in self.joint_plan.get('individual').keys():
+            plan = self.joint_plan.get('individual').get(agent)
+            # Accumulate travelled kms (dist) and time waited in station queues (waiting)
+            dist = 0
+            waiting = 0
+            for entry in plan.entries:
+                action = entry.action
+                if action.get('type') != 'CHARGE':
+                    dist += action.get('statistics').get('dist')
+                else:
+                    waiting += (
+                        action.get('statistics').get('init_charge') - action.get('statistics').get('at_station'))
+
+            # Get charge expenses from plan evaluation
+            _, cost_dic = evaluate_plan(plan, self.db)
+            charge_expenses = cost_dic.get('charge_cost') + cost_dic.get('charge_congestion')
+            # charge_expenses = cost_dic.get('charge_congestion')
+
+            # Update dataframe dictionary
+            df_dic['agent'].append(agent)
+            df_dic['travelled_kms'].append(dist / 1000)
+            df_dic['travel_cost(€)'].append((dist / 1000) * 0.042)
+            df_dic['charge_expenses(€)'].append(charge_expenses)
+            df_dic['waiting_in_station_secs'].append(waiting)
+
+        # Dataframe from dic
+        return pd.DataFrame.from_dict(df_dic)
+
     def to_string_cost_analysis(self):
         df = self.cost_analysis()
+        return df.to_string()
+
+    # Used in old version
+    def to_string_extract_costs(self):
+        df = self.extract_costs();
         return df.to_string()
 
     def write_output(self, to_write):

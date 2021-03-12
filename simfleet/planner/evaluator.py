@@ -4,11 +4,13 @@ from operator import itemgetter
 from loguru import logger
 
 from congestion import check_charge_congestion, check_road_congestion
-from constants import STARTING_FARE, PRICE_PER_KM, TRAVEL_PENALTY, PRICE_PER_kWh, TIME_PENALTY, \
+from constants import STARTING_FARE, PRICE_PER_KM, TRAVEL_PENALTY, POWER_PRICE_PER_KM, TIME_PENALTY, \
     INVALID_CHARGE_PENALTY, HEURISTIC, STATION_CONGESTION, ROAD_CONGESTION, PRINT_OUTPUT, OLD_HEURISTIC, NEW_HEURISTIC
 
 HEURISTIC_VERBOSE = 0
 NO_BENEFITS = True
+# Not correctly implemented yet, leave as False
+INCREMENTAL_WAITING_TIME = False
 
 
 #############################################################
@@ -28,8 +30,9 @@ def evaluate_node(node, db, solution=False):
 
         # Penalise plans that don't serve every customer
         action_list = node.actions
-        penalty = check_plan_completeness(action_list, db)
-        node.costs += penalty
+        if not INCREMENTAL_WAITING_TIME:
+            penalty = check_plan_completeness(action_list, db)
+            node.costs += penalty
 
         g = node.benefits - node.costs
         if HEURISTIC_VERBOSE > 0:
@@ -84,10 +87,11 @@ def evaluate_plan(plan, db):
     costs, cost_dic = compute_costs(action_list, plan.table_of_goals, db)
 
     # Penalise plans that don't serve every customer
-    penalty = check_plan_completeness(action_list, db)
-    costs += penalty
-    cost_dic['total_cost'] += penalty
-    cost_dic['penalty'] = penalty
+    if not INCREMENTAL_WAITING_TIME:
+        penalty = check_plan_completeness(action_list, db)
+        costs += penalty
+        cost_dic['total_cost'] += penalty
+        cost_dic['penalty'] = penalty
 
     # Utility (or g value) = benefits - costs
     utility = benefits - costs
@@ -253,12 +257,17 @@ def get_benefit(action):
     return STARTING_FARE + (action.get('statistics').get('dist') / 1000) * PRICE_PER_KM
 
 
-def get_travel_cost(action):
+# Old version
+def get_travel_cost_old(action):
     return TRAVEL_PENALTY * (action.get('statistics').get('dist') / 1000)
 
 
+def get_travel_cost(action):
+    return POWER_PRICE_PER_KM * (action.get('statistics').get('dist') / 1000)
+
+
 def get_charge_cost(action):
-    return PRICE_PER_kWh * action.get('statistics').get('need')
+    return POWER_PRICE_PER_KM * action.get('statistics').get('need')
 
 
 def compute_benefits(action_list):
@@ -271,9 +280,148 @@ def compute_benefits(action_list):
     return benefits
 
 
+# cost= travel_dist*preu_dist + waiting_time*weight_time + congestion_charge*weight_cc + congestion_road*weight_road
+
+def compute_costs(action_list, table_of_goals, db):
+    weight_cc = 1
+    weight_rc = 1
+    weight_time = 1
+
+    # Evaluating a node
+    is_node = False
+    if isinstance(table_of_goals, list):
+        is_node = True
+
+    cost_dic = {
+        'total_cost': 0,
+        'travel_cost': 0,
+        'waiting_overcost': 0,
+        'waiting_served': 0,
+        'waiting_non_served': 0,
+        'charge_congestion': 0,
+        'road_congestion': 0,
+        'penalty': 0,
+        'INV': 0
+    }
+
+    total_cost = 0
+    waiting_served = 0
+    waiting_non_served = 0
+
+    for action in action_list:
+        # For actions that entail a movement, pay a penalty per km (10%)
+        if action.get('type') != 'CHARGE':
+            travel_cost = get_travel_cost(action)
+            # Update cost dictionary
+            cost_dic['travel_cost'] += travel_cost
+
+            if ROAD_CONGESTION:
+                # Compute road congestion
+                road_congestion = check_road_congestion(action, travel_cost, db)
+
+                if travel_cost != road_congestion:
+                    total_cost += road_congestion
+
+                    # Update cost dictionary
+                    cost_dic['road_congestion'] += (road_congestion - travel_cost)
+
+                    if not is_node:
+                        if PRINT_OUTPUT > 0:
+                            logger.warning(
+                                f"Travel cost incremented by congestion from {travel_cost} to {road_congestion}")
+
+        # For actions that entail charging, pay for the charged electricity
+        else:
+            charge_cost = get_charge_cost(action)
+
+            if action.get('inv') == 'INV':
+                # Update cost dictionary
+                cost_dic['INV'] += INVALID_CHARGE_PENALTY
+
+            else:
+                if STATION_CONGESTION:
+                    # Create station usage from action
+                    agent = action.get('agent')
+                    station = action.get('attributes').get('station_id')
+                    at_station = action.get('statistics').get('at_station')
+                    init_charge = action.get('statistics').get('init_charge')
+                    end_time = at_station + action.get('statistics').get('time')
+                    power = action.get('attributes').get('power')
+                    inv = action.get('inv')
+                    usage = {
+                        'agent': agent,
+                        'at_station': at_station,
+                        'init_charge': init_charge,
+                        'end_charge': end_time,
+                        'power': power,
+                        'inv': inv
+                    }
+                    charge_congestion = check_charge_congestion(usage, station, charge_cost, db)
+
+                    if charge_cost != charge_congestion:
+
+                        # Update cost dictionary
+                        cost_dic['charge_congestion'] += (charge_congestion - charge_cost)
+                        if not is_node:
+                            if PRINT_OUTPUT > 0:
+                                logger.warning(
+                                    f"Charging cost incremented by congestion from {charge_cost} to {charge_congestion}")
+
+        # For actions that pick up a customer, add waiting time as a cost
+        if action.get('type') == 'PICK-UP':
+            # pick_ups += 1
+            customer = action.get('attributes').get('customer_id')
+            # Evaluating a node
+            if isinstance(table_of_goals, list):
+                for tup in table_of_goals:
+                    if tup[0] == customer:
+                        pick_up = tup
+                        break
+            # Evaluating a plan
+            elif isinstance(table_of_goals, dict):
+                customer = action.get('attributes').get('customer_id')
+                pick_up = table_of_goals.get(customer)
+
+            # Add waiting time to costs
+            if isinstance(pick_up, tuple):
+                waiting_served = pick_up[1] * TIME_PENALTY
+                # Update cost dictionary
+                cost_dic['waiting_served'] += waiting_served
+                # total_cost += waiting_served
+            else:
+                waiting_served = pick_up * TIME_PENALTY
+                # Update cost dictionary
+                cost_dic['waiting_served'] += waiting_served
+
+    if INCREMENTAL_WAITING_TIME:
+        # Add waiting time of the non-served customers
+        # Get agent being evaluated
+        agent_id = action_list[0].get('agent')
+        # Get number of goals assigned to such an agent
+        agent_list = [agent for agent in db.agents if
+                      agent.get('id') == agent_id]  # there will only be a single agent in the list
+        assigned_customers = len(agent_list[0].get('goals'))
+        # Check if the agent is serving all customers assigned to it
+        served_customers = len([action for action in action_list if action.get('type') == 'PICK-UP'])
+        # Get plan (or node) end time
+        end_time = sum([action.get('statistics').get('time') for action in action_list])
+        # Count 1 TIME_PENALTY cost units per time unit per non-served customers
+        waiting_non_served += end_time * TIME_PENALTY * (assigned_customers - served_customers)
+        # total_cost += waiting_non_served
+        cost_dic['waiting_non_served'] = waiting_non_served
+
+    # Update cost dictionary
+    cost_dic['waiting_overcost'] = cost_dic.get('waiting_served') + cost_dic.get('waiting_non_served')
+    cost_dic['total_cost'] = cost_dic.get('travel_cost') + cost_dic.get('waiting_overcost') * weight_time + \
+                             cost_dic.get('charge_congestion') * weight_cc + cost_dic.get('road_congestion') * weight_rc
+    total_cost = cost_dic['total_cost']
+    return total_cost, cost_dic
+
+
 # Action_list must be node.actions or plan.entries
 # table of goals must be list of tuples or dictionary
-def compute_costs(action_list, table_of_goals, db):
+# Old version
+def compute_costs_old(action_list, table_of_goals, db):
     # New: only print warning when evaluating (or reevaluating) a plan, not a node
     # Evaluating a node
     is_node = False
