@@ -10,7 +10,9 @@ SPEED = 2000  # km/h
 STARTING_FARE = 5
 PRICE_PER_KM = 1.08  # 0
 TRAVEL_PENALTY = 0  # 10% of the traveled km
-PRICE_PER_kWh = 0.0615
+PRICE_PER_KWH = 0.3
+POWER_CONSUMPTION_PER_KM = 0.14
+POWER_PRICE_PER_KM = PRICE_PER_KWH*POWER_CONSUMPTION_PER_KM
 TIME_PENALTY = 1
 # MAX_STATION_DIST = 10000 # maximum distance to a station to consider it a place to charge
 RADIUS = 5000
@@ -75,10 +77,10 @@ BOUND_ROUTE_PERCENTAGE = 0.3
 # # 10 taxi, 30 customer, 30% is 9 customers per taxi, 20% is 6 per taxi
 
 
-#  # Experimentation - problem 5
-CONFIG_FILE = "configs/problem5-config.json"
-ACTIONS_FILE = "actions/problem5-actions.json"
-ROUTES_FILE = "routes/problem5-routes.json"
+# #  # Experimentation - problem 5
+# CONFIG_FILE = "configs/problem5-config.json"
+# ACTIONS_FILE = "actions/problem5-actions.json"
+# ROUTES_FILE = "routes/problem5-routes.json"
 #  # 20 taxi, 60 customer, 20% is 12 customers per taxi, 10% is 6 per taxi
 
 # Experimentation - 20 taxi, 60 customer, 32 stations (genetic)
@@ -119,12 +121,15 @@ ROUTES_FILE = "routes/problem5-routes.json"
 # ACTIONS_FILE = "actions/200taxi-400customer-20stations-actions.json"
 # ROUTES_FILE = "routes/200taxi-400customer-20stations-routes.json"
 
+CONFIG_FILE = "configs/20taxi-60customer.json"
+ACTIONS_FILE = "actions/20taxi-60customer.json"
+ROUTES_FILE = "routes/20taxi-60customer.json"
 
-# CONFIG_FILE = "configs/10taxi-config.json"
-# ACTIONS_FILE = "actions/10config-actions.json"
-# ROUTES_FILE = "routes/10config-routes.json"
+# CONFIG_FILE = "configs/20taxi-80customer.json"
+# ACTIONS_FILE = "actions/20taxi-80customer.json"
+# ROUTES_FILE = "routes/20taxi-80customer.json"
 
-# CONFIG_FILE = "configs/20-taxi-fsm.json"
-# ACTIONS_FILE = "actions/20config-actions.json"
-# ROUTES_FILE = "routes/20config-routes.json"
+# CONFIG_FILE = "configs/50taxi-250customer.json"
+# ACTIONS_FILE = "actions/50taxi-250customer.json"
+# ROUTES_FILE = "routes/50taxi-250customer.json"
 #
