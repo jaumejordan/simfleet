@@ -100,6 +100,8 @@ def check_road_congestion(a1, original_cost, db):
     # Extract a1's route
     a1_route = db.extract_route(a1)
     a1_distance = a1_route.get('distance')  # calculated by OSRM
+    if a1_distance <= 0:
+        return original_cost
 
     # Get all non CHARGE type actions which occur in overlapping intervals to action's a1 timespan
     if db.joint_plan.get('joint') is not None:
