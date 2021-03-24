@@ -2,6 +2,7 @@ import copy
 import json
 import math
 import time
+import random
 
 import numpy as np
 import pandas as pd
@@ -553,16 +554,59 @@ class BestResponse:
 
             # Update dataframe dictionary
             df_dic['agent'].append(agent)
-            df_dic['total_cost'].append(cost_dic.get('total_cost'))
-            df_dic['travelled_kms'].append(cost_dic.get('travel_cost') / POWER_PRICE_PER_KM)
-            df_dic['total_travel_cost'].append(cost_dic.get('travel_cost') + cost_dic.get('road_congestion'))
-            df_dic['travel_cost'].append(cost_dic.get('travel_cost'))
-            df_dic['road_congestion'].append(cost_dic.get('road_congestion'))
-            df_dic['charge_congestion'].append(cost_dic.get('charge_congestion'))
-            df_dic['waiting_overcost'].append(cost_dic.get('waiting_overcost'))
+            df_dic['total_cost'].append(round(cost_dic.get('total_cost'),2))
+            df_dic['travelled_kms'].append(round(cost_dic.get('travel_cost') / POWER_PRICE_PER_KM ,3))
+            df_dic['total_travel_cost'].append(round(cost_dic.get('travel_cost') + cost_dic.get('road_congestion'),2))
+            df_dic['travel_cost'].append(round(cost_dic.get('travel_cost'),2))
+            df_dic['road_congestion'].append(round(cost_dic.get('road_congestion'),5))
+            df_dic['charge_congestion'].append(round(cost_dic.get('charge_congestion'),5))
+            df_dic['waiting_overcost'].append(round(cost_dic.get('waiting_overcost'),2))
             # df_dic['waiting_non_served'].append(cost_dic.get('waiting_non_served'))
             # df_dic['waiting_served'].append(cost_dic.get('waiting_served'))
             # df_dic['INV'].append(cost_dic.get('INV'))
+
+        # Add averages, std devs and counts
+        df_dic['agent'].append("Averages:")
+
+        # Total cost mean
+        total_cost_array = np.array(df_dic['total_cost'])
+        total_cost_avg = f'{total_cost_array.mean():.2f}'
+        total_cost_std = f'{total_cost_array.std():.2f}'
+        df_dic['total_cost'].append(total_cost_avg + u"\u00B1" + total_cost_std)
+
+        # Travelled kms mean
+        travelled_kms_array = np.array(df_dic['travelled_kms'])
+        df_dic['travelled_kms'].append(
+            f'{travelled_kms_array.mean():.2f}' + u"\u00B1" + f'{travelled_kms_array.std():.2f}')
+
+        # Total travel cost mean
+        total_travel_cost_array = np.array(df_dic['total_travel_cost'])
+        df_dic['total_travel_cost'].append(
+            f'{total_travel_cost_array.mean():.2f}' + u"\u00B1" + f'{total_travel_cost_array.std():.2f}')
+
+        # Travel cost mean
+        travel_cost_array = np.array(df_dic['travel_cost'])
+        df_dic['travel_cost'].append(
+            f'{travel_cost_array.mean():.2f}' + u"\u00B1" + f'{travel_cost_array.std():.2f}')
+
+        # Road congestion count and mean
+        road_congestion_array = np.array(df_dic['road_congestion'])
+        road_congestion_count = np.count_nonzero(road_congestion_array)
+        df_dic['road_congestion'].append('[ ' + str(road_congestion_count) + ', ' +
+                                         f'{road_congestion_array.mean():.2}' + u"\u00B1"
+                                         + f'{road_congestion_array.std():.2} ]')
+
+        # Road congestion count and mean
+        charge_congestion_array = np.array(df_dic['charge_congestion'])
+        charge_congestion_count = np.count_nonzero(charge_congestion_array)
+        df_dic['charge_congestion'].append('[ ' + str(charge_congestion_count) + ', ' +
+                                           f'{charge_congestion_array.mean():.2}' + u"\u00B1"
+                                           + f'{charge_congestion_array.std():.2} ]')
+
+        # Travel cost mean
+        waiting_overcost_array = np.array(df_dic['waiting_overcost'])
+        df_dic['waiting_overcost'].append(
+            f'{waiting_overcost_array.mean():.2f}' + u"\u00B1" + f'{waiting_overcost_array.std():.2f}')
 
         # Dataframe from dic
         return pd.DataFrame.from_dict(df_dic)
@@ -618,15 +662,17 @@ class BestResponse:
 
     # Used in old version
     def to_string_extract_costs(self):
-        df = self.extract_costs();
+        df = self.extract_costs()
         return df.to_string()
 
-    def write_output(self, to_write):
+    def write_output(self, to_write, greedy_solver=False):
         timestr = time.strftime("%Y%m%d-%H%M%S")
         filename = CONFIG_FILE
         filename = filename.split('/', 1)[1]
         filename = filename.split('.', 1)[0]
         filename += "-" + timestr
+        if greedy_solver:
+            filename = "GS-"+filename
         with open(filename + ".txt", "w") as f:
             f.write(to_write)
 
