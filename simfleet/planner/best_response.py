@@ -8,7 +8,8 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-from constants import CONFIG_FILE, ACTIONS_FILE, ROUTES_FILE, INITIAL_GREEDY_PLAN, PRINT_OUTPUT, POWER_PRICE_PER_KM
+from constants import CONFIG_FILE, ACTIONS_FILE, ROUTES_FILE, INITIAL_GREEDY_PLAN, PRINT_OUTPUT, POWER_PRICE_PER_KM, \
+    BOUND_ROUTE_PERCENTAGE, BOUND_POWER_PERCENTAGE
 from evaluator import evaluate_plan
 from plan import JointPlan
 from planner import Planner
@@ -625,14 +626,16 @@ class BestResponse:
             'charge_congestion_mean': f'{charge_congestion_array.mean():.2}',
             'charge_congestion_std': f'{charge_congestion_array.std():.2}',
             'waiting_overcost_mean': f'{waiting_overcost_array.mean():.2f}',
-            'waiting_overcost_std': f'{waiting_overcost_array.std():.2f}'
+            'waiting_overcost_std': f'{waiting_overcost_array.std():.2f}',
+            'bound_road_percentage': BOUND_ROUTE_PERCENTAGE,
+            'bound_power_percentage': BOUND_POWER_PERCENTAGE,
         }]
-        import csv
         csv_columns = ['problem', 'total_cost_mean', 'total_cost_std', 'travelled_kms_mean', 'travelled_kms_std',
                        'total_travel_cost_mean', 'total_travel_cost_std', 'travel_cost_mean', 'travel_cost_std',
                        'road_congestion_count', 'road_congestion_mean', 'road_congestion_std',
                        'charge_congestion_count', 'charge_congestion_mean', 'charge_congestion_std',
-                       'waiting_overcost_mean', 'waiting_overcost_std']
+                       'waiting_overcost_mean', 'waiting_overcost_std', 'bound_road_percentage',
+                       'bound_power_percentage']
 
         self.write_csv(csv_columns, csv_dict)
 
@@ -711,7 +714,7 @@ class BestResponse:
         filename = filename.split('.', 1)[0]
         filename += "-means-" + timestr
         try:
-            with open(filename+'.csv', 'w') as csvfile:
+            with open(filename + '.csv', 'w') as csvfile:
                 writer = csv.DictWriter(csvfile, fieldnames=csv_columns)
                 writer.writeheader()
                 for data in csv_data:
@@ -781,7 +784,9 @@ class BestResponse:
         planning_times = np.array(self.planning_times)
         output_string += f"Agents planned {len(self.planning_times)} times. Avg. planning time: {planning_times.mean():.3f}. "
         output_string += f"Std. dev planning time: {planning_times.std():.3f}\n"
-        output_string += f"Best-Response process time: {end - start:.3f}"
+        output_string += f"Best-Response process time: {end - start:.3f}\n"
+        output_string += f"BOUND_ROUTE_PERCENTAGE: {BOUND_ROUTE_PERCENTAGE}\n"
+        output_string += f"BOUND_POWER_PERCENTAGE: {BOUND_POWER_PERCENTAGE}\n"
 
         logger.info(output_string)
         self.write_output(output_string)
