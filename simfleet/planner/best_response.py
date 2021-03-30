@@ -1,8 +1,8 @@
 import copy
+import csv
 import json
 import math
 import time
-import random
 
 import numpy as np
 import pandas as pd
@@ -554,13 +554,13 @@ class BestResponse:
 
             # Update dataframe dictionary
             df_dic['agent'].append(agent)
-            df_dic['total_cost'].append(round(cost_dic.get('total_cost'),2))
-            df_dic['travelled_kms'].append(round(cost_dic.get('travel_cost') / POWER_PRICE_PER_KM ,3))
-            df_dic['total_travel_cost'].append(round(cost_dic.get('travel_cost') + cost_dic.get('road_congestion'),2))
-            df_dic['travel_cost'].append(round(cost_dic.get('travel_cost'),2))
-            df_dic['road_congestion'].append(round(cost_dic.get('road_congestion'),5))
-            df_dic['charge_congestion'].append(round(cost_dic.get('charge_congestion'),5))
-            df_dic['waiting_overcost'].append(round(cost_dic.get('waiting_overcost'),2))
+            df_dic['total_cost'].append(round(cost_dic.get('total_cost'), 2))
+            df_dic['travelled_kms'].append(round(cost_dic.get('travel_cost') / POWER_PRICE_PER_KM, 3))
+            df_dic['total_travel_cost'].append(round(cost_dic.get('travel_cost') + cost_dic.get('road_congestion'), 2))
+            df_dic['travel_cost'].append(round(cost_dic.get('travel_cost'), 2))
+            df_dic['road_congestion'].append(round(cost_dic.get('road_congestion'), 5))
+            df_dic['charge_congestion'].append(round(cost_dic.get('charge_congestion'), 5))
+            df_dic['waiting_overcost'].append(round(cost_dic.get('waiting_overcost'), 2))
             # df_dic['waiting_non_served'].append(cost_dic.get('waiting_non_served'))
             # df_dic['waiting_served'].append(cost_dic.get('waiting_served'))
             # df_dic['INV'].append(cost_dic.get('INV'))
@@ -607,6 +607,34 @@ class BestResponse:
         waiting_overcost_array = np.array(df_dic['waiting_overcost'])
         df_dic['waiting_overcost'].append(
             f'{waiting_overcost_array.mean():.2f}' + u"\u00B1" + f'{waiting_overcost_array.std():.2f}')
+
+        csv_dict = [{
+            'problem': 'p' + str(len(self.agents)) + '-' + str(len(self.joint_plan['table_of_goals'])),
+            'total_cost_mean': total_cost_avg,
+            'total_cost_std': total_cost_std,
+            'travelled_kms_mean': f'{travelled_kms_array.mean():.2f}',
+            'travelled_kms_std': f'{travelled_kms_array.std():.2f}',
+            'total_travel_cost_mean': f'{total_travel_cost_array.mean():.2f}',
+            'total_travel_cost_std': f'{total_travel_cost_array.std():.2f}',
+            'travel_cost_mean': f'{travel_cost_array.mean():.2f}',
+            'travel_cost_std': f'{travel_cost_array.std():.2f}',
+            'road_congestion_count': np.count_nonzero(road_congestion_array),
+            'road_congestion_mean': f'{road_congestion_array.mean():.2}',
+            'road_congestion_std': f'{road_congestion_array.std():.2}',
+            'charge_congestion_count': np.count_nonzero(charge_congestion_array),
+            'charge_congestion_mean': f'{charge_congestion_array.mean():.2}',
+            'charge_congestion_std': f'{charge_congestion_array.std():.2}',
+            'waiting_overcost_mean': f'{waiting_overcost_array.mean():.2f}',
+            'waiting_overcost_std': f'{waiting_overcost_array.std():.2f}'
+        }]
+        import csv
+        csv_columns = ['problem', 'total_cost_mean', 'total_cost_std', 'travelled_kms_mean', 'travelled_kms_std',
+                       'total_travel_cost_mean', 'total_travel_cost_std', 'travel_cost_mean', 'travel_cost_std',
+                       'road_congestion_count', 'road_congestion_mean', 'road_congestion_std',
+                       'charge_congestion_count', 'charge_congestion_mean', 'charge_congestion_std',
+                       'waiting_overcost_mean', 'waiting_overcost_std']
+
+        self.write_csv(csv_columns, csv_dict)
 
         # Dataframe from dic
         return pd.DataFrame.from_dict(df_dic)
@@ -672,9 +700,24 @@ class BestResponse:
         filename = filename.split('.', 1)[0]
         filename += "-" + timestr
         if greedy_solver:
-            filename = "GS-"+filename
+            filename = "GS-" + filename
         with open(filename + ".txt", "w") as f:
             f.write(to_write)
+
+    def write_csv(self, csv_columns, csv_data):
+        timestr = time.strftime("%Y%m%d-%H%M%S")
+        filename = CONFIG_FILE
+        filename = filename.split('/', 1)[1]
+        filename = filename.split('.', 1)[0]
+        filename += "-means-" + timestr
+        try:
+            with open(filename+'.csv', 'w') as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=csv_columns)
+                writer.writeheader()
+                for data in csv_data:
+                    writer.writerow(data)
+        except IOError:
+            print("I/O error")
 
     def print_game_state(self, game_turn):
         logger.debug("\n")
