@@ -4,7 +4,7 @@ import numpy as np
 from loguru import logger
 from shapely.geometry import LineString, Point, GeometryCollection, MultiLineString, MultiPoint
 
-from constants import BOUND_ROUTE_PERCENTAGE, BOUND_POWER_PERCENTAGE
+from constants import BOUND_ROUTE_PERCENTAGE, BOUND_POWER_PERCENTAGE, POWER_MULTIPLIER, ROAD_MULTIPLIER
 
 
 def get_electric_grid(station, power_grids):
@@ -85,7 +85,7 @@ def charge_congestion_function(bound_power_percentage, limit_power, power_consum
         # logger.debug(
         #     f"Overlaps: {mean_overlap}, power_consumption: {power_consumption}, original_cost: {cost}, "
         #     f"increment: {((occupation - bound_power_percentage) * cost) * mean_overlap}")
-        return cost + ((occupation - bound_power_percentage) * cost) * mean_overlap
+        return cost + (((occupation - bound_power_percentage) * cost) * mean_overlap) * POWER_MULTIPLIER
 
 
 def check_road_congestion(a1, original_cost, db):
@@ -182,7 +182,7 @@ def travel_congestion_function(bound_route_percentage, cost, route_distance, mea
         # logger.debug(
         #     f"Overlaps: {mean_overlap}, num_agents: {num_agents}, original_cost: {cost}, "
         #     f"increment: {((aux - bound_route_percentage) * cost) * mean_overlap}")
-        return cost + ((aux - bound_route_percentage) * route_distance) * mean_overlap
+        return cost + (((aux - bound_route_percentage) * route_distance) * mean_overlap) * ROAD_MULTIPLIER
 
 
 def measure_linestring(ob):

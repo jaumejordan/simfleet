@@ -12,7 +12,7 @@ PRICE_PER_KM = 1.08  # 0
 TRAVEL_PENALTY = 0  # 10% of the traveled km
 PRICE_PER_KWH = 0.3
 POWER_CONSUMPTION_PER_KM = 0.14
-POWER_PRICE_PER_KM = PRICE_PER_KWH*POWER_CONSUMPTION_PER_KM
+POWER_PRICE_PER_KM = PRICE_PER_KWH * POWER_CONSUMPTION_PER_KM
 TIME_PENALTY = 1
 # MAX_STATION_DIST = 10000 # maximum distance to a station to consider it a place to charge
 RADIUS = 5000
@@ -34,9 +34,11 @@ RELOAD_ACTIONS = False
 DEEPCOPY = not RELOAD_ACTIONS
 
 # Congestion bound variables
-BOUND_POWER_PERCENTAGE = 0.5
-BOUND_ROUTE_PERCENTAGE = 0.3
-
+BOUND_POWER_PERCENTAGE = 0
+BOUND_ROUTE_PERCENTAGE = 0
+# Congestion multiplier
+POWER_MULTIPLIER = 100
+ROAD_MULTIPLIER = 50
 # # Congestion test 1
 # CONFIG_FILE = "configs/congestion1.json"
 # ACTIONS_FILE = "actions/congestion1-actions.json"
@@ -87,29 +89,29 @@ BOUND_ROUTE_PERCENTAGE = 0.3
 # 4 rondes, 150 segons
 # CONFIG_FILE = "configs/20taxi-60customer-32stations-config.json"
 # ACTIONS_FILE = "actions/20taxi-60customer-32stations-actions.json"
-# ROUTES_FILE = "routes/50taxi-200customer-32stations-routes.json"
+# ROUTES_FILE = "routes/50taxi-250customer-32stations-routes.json"
 
 #  # Experimentation - 50 taxi, 150 customer, 16 stations (genetic)
 # # 7 rondes, 2048 segons
-# CONFIG_FILE = "configs/50taxi-150customer-16stations-config.json"
-# ACTIONS_FILE = "actions/50taxi-150customer-16stations-actions.json"
-# ROUTES_FILE = "routes/50taxi-200customer-32stations-routes.json"
+# CONFIG_FILE = "configs/50taxi-250customer-16stations-config.json"
+# ACTIONS_FILE = "actions/50taxi-250customer-16stations-actions.json"
+# ROUTES_FILE = "routes/50taxi-250customer-32stations-routes.json"
 #
 # # Experimentation - 50 taxi, 150 customer, 32 stations (genetic)
 # # Converges in 4 BR turns in aprox 600s (3.76s avg planning)
-# CONFIG_FILE = "configs/50taxi-150customer-32stations-config.json"
-# ACTIONS_FILE = "actions/50taxi-200customer-32stations-actions.json"
-# ROUTES_FILE = "routes/50taxi-200customer-32stations-routes.json"
+# CONFIG_FILE = "configs/50taxi-250customer-32stations-config.json"
+# ACTIONS_FILE = "actions/50taxi-250customer-32stations-actions.json"
+# ROUTES_FILE = "routes/50taxi-250customer-32stations-routes.json"
 
 # # Experimentation - 50 taxi, 200 customer, 32 stations (genetic)
-# CONFIG_FILE = "configs/50taxi-200customer-32stations-config.json"
-# ACTIONS_FILE = "actions/50taxi-200customer-32stations-actions.json"
-# ROUTES_FILE = "routes/50taxi-200customer-32stations-routes.json"
+# CONFIG_FILE = "configs/50taxi-250customer-32stations-config.json"
+# ACTIONS_FILE = "actions/50taxi-250customer-32stations-actions.json"
+# ROUTES_FILE = "routes/50taxi-250customer-32stations-routes.json"
 
 # # Experimentation - 100 taxi, 200 customer, 20 stations (uniform)
-# CONFIG_FILE = "configs/100taxi-200customer-20stations-config.json"
-# ACTIONS_FILE = "actions/100taxi-200customer-20stations-actions.json"
-# ROUTES_FILE = "routes/100taxi-200customer-20stations-routes.json"
+# CONFIG_FILE = "configs/100taxi-300customer-20stations-config.json"
+# ACTIONS_FILE = "actions/100taxi-300customer-20stations-actions.json"
+# ROUTES_FILE = "routes/100taxi-300customer-20stations-routes.json"
 
 # # Experimentation - 100 taxi, 300 customer, 20 stations (uniform)
 # CONFIG_FILE = "configs/100taxi-300customer-20stations-config.json"
@@ -125,11 +127,23 @@ CONFIG_FILE = "configs/20taxi-60customer.json"
 ACTIONS_FILE = "actions/20taxi-60customer.json"
 ROUTES_FILE = "routes/20taxi-60customer.json"
 
-# CONFIG_FILE = "configs/20taxi-80customer.json"
-# ACTIONS_FILE = "actions/20taxi-80customer.json"
-# ROUTES_FILE = "routes/20taxi-80customer.json"
-
 # CONFIG_FILE = "configs/50taxi-250customer.json"
 # ACTIONS_FILE = "actions/50taxi-250customer.json"
 # ROUTES_FILE = "routes/50taxi-250customer.json"
+
+# CONFIG_FILE = "configs/100taxi-400customer.json"
+# ACTIONS_FILE = "actions/100taxi-400customer.json"
+# ROUTES_FILE = "routes/100taxi-400customer.json"
+
 #
+# CONFIG_FILE = "configs/150taxi-450customer.json"
+# ACTIONS_FILE = "actions/150taxi-450customer.json"
+# ROUTES_FILE = "routes/150taxi-450customer.json"
+
+# CONFIG_FILE = "configs/200taxi-400customer.json"
+# ACTIONS_FILE = "actions/200taxi-400customer.json"
+# ROUTES_FILE = "routes/200taxi-400customer.json"
+#
+# CONFIG_FILE = "configs/500taxi-1000customer.json"
+# ACTIONS_FILE = "actions/500taxi-1000customer.json"
+# ROUTES_FILE = "routes/500taxi-1000customer.json"

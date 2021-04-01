@@ -593,16 +593,18 @@ class BestResponse:
         # Road congestion count and mean
         road_congestion_array = np.array(df_dic['road_congestion'])
         road_congestion_count = np.count_nonzero(road_congestion_array)
+        road_congestion_array = road_congestion_array[road_congestion_array != 0]
         df_dic['road_congestion'].append('[ ' + str(road_congestion_count) + ', ' +
-                                         f'{road_congestion_array.mean():.2}' + u"\u00B1"
-                                         + f'{road_congestion_array.std():.2} ]')
+                                         f'{road_congestion_array.mean():.2f}' + u"\u00B1"
+                                         + f'{road_congestion_array.std():.2f} ]')
 
         # Road congestion count and mean
         charge_congestion_array = np.array(df_dic['charge_congestion'])
         charge_congestion_count = np.count_nonzero(charge_congestion_array)
+        charge_congestion_array = charge_congestion_array[charge_congestion_array != 0]
         df_dic['charge_congestion'].append('[ ' + str(charge_congestion_count) + ', ' +
-                                           f'{charge_congestion_array.mean():.2}' + u"\u00B1"
-                                           + f'{charge_congestion_array.std():.2} ]')
+                                           f'{charge_congestion_array.mean():.2f}' + u"\u00B1"
+                                           + f'{charge_congestion_array.std():.2f} ]')
 
         # Travel cost mean
         waiting_overcost_array = np.array(df_dic['waiting_overcost'])
